@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
 <meta charset="UTF-8">
@@ -3673,18 +3673,19 @@ var TUT={
   // 教程步骤定义
   _all:[
     {id:'welcome',title:'欢迎来到 KARDS！',text:'这是一款二战题材的卡牌对战游戏。<br><br><b>目标：利用你的卡组摧毁敌方总部</b>（20生命值）。<br><br>战场分<b>三条阵线</b>：<em>敌方支援阵线</em>（上）→ <em>前线 FL</em>（中）→ <em>友方支援阵线</em>（下）。<br><br>双方总部在各自的<b>支援阵线上</b>',hl:'#arena',pos:'center',autoNext:false,btn:'开始教程'},
-    {id:'hand1',title:'指挥点与指挥点槽',text:'总部左下角的 <b>⚡ 左边数字</b> 是你当前的<b>指挥点</b>，<b>右边数字</b>是你当前的<b>指挥点槽</b>。<br><br><b>指挥点</b>是消耗性资源，用于支付打出卡牌、移动或攻击的费用。它会在每回合开始时重置，数量等同于你当前的<b>指挥点槽</b>，且<b>未使用</b>的部分<b>不会保留</b>到下一回合。\n<br><br><b>指挥点槽</b>是成长性属性，代表你每回合可用的<b>指挥点上限</b>。它决定了你的资源规模，一般不会消耗，并<b>永久提升</b>你的每回合资源量。\n<br><br>现在拖动手牌中的 <em>动员兵</em>（1费 3/1 步兵）来<b>部署</b>他。',hl:'#handZone',pos:'top',autoNext:false,waitFor:'deployCard',waitCard:'动员兵'},
+    {id:'hand1',title:'指挥点与指挥点槽',text:'总部左下角的 <b>⚡ 左边数字</b> 是当前<b>指挥点</b>，<b>右边数字</b>是<b>指挥点槽</b>。<br><br><b>指挥点</b>是消耗性资源，用于支付卡牌、移动、攻击的费用。每回合重置，未用完<b>不保留</b>。<br><br><b>指挥点槽</b>随回合增长，决定每回合的指挥点上限。<br><br>现在拖动手牌中的 <em>动员兵</em>（1费 3/1 步兵）来<b>部署</b>他。',hl:'#handZone',pos:'top',autoNext:false,waitFor:'deployCard',waitCard:'动员兵'},
     {id:'deploySide',title:'部署位置',text:'拖拽动员兵后，选择<b>左边或右边的支援阵线</b>放置它。<br><br>支援阵线最多放 <b>4</b> 个单位，前线最多 <b>5</b> 个。',hl:'#plSupportL,#plSupportR',pos:'top',autoNext:false,waitFor:'deployComplete'},
-    {id:'afterDeploy',title:'部署成功！',text:'动员兵已部署在上支援阵线。花费1指挥点<br><br><b>3/1</b> 表示 3攻击力/1生命值。<br>它拥有 <em>亡计</em> 效果：死亡时对随机敌方单位造成2点伤害。\n<br><br>左上角为<b>部署花费</b>，是单位从手牌打出单位到支援阵线所需支付的指挥点。，右上角为<b>行动花费</b>，是单位在战场上移动或攻击所需支付的指挥点。\n<br><br>一般情况，单位部署到支援阵线后无法立即行动，友方单位下一回合开始才可以<b>推进到前线</b>准备攻击。<br><br>现在点击 <b>"结束回合"</b> 按钮，让敌方行动。',hl:'#btnEndPlay',pos:'left',autoNext:false,waitFor:'endTurn',btn:false},
-    {id:'turn2',title:'部署坦克',text:'你的指挥点已恢复并增长了。为方便教学，为你提供额外的指挥点<br><br>现在<b>拖拽手牌中的 <em>T-34/76</em></b>（5费 4/4 闪击坦克）来部署它。<br><br>T-34/76 拥有 <em>闪击</em> 关键词——它部署后可以<b>立即行动</b>！',hl:'#handZone',pos:'top',autoNext:false,waitFor:'deployCard',waitCard:'T-34/76'},
-    {id:'deployT34',title:'部署 T-34/76',text:'将 T-34/76 部署到支援阵线。<br><br>因为拥有 <em>闪击</em> 关键词，部署后它将可以立即行动！<br><br>（普通单位部署后需要等到下回合才能行动）',hl:'#plSupportL,#plSupportR',pos:'top',autoNext:false,waitFor:'deployComplete'},
-    {id:'groundRule',title:'\uD83D\uDEE1 陆军单位规则',text:'<b>陆军单位</b>（步兵、坦克、炮兵）部署在支援阵线。<br><br>支援阵线的陆军单位<b>无法直接攻击敌方总部</b>——<br>必须先<b>推进到前线 FL</b>，才能攻击敌方总部和敌方支援阵线的单位。<br><br>接下来你将学习如何将单位推进到前线！',hl:'#arena',pos:'center',autoNext:false,btn:false},
-    {id:'pushToFL',title:'\u27A1 推进至前线',text:'T-34/76 已部署在<b>支援阵线</b>。<br><br>现在<b>拖拽 T-34/76 卡牌到前线区域</b>，将其推至前线。<br><br>\u26A1 推进消耗 <b>1 点指挥点</b> 。<br>因为其为 <em>坦克</em>，移动后仍可攻击！',hl:'#frontline',pos:'top',autoNext:false,waitFor:'pushComplete'},
-    {id:'attack',title:'\u2694 攻击敌方总部',text:'T-34/76 已在前线就位！<br><br>现在<b>点击前线的 T-34/76</b> 选中它，<br>然后 <b>点击敌方单位或总部</b>进行攻击！攻击消耗1点指挥点<br><br>\uD83C\uDFAF 单位每点攻击力造成 1 点伤害。',hl:'#enemyInfo',pos:'bottom',autoNext:false,waitFor:'attack'},
-    {id:'attackDone',title:'攻击成功！',text:'T-34/76 对敌方目标造成了 <b>4 点伤害</b>！<br><br>一般情况下，单位攻击后本回合无法再次攻击。<br><br>现在点击 <b>"结束回合"</b> 进入下一轮。',hl:'#btnEndPlay',pos:'left',autoNext:false,waitFor:'endTurn',btn:false},
-    {id:'turn3',title:'指令牌',text:'<br><br><b>指令牌</b>是KARDS中实现战术意图、控制战场节奏的关键卡牌。\n<b>指令牌</b>从手牌使用后立刻触发一次性效果，随后被弃置。左上角为指令牌的打出花费<br><b>拖动指令牌 <em>冬季攻势</em></b>（1费）来使用它。',hl:'#handZone',pos:'top',autoNext:false,waitFor:'deployCard',waitCard:'冬季攻势'},
+    {id:'afterDeploy',title:'部署成功！🪖 步兵单位',text:'动员兵已部署，花费 1 指挥点。<br><br><b>3/1</b> = 3攻击力 / 1生命值。<br><em>亡计</em>：死亡时对随机敌方单位造成2点伤害。<br><br><b>🪖 步兵特点</b>：高攻击、低血量，靠数量优势作战。<br>典型"炮灰"单位——输出高但一碰就碎。<br><br>现在<b>将动员兵推进到前线 FL</b>！<br>点击动员兵卡牌，<b>拖拽到前线区域</b>。（消耗 1 指挥点）',hl:'#frontline',pos:'top',autoNext:false,waitFor:'pushComplete'},
+    {id:'attackHQ',title:'⚔ 攻击敌方总部（无反击）',text:'动员兵已在前线就位！<br><br>现在<b>点击前线的动员兵</b>选中它，<br>然后<b>点击敌方总部</b>进行攻击。<br><br>🛡 <b>重要：攻击敌方总部不会受到反击伤害！</b><br>总部没有攻击力，攻击它很安全。<br><br>攻击消耗 1 指挥点，造成 <b>3 点伤害</b>。',hl:'#enemyInfo',pos:'bottom',autoNext:false,waitFor:'attack'},
+    {id:'counterExplain',title:'🛡 反击伤害 + 兵种对比',text:'<b>⚔ 反击伤害规则：</b><br>用单位攻击<b>敌方单位</b>时，<br>对方会用其<b>攻击力</b>反击你的单位！<br><br>例：3攻1血步兵 → 打敌方2攻单位 →<br>造成3伤，但<b>同时受2点反击</b>→ 1血阵亡！<br><br><b>📋 兵种反击一览：</b><br>🪖 <b>步兵</b>：正常受反击（高攻低血，慎攻单位）<br>🔧 <b>坦克</b>：正常受反击（血量高，可承受反击）<br>💣 <b>炮兵</b>：<em>不受反击</em>（远程打击）<br>✈ <b>轰炸机</b>：<em>不受反击</em>（可被战斗机反击）<br>✈ <b>战斗机</b>：正常受反击<br><br>现在点击 <b>"结束回合"</b>，让敌军行动。',hl:'#btnEndPlay',pos:'left',autoNext:false,waitFor:'endTurn',btn:false},
+    {id:'turn2',title:'部署坦克 T-34/76',text:'敌方已部署单位到前线。<br>你的指挥点已恢复并增长。<br><br>现在<b>拖拽手牌中的 <em>T-34/76</em></b>（5费 4/4 坦克）来部署它。<br><br>🔧 <b>坦克特点</b>：血量较高，可承受反击伤害。<br><em>闪击</em>——部署后可<b>立即行动</b>！',hl:'#handZone',pos:'top',autoNext:false,waitFor:'deployCard',waitCard:'T-34/76'},
+    {id:'deployT34',title:'部署 T-34/76',text:'将 T-34/76 部署到支援阵线。<br><br>因拥有 <em>闪击</em>，部署后即可行动！<br>（普通单位需等下回合才能行动）',hl:'#plSupportL,#plSupportR',pos:'top',autoNext:false,waitFor:'deployComplete'},
+    {id:'pushT34',title:'➡ 推进 T-34 至前线',text:'T-34/76 已部署。<br><br>现在<b>将其推进到前线 FL</b>：<br>点击 T-34 卡牌，拖拽到前线区域。<br><br>⚡ 推进消耗 1 指挥点。<br>坦克移动后仍可攻击！',hl:'#frontline',pos:'top',autoNext:false,waitFor:'pushComplete'},
+    {id:'attackUnit',title:'⚔ 攻击敌方单位——观察反击！',text:'T-34/76 已在前线！敌方也有前线单位。<br><br>现在<b>点击 T-34/76</b> 选中它，<br>然后<b>点击敌方前线单位</b>进行攻击！<br><br>⚠ <b>注意观察战斗日志的"↩反击"！</b><br>T-34（4攻4血）打敌方2攻单位：<br>→ 造成 4 伤，受到 2 点反击 → 还剩 2 血<br><br>🔧 坦克血量高，可承受反击；<br>动员兵（1血）攻击单位则直接阵亡！',hl:'#frontline',pos:'top',autoNext:false,waitFor:'attack'},
+    {id:'attackDone',title:'反击演示完成！',text:'观察战斗日志：T-34 对敌方单位造成伤害，<br>同时受到了<b>反击伤害</b>（↩反击 -N HP）。<br><br><b>📋 反击机制总结：</b><br>• 攻击敌方单位 → 受反击（对方攻击力=反击伤害）<br>• 攻击敌方总部 → <em>无反击</em><br>• 💣炮兵 / ✈轰炸机 → <em>不受反击</em><br>• 高血量单位（坦克）→ 适合攻击敌方单位<br>• 低血量单位（步兵）→ 优先攻击总部<br><br>现在点击 <b>"结束回合"</b>。',hl:'#btnEndPlay',pos:'left',autoNext:false,waitFor:'endTurn',btn:false},
+    {id:'turn3',title:'指令牌',text:'你的回合又开始了。<br><br><b>指令牌</b>从手牌使用后立刻触发一次性效果。<br>左上角为打出花费。<br><br><b>拖动指令牌 <em>冬季攻势</em></b>（1费）来使用它。',hl:'#handZone',pos:'top',autoNext:false,waitFor:'deployCard',waitCard:'冬季攻势'},
     {id:'orderResult',title:'冬季攻势效果',text:'指令牌立即生效——全场目标（双方总部+双方单位）各受到<b>1 点伤害</b>。<br><br>苏联的代价体系就是"以血换场"：不惜一切代价。<br><br>战斗继续——尝试用你的单位消灭敌方总部吧！',hl:'#arena',pos:'center',autoNext:false,btn:false},
-    {id:'done',title:'教程结束！',text:'你已经掌握了 KARDS 的基础操作：<br><br>1. <b>部署</b>——打出单位占领阵线<br>2. <b>推线</b>——将单位从支援阵线推进至前线<br>3. <b>攻击</b>——前线单位打击敌方总部/敌方单位<br>4. <b>指令</b>——打出即生效的指令卡<br>5. <b>结束回合</b>——让对手行动<br><br>现在继续这场对战，摧毁敌方总部来获胜吧！',hl:'#arena',pos:'center',autoNext:false,btn:'开始战斗'},
+    {id:'done',title:'教程结束！',text:'你已经掌握了 KARDS 的核心机制：<br><br>1. <b>部署</b>——打出单位占领阵线<br>2. <b>推线</b>——将单位推进至前线<br>3. <b>攻击总部</b>——安全输出，无反击<br>4. <b>攻击单位</b>——需承受反击伤害<br>5. <b>兵种差异</b>——步兵炮灰 / 坦克肉盾 / 炮兵无反击<br>6. <b>指令牌</b>——打出即生效<br><br>现在继续这场对战，摧毁敌方总部来获胜吧！',hl:'#arena',pos:'center',autoNext:false,btn:'开始战斗'},
   ],
 
   start:function(){
@@ -3725,7 +3726,7 @@ var TUT={
       var c=new Card(cards[i]);c.owner=GAME.player;GAME.player.hand.push(c);
     }
 
-    // AI教程单位：多给几张，让冬季攻势有目标可打
+    // AI教程单位：为演示反击，AI需要可部署到前线的单位
     GAME.enemy.hand=[];GAME.enemy.deck=[];
     var aiCards=[
       ['国民掷弹兵','Volksgrenadier','D','I',2,2,1,1,0,'','部署：抽一张牌。','draw1'],
@@ -3744,7 +3745,7 @@ var TUT={
     // 使用正常指挥点起点（第1回合=1），教程流程中按需补充
     GAME.player.baseMaxCmd=1;GAME.player.cmdBonus=0;
 
-    // 给AI足够指挥点部署教程单位（为冬季攻势准备敌方目标）
+    // AI需要足够指挥点部署单位并推到前线（演示反击）
     GAME.enemy.baseMaxCmd=3;GAME.enemy.maxCmd=3;GAME.enemy.cmd=3;
 
     // 启动玩家第一回合
@@ -3752,7 +3753,6 @@ var TUT={
     GAME.phase='play';
     $('turnInfo').textContent='第1回合 · 你的回合 · 教程';
   },
-
   _showStep:function(idx){
     var s=this._all[idx];this.step=idx;this.stepData=s;
     $('tut-tooltip').classList.add('show');
@@ -3901,11 +3901,10 @@ var TUT={
     if(!this.active)return;
     var s=this.stepData;
     if(!s||s.waitFor!=='endTurn')return;
-    // 让AI部署一个国民掷弹兵（教程用）
     var self=this;
-    var turn2Step=3,turn3Step=9; // 教程中结束回合后切换到下个玩家回合
+    var turn2Step=5,turn3Step=10; // 教程中结束回合后切换到下个玩家回合
     setTimeout(function(){
-      // AI：部署所有付得起的单位（为冬季攻势准备目标）
+      // AI：部署所有付得起的单位
       while(GAME.enemy.hand.length>0){
         var c=GAME.enemy.hand[0];
         if(c.cost>GAME.enemy.cmd)break;
@@ -3915,22 +3914,28 @@ var TUT={
         if(GAME.enemy.support.length<4){GAME.enemy.support.push(c);}
         GAME.log('AI部署了 '+c.cn,'ai');
       }
+      // 教程第1次结束回合：推一个AI单位到前线（用于演示反击）
+      if(self.step===turn2Step&&GAME.enemy.support.length>0){
+        var u=GAME.enemy.support[0];
+        u.zone='frontline';GAME.enemy.support.splice(0,1);GAME.enemy.frontline.push(u);
+        GAME.log('AI将 '+u.cn+' 推进至前线','ai');
+      }
       GAME.render();
-      if(self.step===turn2Step){ // after "结束回合" → turn2 (step 4)
+      if(self.step===turn2Step){ // counterExplain结束回合 → turn2 (step 6)
         GAME.turn++;GAME.phase='play';
-        self._showStep(4);
+        self._showStep(6);
         GAME._startTurn(GAME.player,false);
-        // 教程第2回合需要足够指挥点打出T-34/76(5费)+推进(1费)
+        // 教程第2回合需要足够指挥点打出T-34/76(5费)+推进(1费)+攻击(1费)
         GAME.player.cmd=Math.max(GAME.player.cmd,7);
         GAME.selected=null;GAME.pendingPush=null;GAME.pendingEffect=null;GAME.pendingOrder=null;
-        GAME.log('\u2550\u2550\u2550 第2回合 · 你的回合 \u2550\u2550\u2550','system');
+        GAME.log('\u2550\u2550\u2550 第2回合 \u00b7 你的回合 \u2550\u2550\u2550','system');
         GAME.render();
-      }else if(self.step===turn3Step){ // after "结束回合" → turn3 (step 10)
+      }else if(self.step===turn3Step){ // attackDone结束回合 → turn3 (step 11)
         GAME.turn++;GAME.phase='play';
-        self._showStep(10);
+        self._showStep(11);
         GAME._startTurn(GAME.player,false);
         GAME.selected=null;GAME.pendingPush=null;GAME.pendingEffect=null;GAME.pendingOrder=null;
-        GAME.log('\u2550\u2550\u2550 第3回合 · 你的回合 \u2550\u2550\u2550','system');
+        GAME.log('\u2550\u2550\u2550 第3回合 \u00b7 你的回合 \u2550\u2550\u2550','system');
         // 确保手里有冬季攻势
         if(!GAME.player.hand.some(function(h){return h.cn==='冬季攻势'})){
           var wo=new Card(['冬季攻势','Winter Offensive','S','X',1,'dmg1allTargets','对全体目标造成1点伤害。','always','',2]);
@@ -3940,7 +3945,6 @@ var TUT={
       }
     },500);
   },
-
   onAttack:function(){
     if(!this.active)return;
     var s=this.stepData;
@@ -3958,7 +3962,7 @@ var TUT={
       // 阻止不在结束回合步骤时结束回合
       if(!TUT._blockIfNot('endTurn','请先完成当前教程步骤，再结束回合')){
         TUT.onEndTurn();
-        if(TUT.step===3||TUT.step===9)return; // 教程接管回合结束
+        if(TUT.step===5||TUT.step===10)return; // 教程接管回合结束
       }else{
         return; // 被阻止
       }
