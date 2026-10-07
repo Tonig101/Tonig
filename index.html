@@ -4267,22 +4267,29 @@ document.addEventListener('click',function(e){
   var ls=document.getElementById("loading-screen");
   var bar=document.getElementById("loading-bar-fill");
   var pct=document.getElementById("loading-pct");
+  if(!ls||!bar||!pct)return;
   var preload=Object.values(IMG_MAP);
   var loaded=0, total=preload.length;
+  var done=function(){
+    if(ls._done)return;ls._done=1;
+    bar.style.width="100%";pct.textContent="100%";
+    setTimeout(function(){ls.classList.add("fade-out");
+      setTimeout(function(){if(ls.parentNode)ls.parentNode.removeChild(ls)},500);
+    },400);
+  };
+  if(total===0){done();return;}
   preload.forEach(function(src){
     var img=new Image();
     img.onload=img.onerror=function(){
       loaded++;
       var p=Math.round(loaded/total*100);
-      bar.style.width=p+"%"; pct.textContent=p+"%";
-      if(loaded>=total){
-        setTimeout(function(){ ls.classList.add("fade-out");
-          setTimeout(function(){ if(ls.parentNode)ls.parentNode.removeChild(ls); },500);
-        },400);
-      }
+      if(bar)bar.style.width=p+"%";
+      if(pct)pct.textContent=p+"%";
+      if(loaded>=total)done();
     };
     img.src=src;
   });
+  setTimeout(function(){if(!ls._done)done()},8000);
 })();
 </script>
 </body>
