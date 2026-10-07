@@ -4259,11 +4259,15 @@ document.addEventListener('click',function(e){
   popup.classList.add('show');
   e.stopPropagation();
 });
+})();
+</script>
 
+<div id="loading-screen"><div class="loading-spinner"></div><div class="loading-text">KARDS 加载中...</div><div class="loading-bar-wrap"><div class="loading-bar-fill" id="loading-bar-fill"></div></div><div class="loading-pct" id="loading-pct">0%</div></div>
+<script>
 (function(){
-  var ls=document.getElementById('loading-screen');
-  var bar=document.getElementById('loading-bar-fill');
-  var pct=document.getElementById('loading-pct');
+  var ls=document.getElementById("loading-screen");
+  var bar=document.getElementById("loading-bar-fill");
+  var pct=document.getElementById("loading-pct");
   var preload=Object.values(IMG_MAP);
   var loaded=0, total=preload.length;
   preload.forEach(function(src){
@@ -4271,9 +4275,9 @@ document.addEventListener('click',function(e){
     img.onload=img.onerror=function(){
       loaded++;
       var p=Math.round(loaded/total*100);
-      bar.style.width=p+'%'; pct.textContent=p+'%';
+      bar.style.width=p+"%"; pct.textContent=p+"%";
       if(loaded>=total){
-        setTimeout(function(){ ls.classList.add('fade-out');
+        setTimeout(function(){ ls.classList.add("fade-out");
           setTimeout(function(){ if(ls.parentNode)ls.parentNode.removeChild(ls); },500);
         },400);
       }
@@ -4282,8 +4286,5 @@ document.addEventListener('click',function(e){
   });
 })();
 </script>
-
-
-<div id="loading-screen"><div class="loading-spinner"></div><div class="loading-text">KARDS 加载中...</div><div class="loading-bar-wrap"><div class="loading-bar-fill" id="loading-bar-fill"></div></div><div class="loading-pct" id="loading-pct">0%</div></div>
 </body>
 </html>
