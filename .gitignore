@@ -1,0 +1,7 @@
+# 方案文档
+KARDS卡图生成与UI实现方案*.png
+# 未使用的散图
+**/*.jpeg~tplv-*
+**/*.jpg~tplv-*
+# 说明文件
+README.txt
