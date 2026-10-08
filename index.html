@@ -625,6 +625,7 @@ body{background:var(--bg);color:var(--w);min-height:100vh;display:flex;justify-c
   .card .mid { font-size: .56rem; padding: 1px 3px; }
   .card .stats { font-size: .58rem; padding: 1px 3px; }
   .card .bot { font-size: .48rem; padding: 1px 3px; min-height: 20px; }
+  .card .ui-icons img { width: 24px; height: 24px; }
   .card .top { font-size: .55rem; padding: 2px 4px; }
   .card .cost-badge { width: 18px; height: 18px; font-size: .6rem; top: -2px; left: -2px; }
   .card .acost-badge { width: 14px; height: 14px; font-size: .48rem; top: -2px; right: -2px; }
@@ -2756,7 +2757,7 @@ var GAME={
           el.onclick=function(){GAME.onEffectTargetClick(c)};
         }
         // 我方支援单位且可推线
-        if(GAME.phase==='play'&&isPlayer&&c.zone==='support'&&GAME.canPush(GAME.player)&&c.canStillMove){
+        if(GAME.phase==='play'&&isPlayer&&c.zone==='support'&&c.isGround&&GAME.canPush(GAME.player)&&c.canStillMove){
           if(GAME.isTouchDevice){
             // 手机：点击推线（两步：先选单位→再点前线）
             el.classList.add('clickable');
@@ -3256,7 +3257,7 @@ var GAME={
       var canSelect=card.zone==='frontline'?card.canStillAtk:card.canStillAct;
       if(!canSelect)return toast('该单位已无法行动');
       GAME.selected=card;GAME.pendingPush=null;
-      if(card.zone==="support"&&GAME.canPush(GAME.player)&&card.canStillMove){
+      if(card.zone==="support"&&card.isGround&&GAME.canPush(GAME.player)&&card.canStillMove){
         if(GAME.isTouchDevice){
           GAME.pendingPush=card;GAME.pushToFL();return;
         }
