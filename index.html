@@ -62,7 +62,7 @@ body{background:var(--bg);color:var(--w);min-height:100vh;display:flex;justify-c
 .hand-section h3{font-size:.76rem;color:var(--d);margin-bottom:4px}
 .hand-cards{display:flex;gap:0;flex-wrap:nowrap;min-height:116px;padding:3px 0;overflow-x:auto;overflow-y:visible}
 /* 手牌单行轻微叠放：后一张叠在前一张上 */
-.hand-cards .card{margin-right:-34px}
+.hand-cards .card{margin-right:-44px}
 .hand-cards .card:last-child{margin-right:0}
 .hand-cards .card:hover{transform:translateY(-8px) scale(1.04);z-index:8;box-shadow:0 10px 24px rgba(0,0,0,.6),0 0 18px rgba(68,170,136,.2)}
 .hand-cards .card.dragging{opacity:.35;transform:translateY(-6px);z-index:9;box-shadow:0 8px 20px rgba(0,0,0,.5)}
@@ -631,7 +631,7 @@ body{background:var(--bg);color:var(--w);min-height:100vh;display:flex;justify-c
 
   .hand-section h3 { font-size: .68rem; }
   .hand-cards { min-height: 84px; }
-  .hand-cards .card { margin-right: -40px; }
+  .hand-cards .card { margin-right: -52px; }
   .hand-cards .card:hover { transform: translateY(-5px) scale(1.02); }
   .hq-card .hq-body .hp { font-size: .85rem; }
   .hq-card .hq-stats { font-size: .48rem; gap: 2px; }
@@ -3822,6 +3822,7 @@ var GAME={
       }
     }
     if(who.nextExtraDraw){who.draw(who.nextExtraDraw);GAME.log('\uD83C\uDFA0 战争债券\u2192额外抽'+who.nextExtraDraw+'张牌','effect');who.nextExtraDraw=0;}
+    if(who===GAME.enemy&&GAME.turn===1&&!GAME.playerIsFirst){who.cmd+=2;GAME.log("\u26A1 AI先手显性优势：额外+2指挥点（共"+who.cmd+"点）","system")}
     if(who===GAME.enemy){var cfg3=AI_CONFIG[AI_LEVEL];if(cfg3.cmdBonus){who.cmd+=cfg3.cmdBonus;GAME.log("💰 AI加成：指挥点+"+cfg3.cmdBonus,"system")};if(cfg3.extraDraw&&GAME.turn>0){who.draw(cfg3.extraDraw);GAME.log("💰 AI加成：额外抽"+cfg3.extraDraw+"张牌","system")}}
 
     // 当前玩家的单位刷新
