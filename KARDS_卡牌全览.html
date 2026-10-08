@@ -1,0 +1,835 @@
+﻿<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>KARDS 卡牌全览</title>
+<style>
+:root{--bg:#0d0e12;--card:#1a1c24;--w:#eee;--d:#888;--g:#4a9;--r:#e44;--b:#48f;--y:#da2}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--w);font-family:'Segoe UI','Microsoft YaHei',sans-serif;padding:20px}
+h1{text-align:center;font-size:1.6rem;margin-bottom:6px;letter-spacing:2px}
+.sub{text-align:center;color:var(--d);font-size:.8rem;margin-bottom:24px}
+h2{font-size:1.2rem;margin:28px 0 10px;padding-bottom:6px;border-bottom:2px solid #333;display:flex;align-items:center;gap:8px}
+h3{font-size:.95rem;margin:14px 0 6px;color:#aaa}
+.tag{font-size:.68rem;padding:2px 8px;border-radius:3px;font-weight:700}
+.tag.D{background:#667;color:#fff}.tag.S{background:#c44;color:#fff}.tag.U{background:#482;color:#fff}
+.tag.B{background:#a62;color:#fff}.tag.J{background:#b82;color:#fff}
+.tbl-wrapper{overflow-x:auto;border-radius:8px;border:1px solid #2a2d3a;background:var(--card)}
+table{width:100%;border-collapse:collapse;font-size:.82rem;min-width:850px}
+th,td{padding:8px 10px;text-align:center;border-bottom:1px solid #252830;white-space:nowrap}
+th{background:#1a1d28;color:var(--d);font-size:.7rem;text-transform:uppercase;letter-spacing:.5px;position:sticky;top:0}
+td.left{text-align:left}
+.ut-i{color:#a8d8a8}.ut-t{color:#c9a86c}.ut-a{color:#e09060}.ut-f{color:#78b8d8}.ut-o{color:#c0a0d8}.ut-x{color:#d8c880}
+.cost{font-weight:900}
+.cost.low{color:#4d6}.cost.mid{color:#d90}.cost.high{color:#fa8}
+.kw{font-size:.65rem;padding:1px 5px;border-radius:2px;background:rgba(255,255,255,.08)}
+.kw.B{color:#ffd700}.kw.H{color:#98d8ff}.kw.G{color:#7be07b}.kw.A{color:#ff8888}.kw.S{color:#aaa}.kw.F{color:#ffa500}.kw.C{color:#ff6b9d}
+.eff{font-size:.78rem;color:#bbb;max-width:340px;white-space:normal;text-align:left}
+.eff b{color:#ffd066;font-weight:900}
+.eff .star{color:var(--y);font-weight:900;font-size:.8rem}
+.count{text-align:center;color:var(--d);font-size:.78rem;margin-top:4px}
+.limit{font-weight:900;font-size:.85rem}
+.img-cell{width:92px;text-align:center;vertical-align:middle;padding:3px}
+.img-cell img{width:80px;height:auto;border-radius:6px;border:1px solid #333;display:block;margin:0 auto;object-fit:cover;box-shadow:0 2px 8px rgba(0,0,0,.5)}
+.img-cell.noimg{color:#555;font-size:.62rem;width:92px}
+.limit.x1{color:#e09060}.limit.x2{color:#6cf}.limit.x3{color:#fa8}.limit.x4{color:var(--y)}
+.summary{display:flex;flex-wrap:wrap;gap:16px;justify-content:center;margin-bottom:20px}
+.summary-card{background:var(--card);border-radius:10px;padding:14px 20px;border:1px solid #2a2d3a;text-align:center;min-width:140px;cursor:pointer;transition:transform .15s,border-color .15s}
+.summary-card:hover{transform:translateY(-2px);border-color:#555}
+.summary-card .s-name{font-size:1rem;font-weight:900;margin-bottom:4px}
+.summary-card .s-total{font-size:1.4rem;font-weight:900;color:var(--y)}
+.summary-card .s-detail{font-size:.72rem;color:var(--d);margin-top:3px}
+hr{border:none;border-top:1px solid #2a2d3a;margin:20px 0}
+/* 设计理念条 */
+.design{display:flex;flex-wrap:wrap;gap:14px;justify-content:center;margin:20px 0 6px}
+.design-box{flex:1 1 200px;max-width:240px;background:var(--card);border-radius:10px;padding:12px 14px;border:1px solid #2a2d3a;cursor:pointer;transition:transform .15s,border-color .15s}
+.design-box:hover{transform:translateY(-2px);border-color:#555}
+.design-box .dn{font-weight:900;font-size:.9rem;margin-bottom:4px;display:flex;align-items:center;gap:6px}
+.design-box .dn.slogan{font-weight:700;font-size:.72rem;color:var(--y);margin-bottom:3px}
+.design-box p{font-size:.74rem;color:#bbb;line-height:1.5}
+.legend{text-align:center;color:var(--d);font-size:.74rem;margin:6px 0 0}
+.legend .star{color:var(--y);font-weight:900}
+/* 上限分级图例 */
+.lim-legend{display:flex;flex-wrap:wrap;gap:10px;justify-content:center;margin:16px 0 2px}
+.lim-legend span{font-size:.74rem;color:#ccc}
+/* 词条说明按钮与弹窗 */
+#kw-btn{position:fixed;bottom:20px;right:20px;padding:8px 16px;border-radius:20px;background:var(--y);color:#000;border:none;font-size:.7rem;font-weight:900;cursor:pointer;box-shadow:0 4px 16px rgba(0,0,0,.5);z-index:999;transition:transform .15s}
+#kw-btn:hover{transform:scale(1.1)}
+.kw-modal{display:none;position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:1000;justify-content:center;align-items:center}
+.kw-modal.show{display:flex}
+.kw-panel{background:var(--card);border-radius:12px;border:1px solid #333;padding:24px;max-width:540px;width:90%;max-height:82vh;overflow-y:auto}
+.kw-panel h3{text-align:center;font-size:1.1rem;margin-bottom:6px;color:var(--w)}
+/* 手册标签页切换 */
+.kw-tabs{display:flex;gap:0;margin-bottom:16px;border-bottom:2px solid #252830}
+.kw-tab{flex:1;padding:8px 0;text-align:center;background:none;border:none;color:#888;font-size:.82rem;font-weight:700;cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-2px;transition:all .2s}
+.kw-tab.active{color:var(--y);border-bottom-color:var(--y)}
+.kw-tab:hover{color:#ccc}
+.kw-tab-content h3{text-align:left;font-size:.95rem;margin:14px 0 4px;color:var(--y)}
+.kw-tab-content h3:first-child{margin-top:0}
+/* 兵种卡片 */
+.ut-card{background:#1a1d24;border-left:3px solid #555;border-radius:6px;padding:10px 14px;margin-bottom:10px}
+.ut-card.ut-I{border-left-color:#8b9}
+.ut-card.ut-T{border-left-color:#fd0}
+.ut-card.ut-A{border-left-color:#f66}
+.ut-card.ut-F{border-left-color:#6bf}
+.ut-card.ut-O{border-left-color:#c8f}
+.ut-header{display:flex;align-items:center;gap:8px;margin-bottom:6px}
+.ut-icon{flex-shrink:0;width:36px;height:36px;border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:.75rem;font-weight:900;color:#000}
+.ut-icon.ut-I{background:#8b9}
+.ut-icon.ut-T{background:#fd0}
+.ut-icon.ut-A{background:#f66}
+.ut-icon.ut-F{background:#6bf}
+.ut-icon.ut-O{background:#c8f}
+.ut-name{font-size:.9rem;font-weight:800;color:var(--w)}
+.ut-sub{font-size:.68rem;color:#999;margin-top:1px}
+.ut-desc{font-size:.76rem;color:#bbb;line-height:1.6}
+.ut-desc b{color:var(--w)}
+.ut-stats{margin-top:6px;display:flex;flex-wrap:wrap;gap:4px 12px;font-size:.7rem;color:#999}
+.ut-stats span{white-space:nowrap}
+.ut-stats b{color:#ddd}
+/* 速查表 */
+.ut-compare{width:100%;border-collapse:collapse;font-size:.68rem;margin:10px 0;color:#bbb}
+.ut-compare th{background:#1a1d24;color:var(--y);padding:5px 6px;text-align:center;font-weight:700;border-bottom:1px solid #333}
+.ut-compare td{text-align:center;padding:4px 6px;border-bottom:1px solid #252830}
+.ut-compare tr:nth-child(even) td{background:rgba(255,255,255,.02)}
+.ut-compare td:first-child{text-align:left;font-weight:700;color:var(--w);width:70px}
+.kw-modal-note{font-size:.62rem;color:#555;text-align:center;margin-top:10px}
+.kw-row{display:flex;gap:10px;padding:10px 0;border-bottom:1px solid #252830;align-items:flex-start}
+.kw-row:last-child{border-bottom:none}
+.kw-tag-big{flex-shrink:0;padding:3px 10px;border-radius:4px;font-size:.78rem;font-weight:900;min-width:56px;text-align:center}
+.kw-tag-big.G{background:rgba(255,184,77,.2);color:#fb4}
+.kw-tag-big.B{background:rgba(255,215,0,.15);color:#ffd700}
+.kw-tag-big.H{background:rgba(152,216,255,.15);color:#98d8ff}
+.kw-tag-big.A{background:rgba(255,136,136,.15);color:#f88}
+.kw-tag-big.S{background:rgba(170,170,170,.15);color:#aaa}
+.kw-tag-big.F{background:rgba(255,165,0,.15);color:#fa0}
+.kw-tag-big.C{background:rgba(120,220,180,.15);color:#7cdcb4}
+.kw-desc{font-size:.78rem;color:#bbb;line-height:1.5}
+.kw-desc b{color:var(--w)}
+.kw-close{display:block;margin:16px auto 0;padding:8px 24px;border-radius:6px;background:#333;color:#ccc;border:none;cursor:pointer;font-size:.8rem}
+.kw-close:hover{background:#444}
+</style>
+</head>
+<body>
+
+<h1>KARDS 卡牌全览</h1>
+
+<button id="kw-btn" title="战斗手册" onclick="document.getElementById('kw-modal').classList.add('show')">战斗手册</button>
+
+<!-- 上限分级图例 -->
+<div class="lim-legend">
+  <span><b style="color:#e09060">1张</b> · 核心终结卡（高强度/终结技）</span>
+  <span><b style="color:#6cf">2张</b> · 强卡（核心节奏）</span>
+  <span><b style="color:#fa8">3张</b> · 泛用卡（标准价值）</span>
+  <span><b style="color:var(--y)">4张</b> · 基础卡（低费填充/保底）</span>
+</div>
+
+<!-- 阵营设计理念 -->
+<div class="design">
+  <div class="design-box" onclick="goTo('faction-D')"><div class="dn"><span class="tag D">&#x2716; 德军</span></div><div class="dn slogan">闪电战 · 重甲突袭</div><p>以闪击/重甲为骨架，特效强调<b>装甲滚雪球与反装甲突击</b>：击杀后膨胀、打击坦克与空军增伤、工兵拆除重甲。</p></div>
+  <div class="design-box" onclick="goTo('faction-S')"><div class="dn"><span class="tag S">&#x262D; 苏军</span></div><div class="dn slogan">人海 · 牺牲</div><p>以数量与自我牺牲为核心，特效强调<b>以弱搏强与亡计补员</b>：数量优势、阵亡加入补充兵、掩护回血。</p></div>
+  <div class="design-box" onclick="goTo('faction-U')"><div class="dn"><span class="tag U">&#x2605; 美军</span></div><div class="dn slogan">工业 · 量产</div><p>以资源与补充为主线，特效强调<b>工业补给与联合作战</b>：部署抽牌、阵亡补员、护航机增幅轰炸机。</p></div>
+  <div class="design-box" onclick="goTo('faction-B')"><div class="dn"><span class="tag B">&#x2694; 英军</span></div><div class="dn slogan">要塞 · 坚守</div><p>以守护与重甲为基石，特效强调<b>防御、回血与工事</b>：防护光环、总部回复、反坦克猎手、重型堡垒。</p></div>
+  <div class="design-box" onclick="goTo('faction-J')"><div class="dn"><span class="tag J">&#x2600; 日军</span></div><div class="dn slogan">速攻 · 玉碎</div><p>以低行动费与自毁为核心，特效强调<b>亡计伤害与快速突进</b>：阵亡惩罚、击杀连击、直伤总部。</p></div>
+</div>
+
+
+<div class="summary">
+  <div class="summary-card" onclick="goTo('faction-D')"><div class="s-name tag D">&#x2716; 德军</div><div class="s-total">17张</div><div class="s-detail">12单位 + 5指令</div></div>
+  <div class="summary-card" onclick="goTo('faction-S')"><div class="s-name tag S">&#x262D; 苏军</div><div class="s-total">20张</div><div class="s-detail">14单位 + 6指令</div></div>
+  <div class="summary-card" onclick="goTo('faction-U')"><div class="s-name tag U">&#x2605; 美军</div><div class="s-total">17张</div><div class="s-detail">12单位 + 5指令</div></div>
+  <div class="summary-card" onclick="goTo('faction-B')"><div class="s-name tag B">&#x2694; 英军</div><div class="s-total">20张</div><div class="s-detail">14单位 + 6指令</div></div>
+  <div class="summary-card" onclick="goTo('faction-J')"><div class="s-name tag J">&#x2600; 日军</div><div class="s-total">18张</div><div class="s-detail">12单位 + 6指令</div></div>
+</div>
+
+<!-- ================================================================ -->
+<!-- 德军 D -->
+<!-- ================================================================ -->
+<h2 id="faction-D"><span class="tag D">&#x2716; 德军</span> Wehrmacht — 闪击突击 <span style="font-size:.72rem;color:var(--d);margin-left:auto">单位 12 + 指令 5 = 17张</span></h2>
+
+<h3>单位</h3>
+<div class="tbl-wrapper">
+<table>
+<thead><tr><th>中文名</th><th>英文名</th><th>类型</th><th>攻</th><th>血</th><th>部署费</th><th>行动费</th><th>重甲</th><th>关键词</th><th>上限</th><th>效果</th></tr></thead>
+<tbody>
+<tr>
+  <td class="left">国民掷弹兵</td><td class="left">Volksgrenadier</td><td class="ut-i">步兵</td><td>2</td><td>2</td><td class="cost low">1</td><td>1</td><td>0</td><td>—</td><td class="limit x4">4</td><td class="eff">部署：抽一张牌</td>
+</tr>
+<tr>
+  <td class="left">装甲掷弹兵</td><td class="left">Panzergrenadier</td><td class="ut-i">步兵</td><td>4</td><td>3</td><td class="cost low">3</td><td>1</td><td>0</td><td><span class="kw B">闪击</span></td><td class="limit x2">2</td><td class="eff">闪击。部署：对一个敌方单位造成 1 点伤害</td>
+</tr>
+<tr>
+  <td class="left">突击工兵第一团</td><td class="left">Sturmpionier</td><td class="ut-i">步兵</td><td>3</td><td>3</td><td class="cost low">3</td><td>1</td><td>0</td><td><span class="kw C">冲击</span> <span class="kw B">闪击</span></td><td class="limit x3">3</td><td class="eff"><span class="star">&#x2726;</span> 冲击。闪击。部署：移除一个敌方单位的所有重甲和守护</td>
+</tr>
+<tr>
+  <td class="left">三号坦克</td><td class="left">Panzer III</td><td class="ut-t">坦克</td><td>2</td><td>2</td><td class="cost low">2</td><td>1</td><td>0</td><td><span class="kw B">闪击</span></td><td class="limit x2">2</td><td class="eff"><span class="star">&#x2726;</span> 闪击。本卡攻击并存活时，获得 +1/+1（每回合最多一次）</td>
+</tr>
+<tr>
+  <td class="left">四号突击坦克</td><td class="left">StuG IV</td><td class="ut-t">坦克</td><td>4</td><td>5</td><td class="cost low">4</td><td>1</td><td>0</td><td><span class="kw C">冲击</span> <span class="kw B">闪击</span></td><td class="limit x2">2</td><td class="eff"><span class="star">&#x2726;</span> 冲击。闪击。本卡攻击坦克时，攻击 +2</td>
+</tr>
+<tr>
+  <td class="left">虎式</td><td class="left">Tiger I</td><td class="ut-t">坦克</td><td>8</td><td>8</td><td class="cost high">7</td><td>2</td><td>2</td><td><span class="kw B">闪击</span><span class="kw H">重甲</span></td><td class="limit x1">1</td><td class="eff">闪击。重甲 2。亡计：对敌方全体单位造成 2 点伤害</td>
+</tr>
+<tr>
+  <td class="left">88mmFlak</td><td class="left">88mm Flak</td><td class="ut-a">炮兵</td><td>4</td><td>6</td><td class="cost high">6</td><td>2</td><td>0</td><td>—</td><td class="limit x1">1</td><td class="eff"><span class="star">&#x2726;</span> 部署：消灭一个敌方空军</td>
+</tr>
+<tr>
+  <td class="left">黄蜂自行火炮</td><td class="left">Wespe</td><td class="ut-a">炮兵</td><td>3</td><td>3</td><td class="cost low">3</td><td>1</td><td>0</td><td>—</td><td class="limit x3">3</td><td class="eff"><span class="star">&#x2726;</span> 友方部署单位时，对敌方总部造成 1 点伤害</td>
+</tr>
+<tr>
+  <td class="left">Bf109</td><td class="left">Bf 109 G</td><td class="ut-f">战斗机</td><td>3</td><td>4</td><td class="cost mid">4</td><td>2</td><td>0</td><td>—</td><td class="limit x3">3</td><td class="eff"><span class="star">&#x2726;</span> 部署：若友方有步兵或坦克，自身获得 +1/+1；若两者都有，自身获得 +3/+3</td>
+</tr>
+<tr>
+  <td class="left">Fw190</td><td class="left">Fw 190 A</td><td class="ut-f">战斗机</td><td>5</td><td>4</td><td class="cost mid">5</td><td>2</td><td>0</td><td>—</td><td class="limit x2">2</td><td class="eff"><span class="star">&#x2726;</span> 部署：将一个敌方地面单位（步兵/坦克/炮兵）返回敌方手牌</td>
+</tr>
+<tr>
+  <td class="left">Ju87斯图卡</td><td class="left">Ju 87 Stuka</td><td class="ut-o">轰炸机</td><td>4</td><td>5</td><td class="cost mid">5</td><td>2</td><td>0</td><td>—</td><td class="limit x2">2</td><td class="eff">部署：对一个敌方单位造成 2 点伤害</td>
+</tr>
+<tr>
+  <td class="left">He177</td><td class="left">He 177</td><td class="ut-o">轰炸机</td><td>5</td><td>7</td><td class="cost high">7</td><td>3</td><td>0</td><td><span class="kw B">闪击</span></td><td class="limit x1">1</td><td class="eff"><span class="star">&#x2726;</span> 闪击。部署：对敌方总部造成 2 点伤害</td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="count">步兵3 · 坦克3 · 炮兵2 · 战斗机2 · 轰炸机2 &nbsp;|&nbsp; 上限分布：<b style="color:#e09060">1张×4</b> · <b style="color:#6cf">2张×7</b> · <b style="color:#fa8">3张×4</b> · <b style="color:var(--y)">4张×2</b> &nbsp;|&nbsp; 特效补全 <b style="color:var(--y)">5</b> 张</div>
+
+<h3>指令</h3>
+<div class="tbl-wrapper">
+<table>
+<thead><tr><th>中文名</th><th>英文名</th><th>费用</th><th>上限</th><th>效果</th><th>条件</th></tr></thead>
+<tbody>
+<tr><td class="left">突然袭击</td><td class="left">Sudden Strike</td><td class="cost low">2</td><td class="limit x4">4</td><td class="eff">消灭一个 &#x2264;2 费的敌方单位</td><td class="eff">敌方有 &#x2264;2 费单位</td></tr>
+<tr><td class="left">战术打击</td><td class="left">Tactical Strike</td><td class="cost low">3</td><td class="limit x3">3</td><td class="eff">对一个敌方单位造成 2 点伤害；若我方有坦克，改为造成 4 点伤害</td><td class="eff">敌方场上有人</td></tr>
+<tr><td class="left">闪电战</td><td class="left">Blitzkrieg</td><td class="cost low">4</td><td class="limit x3">3</td><td class="eff">前线所有友方单位获得+3攻击力和-1行动花费，直到友方回合结束</td><td class="eff">己方前线有单位</td></tr>
+<tr><td class="left">协同作战</td><td class="left">Combined Arms</td><td class="cost low">2</td><td class="limit x2">2</td><td class="eff">场上每有一个友方步兵，使一个坦克获得 +1/+1</td><td class="eff">己方有步兵和坦克</td></tr>
+<tr><td class="left">断水</td><td class="left">Blockade</td><td class="cost mid">5</td><td class="limit x1">1</td><td class="eff">敌方随机弃两张牌</td><td class="eff">敌方手牌 &#x2265; 2</td></tr>
+<tr><td class="left">斯图卡俯冲</td><td class="left">Stuka Dive</td><td class="cost mid">5</td><td class="limit x2">2</td><td class="eff">对敌方全体单位造成 3 点伤害</td><td class="eff">敌方场上有人</td></tr>
+</tbody>
+</table>
+</div>
+
+<hr>
+
+<!-- ================================================================ -->
+<!-- 苏军 S -->
+<!-- ================================================================ -->
+<h2 id="faction-S"><span class="tag S">&#x262D; 苏军</span> Soviet Union — 人海牺牲 <span style="font-size:.72rem;color:var(--d);margin-left:auto">单位 14 + 指令 6 = 20张</span></h2>
+
+<h3>单位</h3>
+<div class="tbl-wrapper">
+<table>
+<thead><tr><th>中文名</th><th>英文名</th><th>类型</th><th>攻</th><th>血</th><th>部署费</th><th>行动费</th><th>重甲</th><th>关键词</th><th>上限</th><th>效果</th></tr></thead>
+<tbody>
+<tr>
+  <td class="left">动员兵</td><td class="left">Mobilized Infantry</td><td class="ut-i">步兵</td><td>3</td><td>1</td><td class="cost low">1</td><td>1</td><td>0</td><td>—</td><td class="limit x4">4</td><td class="eff">亡计：对随机一个敌方单位造成 2 点伤害</td>
+</tr>
+<tr>
+  <td class="left">近卫步兵第二团</td><td class="left">Guards Infantry 2nd</td><td class="ut-i">步兵</td><td>4</td><td>4</td><td class="cost low">4</td><td>1</td><td>0</td><td><span class="kw G">守护</span></td><td class="limit x2">2</td><td class="eff">守护。受到伤害时，为总部回复等量生命值</td>
+</tr>
+<tr>
+  <td class="left">突击工兵</td><td class="left">Assault Sapper</td><td class="ut-i">步兵</td><td>4</td><td>3</td><td class="cost low">3</td><td>1</td><td>0</td><td><span class="kw C">冲击</span> <span class="kw B">闪击</span></td><td class="limit x3">3</td><td class="eff"><span class="star">&#x2726;</span> 冲击。闪击。本卡攻击生命值高于自己的目标时，攻击 +3</td>
+</tr>
+<tr>
+  <td class="left">狙击小组</td><td class="left">Sniper Team</td><td class="ut-i">步兵</td><td>1</td><td>2</td><td class="cost low">2</td><td>1</td><td>0</td><td>—</td><td class="limit x3">3</td><td class="eff">部署：压制一个单位，并使其攻击力 -2（不低于 0）</td>
+</tr>
+<tr style="background:rgba(255,50,50,.06)">
+  <td class="left">近卫步兵第4团</td><td class="left">4th Guards Rifles</td><td class="ut-i">步兵</td><td>9</td><td>9</td><td class="cost high">9</td><td>1</td><td>0</td><td><span class="kw G">守护</span></td><td class="limit x1">1</td><td class="eff">守护。若在手中，敌方每抽 1 张牌，获得 -1 花费</td>
+</tr>
+<tr>
+  <td class="left">T34/76</td><td class="left">T-34/76</td><td class="ut-t">坦克</td><td>4</td><td>4</td><td class="cost mid">5</td><td>1</td><td>0</td><td><span class="kw B">闪击</span></td><td class="limit x3">3</td><td class="eff"><span class="star">&#x2726;</span> 闪击。亡计：在支援阵线加入一个 3/4 守护近卫第8步兵师</td>
+</tr>
+<tr>
+  <td class="left">IS-3</td><td class="left">IS-3</td><td class="ut-t">坦克</td><td>5</td><td>5</td><td class="cost mid">5</td><td>2</td><td>0</td><td><span class="kw C">冲击</span></td><td class="limit x2">2</td><td class="eff"><span class="star">&#x2726;</span> 冲击。本卡攻击重甲目标时，攻击 +2</td>
+</tr>
+<tr>
+  <td class="left">IS2</td><td class="left">IS-2</td><td class="ut-t">坦克</td><td>6</td><td>6</td><td class="cost high">7</td><td>2</td><td>2</td><td><span class="kw H">重甲</span></td><td class="limit x1">1</td><td class="eff">重甲 2。亡计：对随机敌方单位造成 3 点伤害</td>
+</tr>
+<tr>
+  <td class="left">ZiS3</td><td class="left">ZiS-3</td><td class="ut-a">炮兵</td><td>2</td><td>3</td><td class="cost low">2</td><td>1</td><td>0</td><td>—</td><td class="limit x3">3</td><td class="eff">部署：为一个友方单位提供 +2/+2。对己方总部造成 2 点伤害</td>
+</tr>
+<tr>
+  <td class="left">喀秋莎</td><td class="left">Katyusha BM-13</td><td class="ut-a">炮兵</td><td>3</td><td>5</td><td class="cost mid">5</td><td>1</td><td>0</td><td>—</td><td class="limit x2">2</td><td class="eff">部署：对敌方全体单位造成 1 点伤害</td>
+</tr>
+<tr>
+  <td class="left">雅克9</td><td class="left">Yak-9</td><td class="ut-f">战斗机</td><td>3</td><td>4</td><td class="cost low">4</td><td>1</td><td>0</td><td>—</td><td class="limit x3">3</td><td class="eff">部署：对一个敌方轰炸机造成 2 点伤害</td>
+</tr>
+<tr>
+  <td class="left">拉7</td><td class="left">La-7</td><td class="ut-f">战斗机</td><td>4</td><td>6</td><td class="cost high">6</td><td>2</td><td>0</td><td><span class="kw F">奋战</span></td><td class="limit x2">2</td><td class="eff"><span class="star">&#x2726;</span> 奋战。本卡攻击后，为受伤最重的友方单位回复 2 点生命值</td>
+</tr>
+<tr>
+  <td class="left">佩2</td><td class="left">Pe-2</td><td class="ut-o">轰炸机</td><td>3</td><td>5</td><td class="cost low">4</td><td>2</td><td>0</td><td>—</td><td class="limit x3">3</td><td class="eff">部署：抽一张牌</td>
+</tr>
+<tr>
+  <td class="left">图2</td><td class="left">Tu-2</td><td class="ut-o">轰炸机</td><td>4</td><td>6</td><td class="cost high">6</td><td>3</td><td>0</td><td>—</td><td class="limit x1">1</td><td class="eff">部署：对敌方总部造成 3 点伤害</td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="count">步兵5 · 坦克3 · 炮兵2 · 战斗机2 · 轰炸机2 &nbsp;|&nbsp; 上限分布：<b style="color:#e09060">1张×4</b> · <b style="color:#6cf">2张×7</b> · <b style="color:#fa8">3张×7</b> · <b style="color:var(--y)">4张×2</b> &nbsp;|&nbsp; 特效补全 <b style="color:var(--y)">4</b> 张</div>
+
+<h3>指令</h3>
+<div class="tbl-wrapper">
+<table>
+<thead><tr><th>中文名</th><th>英文名</th><th>费用</th><th>上限</th><th>效果</th><th>条件</th></tr></thead>
+<tbody>
+<tr><td class="left">炮火封锁</td><td class="left">Artillery Blockade</td><td class="cost low">2</td><td class="limit x2">2</td><td class="eff">对敌方前线全体单位造成 1 点伤害并压制（本回合不可行动）</td><td class="eff">敌方前线有单位</td></tr>
+<tr><td class="left">人海战术</td><td class="left">Human Wave Tactics</td><td class="cost mid">5</td><td class="limit x1">1</td><td class="eff"><span class="star">&#x2726;</span> 持续加入动员兵，直到友方支援阵线被填满，并使其获得闪击</td><td class="eff">支援阵线未满</td></tr>
+<tr><td class="left">血红的镰刀</td><td class="left">Bloody Sickle</td><td class="cost low">1</td><td class="limit x4">4</td><td class="eff"><span class="star">&#x2726;</span> 对一名敌方单位造成 1 点伤害，自身总部受 1 伤，抽一张牌</td><td class="eff">敌方场上有人</td></tr>
+<tr><td class="left">不惜代价</td><td class="left">At All Costs</td><td class="cost low">3</td><td class="limit x2">2</td><td class="eff">对敌方全体单位造成 2 点伤害，自身总部受到 1 点伤害</td><td class="eff">敌方场上有人</td></tr>
+<tr><td class="left">钢铁洪流</td><td class="left">Steel Tide</td><td class="cost low">4</td><td class="limit x2">2</td><td class="eff">己方全体坦克单位获得 +2/+2</td><td class="eff">己方有坦克</td></tr>
+<tr><td class="left">工人们联合</td><td class="left">Workers Unite</td><td class="cost mid">5</td><td class="limit x1">1</td><td class="eff">额外指挥点槽 +1，抽两张牌</td><td class="eff">—（无条件）</td></tr>
+<tr><td class="left">冬季攻势</td><td class="left">Winter Offensive</td><td class="cost low">1</td><td class="limit x2">2</td><td class="eff">对敌方总部、敌方单位、友方总部、友方单位各造成 1 点伤害</td><td class="eff">—（无条件）</td></tr>
+</tbody>
+</table>
+</div>
+
+<hr>
+
+<!-- ================================================================ -->
+<!-- 美军 U -->
+<!-- ================================================================ -->
+<h2 id="faction-U"><span class="tag U">&#x2605; 美军</span> United States — 工业跳费 <span style="font-size:.72rem;color:var(--d);margin-left:auto">单位 12 + 指令 5 = 17张</span></h2>
+
+<h3>单位</h3>
+<div class="tbl-wrapper">
+<table>
+<thead><tr><th>中文名</th><th>英文名</th><th>类型</th><th>攻</th><th>血</th><th>部署费</th><th>行动费</th><th>重甲</th><th>关键词</th><th>上限</th><th>效果</th></tr></thead>
+<tbody>
+<tr>
+  <td class="left">步兵班</td><td class="left">Rifle Squad</td><td class="ut-i">步兵</td><td>2</td><td>1</td><td class="cost low">1</td><td>1</td><td>0</td><td>—</td><td class="limit x4">4</td><td class="eff">亡计：额外获得一个指挥点槽</td>
+</tr>
+<tr>
+  <td class="left">海军陆战队</td><td class="left">US Marines</td><td class="ut-i">步兵</td><td>3</td><td>3</td><td class="cost low">4</td><td>1</td><td>0</td><td><span class="kw A">伏击</span></td><td class="limit x3">3</td><td class="eff"><span class="star">&#x2726;</span> 伏击。部署：对敌方前线全体单位造成 1 点伤害</td>
+</tr>
+<tr>
+  <td class="left">游骑兵</td><td class="left">Rangers</td><td class="ut-i">步兵</td><td>3</td><td>4</td><td class="cost low">3</td><td>1</td><td>0</td><td><span class="kw C">冲击</span></td><td class="limit x3">3</td><td class="eff"><span class="star">&#x2726;</span> 冲击。部署：抽一张牌</td>
+</tr>
+<tr>
+  <td class="left">M4谢尔曼</td><td class="left">Sherman M4A3</td><td class="ut-t">坦克</td><td>4</td><td>4</td><td class="cost mid">5</td><td>1</td><td>0</td><td><span class="kw B">闪击</span></td><td class="limit x3">3</td><td class="eff"><span class="star">&#x2726;</span> 闪击。亡计：在支援阵线加入一个花费不大于 4 的美国单位，且使其具有闪击</td>
+</tr>
+<tr>
+  <td class="left">M36杰克逊</td><td class="left">M36 Jackson</td><td class="ut-t">坦克</td><td>4</td><td>5</td><td class="cost low">4</td><td>2</td><td>0</td><td><span class="kw C">冲击</span></td><td class="limit x2">2</td><td class="eff"><span class="star">&#x2726;</span> 冲击。部署：对一个敌方坦克造成 1 点伤害</td>
+</tr>
+<tr>
+  <td class="left">M26潘兴</td><td class="left">M26 Pershing</td><td class="ut-t">坦克</td><td>6</td><td>6</td><td class="cost high">7</td><td>2</td><td>1</td><td><span class="kw B">闪击</span><span class="kw H">重甲</span></td><td class="limit x1">1</td><td class="eff">闪击。重甲 1。亡计：对随机敌方单位造成 3 点伤害</td>
+</tr>
+<tr>
+  <td class="left">105mm榴弹炮</td><td class="left">105mm M2</td><td class="ut-a">炮兵</td><td>3</td><td>4</td><td class="cost low">4</td><td>1</td><td>0</td><td>—</td><td class="limit x3">3</td><td class="eff">部署：对一个敌方单位造成 1 点伤害</td>
+</tr>
+<tr>
+  <td class="left">155mm长汤姆</td><td class="left">155mm Long Tom</td><td class="ut-a">炮兵</td><td>4</td><td>7</td><td class="cost high">7</td><td>2</td><td>0</td><td>—</td><td class="limit x1">1</td><td class="eff">部署：对敌方前线全体单位造成 1 点伤害</td>
+</tr>
+<tr>
+  <td class="left">P51野马</td><td class="left">P-51D Mustang</td><td class="ut-f">战斗机</td><td>4</td><td>4</td><td class="cost mid">5</td><td>2</td><td>0</td><td><span class="kw F">奋战</span></td><td class="limit x2">2</td><td class="eff"><span class="star">&#x2726;</span> 奋战。部署：使一个友方轰炸机获得 +1/+1</td>
+</tr>
+<tr>
+  <td class="left">P38闪电</td><td class="left">P-38 Lightning</td><td class="ut-f">战斗机</td><td>3</td><td>5</td><td class="cost low">4</td><td>1</td><td>0</td><td>—</td><td class="limit x3">3</td><td class="eff">部署：对一个敌方战斗机造成 2 点伤害</td>
+</tr>
+<tr>
+  <td class="left">B17空中堡垒</td><td class="left">B-17 Flying Fortress</td><td class="ut-o">轰炸机</td><td>4</td><td>7</td><td class="cost high">7</td><td>3</td><td>0</td><td>—</td><td class="limit x1">1</td><td class="eff">部署：对敌方总部造成 2 点伤害</td>
+</tr>
+<tr>
+  <td class="left">B25米切尔</td><td class="left">B-25 Mitchell</td><td class="ut-o">轰炸机</td><td>3</td><td>5</td><td class="cost mid">5</td><td>2</td><td>0</td><td>—</td><td class="limit x3">3</td><td class="eff">部署：抽一张牌</td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="count">步兵3 · 坦克3 · 炮兵2 · 战斗机2 · 轰炸机2 &nbsp;|&nbsp; 上限分布：<b style="color:#e09060">1张×4</b> · <b style="color:#6cf">2张×6</b> · <b style="color:#fa8">3张×6</b> · <b style="color:var(--y)">4张×1</b> &nbsp;|&nbsp; 特效补全 <b style="color:var(--y)">5</b> 张</div>
+
+<h3>指令</h3>
+<div class="tbl-wrapper">
+<table>
+<thead><tr><th>中文名</th><th>英文名</th><th>费用</th><th>上限</th><th>效果</th><th>条件</th></tr></thead>
+<tbody>
+<tr><td class="left">死神降临</td><td class="left">Death From Above</td><td class="cost low">4</td><td class="limit x2">2</td><td class="eff">随机消灭一个敌方单位</td><td class="eff">敌方场上有人</td></tr>
+<tr><td class="left">战争机器</td><td class="left">War Machine</td><td class="cost low">2</td><td class="limit x4">4</td><td class="eff">额外指挥点槽 +1</td><td class="eff">指挥点槽未满</td></tr>
+<tr><td class="left">战争债券</td><td class="left">War Bonds</td><td class="cost high">5</td><td class="limit x2">2</td><td class="eff">额外指挥点槽 +2，下回合抽 1 张牌</td><td class="eff">—（无条件）</td></tr>
+<tr><td class="left">工业动员</td><td class="left">Industrial Might</td><td class="cost low">4</td><td class="limit x2">2</td><td class="eff">将卡组中随机一个费用不小于6的单位复制加入手牌，然后抽一张牌</td><td class="eff">卡组中有费用不小于6的单位</td></tr>
+<tr><td class="left">空降师</td><td class="left">Airborne Division</td><td class="cost mid">4</td><td class="limit x2">2</td><td class="eff">加入两个 2/2 闪击空降兵到支援阵线</td><td class="eff">支援阵线 &#x2264;2 空位</td></tr>
+<tr><td class="left">战略轰炸</td><td class="left">Strategic Bombing</td><td class="cost high">6</td><td class="limit x1">1</td><td class="eff">对支援阵线上敌方全体目标造成 3 点伤害，敌方失去 1 点指挥点槽</td><td class="eff">敌方支援阵线有单位</td></tr>
+</tbody>
+</table>
+</div>
+
+<hr>
+
+<!-- ================================================================ -->
+<!-- 英军 B -->
+<!-- ================================================================ -->
+<h2 id="faction-B"><span class="tag B">&#x2694; 英军</span> British Empire — 守护防守 <span style="font-size:.72rem;color:var(--d);margin-left:auto">单位 14 + 指令 6 = 20张</span></h2>
+
+<h3>单位</h3>
+<div class="tbl-wrapper">
+<table>
+<thead><tr><th>中文名</th><th>英文名</th><th>类型</th><th>攻</th><th>血</th><th>部署费</th><th>行动费</th><th>重甲</th><th>关键词</th><th>上限</th><th>效果</th></tr></thead>
+<tbody>
+<tr>
+  <td class="left">本土防卫军</td><td class="left">Home Guard</td><td class="ut-i">步兵</td><td>1</td><td>3</td><td class="cost low">1</td><td>1</td><td>0</td><td><span class="kw G">守护</span></td><td class="limit x4">4</td><td class="eff"><span class="star">&#x2726;</span> 守护。亡计：为总部回复 2 点生命值</td>
+</tr>
+<tr>
+  <td class="left">苏格兰伞兵</td><td class="left">Scottish Paratroopers</td><td class="ut-i">步兵</td><td>3</td><td>5</td><td class="cost mid">5</td><td>1</td><td>1</td><td><span class="kw G">守护</span> <span class="kw H">重甲</span></td><td class="limit x2">2</td><td class="eff"><span class="star">&#x2726;</span> 守护。重甲 1。部署：为总部回复 2 点生命值</td>
+</tr>
+<tr>
+  <td class="left">突击队</td><td class="left">Commandos</td><td class="ut-i">步兵</td><td>3</td><td>4</td><td class="cost low">3</td><td>1</td><td>0</td><td><span class="kw G">守护</span><span class="kw C">冲击</span></td><td class="limit x3">3</td><td class="eff"><span class="star">&#x2726;</span> 守护。冲击。战斗后若存活获得 +2 血</td>
+</tr>
+<tr>
+  <td class="left">皇家工兵</td><td class="left">Royal Engineers</td><td class="ut-i">步兵</td><td>2</td><td>3</td><td class="cost low">2</td><td>1</td><td>0</td><td>—</td><td class="limit x3">3</td><td class="eff">部署：压制一个敌方单位</td>
+</tr>
+<tr>
+  <td class="left">玛蒂尔达II</td><td class="left">Matilda II</td><td class="ut-t">坦克</td><td>3</td><td>5</td><td class="cost low">4</td><td>2</td><td>1</td><td><span class="kw H">重甲</span></td><td class="limit x2">2</td><td class="eff"><span class="star">&#x2726;</span> 重甲 1。部署：友方所有步兵单位获得 +2 生命值</td>
+</tr>
+<tr>
+  <td class="left">丘吉尔IV</td><td class="left">Churchill IV</td><td class="ut-t">坦克</td><td>5</td><td>7</td><td class="cost high">7</td><td>2</td><td>2</td><td><span class="kw G">守护</span><span class="kw H">重甲</span></td><td class="limit x1">1</td><td class="eff"><span class="star">&#x2726;</span> 守护。重甲 2。本卡攻击后，使一个友方单位获得 +1/+1</td>
+</tr>
+<tr>
+  <td class="left">克伦威尔</td><td class="left">Cromwell Mk IV</td><td class="ut-t">坦克</td><td>3</td><td>4</td><td class="cost low">3</td><td>1</td><td>0</td><td><span class="kw B">闪击</span><span class="kw G">守护</span></td><td class="limit x3">3</td><td class="eff"><span class="star">&#x2726;</span> 闪击。守护。亡计：抽一张牌</td>
+</tr>
+<tr>
+  <td class="left">25磅炮</td><td class="left">25-pounder</td><td class="ut-a">炮兵</td><td>2</td><td>3</td><td class="cost low">3</td><td>1</td><td>0</td><td>—</td><td class="limit x3">3</td><td class="eff">部署：为一个友方单位提供 +1/+1</td>
+</tr>
+<tr>
+  <td class="left">17磅炮</td><td class="left">17-pounder</td><td class="ut-a">炮兵</td><td>3</td><td>5</td><td class="cost mid">5</td><td>2</td><td>0</td><td>—</td><td class="limit x2">2</td><td class="eff"><span class="star">&#x2726;</span> 本卡攻击坦克时，攻击 +2</td>
+</tr>
+<tr>
+  <td class="left">喷火MkV</td><td class="left">Spitfire Mk V</td><td class="ut-f">战斗机</td><td>6</td><td>4</td><td class="cost mid">5</td><td>2</td><td>0</td><td><span class="kw F">奋战</span></td><td class="limit x2">2</td><td class="eff"><span class="star">&#x2726;</span> 奋战。本卡攻击后，抽一张牌</td>
+</tr>
+<tr>
+  <td class="left">牛津</td><td class="left">Oxford</td><td class="ut-f">战斗机</td><td>1</td><td>2</td><td class="cost low">2</td><td>1</td><td>0</td><td>—</td><td class="limit x1">1</td><td class="eff"><span class="star">&#x2726;</span> 友方守护单位部署或加入时获得+1/+3</td>
+</tr>
+<tr>
+  <td class="left">飓风MkI</td><td class="left">Hurricane Mk I</td><td class="ut-f">战斗机</td><td>3</td><td>3</td><td class="cost low">3</td><td>1</td><td>0</td><td>—</td><td class="limit x3">3</td><td class="eff">部署：对一个敌方轰炸机造成 2 点伤害</td>
+</tr>
+<tr>
+  <td class="left">兰卡斯特</td><td class="left">Lancaster</td><td class="ut-o">轰炸机</td><td>4</td><td>7</td><td class="cost high">7</td><td>3</td><td>0</td><td>—</td><td class="limit x1">1</td><td class="eff">部署：对敌方总部造成 3 点伤害</td>
+</tr>
+<tr>
+  <td class="left">蚊式</td><td class="left">Mosquito</td><td class="ut-o">轰炸机</td><td>3</td><td>5</td><td class="cost mid">5</td><td>2</td><td>0</td><td><span class="kw S">烟幕</span></td><td class="limit x2">2</td><td class="eff"><span class="star">&#x2726;</span> 烟幕。亡计：对敌方总部造成 2 点伤害</td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="count">步兵4 · 坦克3 · 炮兵2 · 战斗机3 · 轰炸机2 &nbsp;|&nbsp; 上限分布：<b style="color:#e09060">1张×3</b> · <b style="color:#6cf">2张×8</b> · <b style="color:#fa8">3张×7</b> · <b style="color:var(--y)">4张×2</b> &nbsp;|&nbsp; 特效补全 <b style="color:var(--y)">10</b> 张</div>
+
+<h3>指令</h3>
+<div class="tbl-wrapper">
+<table>
+<thead><tr><th>中文名</th><th>英文名</th><th>费用</th><th>上限</th><th>效果</th><th>条件</th></tr></thead>
+<tbody>
+<tr><td class="left">炮兵弹幕</td><td class="left">Artillery Barrage</td><td class="cost low">2</td><td class="limit x4">4</td><td class="eff">压制一个敌方单位。被压制单位本回合不可行动</td><td class="eff">敌方场上有人</td></tr>
+<tr><td class="left">皇家空军支援</td><td class="left">RAF Support</td><td class="cost low">3</td><td class="limit x3">3</td><td class="eff">友方总部恢复 3 点生命值。若友方总部生命值 &gt; 敌方总部，对所有敌方单位造成 1 点伤害</td><td class="eff">己方总部已受伤</td></tr>
+<tr><td class="left">防空火力</td><td class="left">AA Fire</td><td class="cost low">3</td><td class="limit x2">2</td><td class="eff">对敌方全体空军单位造成 2 点伤害</td><td class="eff">敌方有空军</td></tr>
+<tr><td class="left">拖延战术</td><td class="left">Delay Tactics</td><td class="cost mid">4</td><td class="limit x2">2</td><td class="eff">敌方全体撤退：支援阵线→手牌，前线→支援阵线（满则手牌），全部满载</td><td class="eff">敌方场上有单位</td></tr>
+<tr><td class="left">雷达警报</td><td class="left">Radar Alert</td><td class="cost low">3</td><td class="limit x2">2</td><td class="eff">将一个本土防卫军加入支援阵线，场上每有一个敌方单位，+1 生命值</td><td class="eff">支援阵线有空位</td></tr>
+<tr><td class="left">消耗战</td><td class="left">War of Attrition</td><td class="cost mid">5</td><td class="limit x2">2</td><td class="eff">对敌方全体单位造成 2 点伤害，若消灭场上敌方全体单位则抽一张牌</td><td class="eff">敌方场上有人</td></tr>
+</tbody>
+</table>
+</div>
+
+<hr>
+
+<!-- ================================================================ -->
+<!-- 日军 J -->
+<!-- ================================================================ -->
+<h2 id="faction-J"><span class="tag J">&#x2600; 日军</span> Imperial Japan — 速攻玉碎 <span style="font-size:.72rem;color:var(--d);margin-left:auto">单位 12 + 指令 6 = 18张</span></h2>
+
+<h3>单位</h3>
+<div class="tbl-wrapper">
+<table>
+<thead><tr><th>中文名</th><th>英文名</th><th>类型</th><th>攻</th><th>血</th><th>部署费</th><th>行动费</th><th>重甲</th><th>关键词</th><th>上限</th><th>效果</th></tr></thead>
+<tbody>
+<tr>
+  <td class="left">步兵小队</td><td class="left">IJA Squad</td><td class="ut-i">步兵</td><td>2</td><td>1</td><td class="cost low">1</td><td>0</td><td>0</td><td><span class="kw B">闪击</span></td><td class="limit x4">4</td><td class="eff"><span class="star">&#x2726;</span> 闪击。亡计：一个随机友方单位获得 +1/+0</td>
+</tr>
+<tr>
+  <td class="left">海军陆战队</td><td class="left">SNLF Marines</td><td class="ut-i">步兵</td><td>4</td><td>3</td><td class="cost low">4</td><td>0</td><td>0</td><td><span class="kw A">伏击</span></td><td class="limit x2">2</td><td class="eff"><span class="star">&#x2726;</span> 伏击。亡计：对敌方总部造成 1 点伤害</td>
+</tr>
+<tr>
+  <td class="left">挺身队</td><td class="left">Giretsu Squad</td><td class="ut-i">步兵</td><td>3</td><td>2</td><td class="cost low">2</td><td>1</td><td>0</td><td><span class="kw C">冲击</span></td><td class="limit x3">3</td><td class="eff"><span class="star">&#x2726;</span> 冲击。亡计：对一个随机敌方单位造成 2 点伤害</td>
+</tr>
+<tr>
+  <td class="left">侦察兵</td><td class="left">Scout</td><td class="ut-i">步兵</td><td>1</td><td>2</td><td class="cost low">1</td><td>1</td><td>0</td><td>—</td><td class="limit x0">0</td><td class="eff">受到伤害时，抽一张牌</td>
+</tr>
+<tr>
+  <td class="left">97式中战车</td><td class="left">Type 97 Chi-Ha</td><td class="ut-t">坦克</td><td>4</td><td>3</td><td class="cost low">4</td><td>1</td><td>0</td><td><span class="kw B">闪击</span></td><td class="limit x2">2</td><td class="eff"><span class="star">&#x2726;</span> 闪击。本卡攻击并消灭目标时，可再行动一次</td>
+</tr>
+<tr>
+  <td class="left">95式轻战车</td><td class="left">Type 95 Ha-Go</td><td class="ut-t">坦克</td><td>2</td><td>2</td><td class="cost low">2</td><td>0</td><td>0</td><td><span class="kw S">烟幕</span></td><td class="limit x3">3</td><td class="eff"><span class="star">&#x2726;</span> 烟幕。本卡攻击时，对敌方总部额外造成 1 点伤害</td>
+</tr>
+<tr>
+  <td class="left">一式炮战车</td><td class="left">Type 1 Ho-Ni</td><td class="ut-t">坦克</td><td>4</td><td>4</td><td class="cost low">3</td><td>1</td><td>0</td><td><span class="kw C">冲击</span></td><td class="limit x3">3</td><td class="eff"><span class="star">&#x2726;</span> 冲击。本卡攻击时，若己方单位多于敌方单位，攻击 +2</td>
+</tr>
+<tr>
+  <td class="left">75mm山炮</td><td class="left">Type 94 Mountain Gun</td><td class="ut-a">炮兵</td><td>2</td><td>3</td><td class="cost low">3</td><td>0</td><td>0</td><td>—</td><td class="limit x3">3</td><td class="eff">部署：对一个敌方单位造成 1 点伤害</td>
+</tr>
+<tr>
+  <td class="left">150mm榴弹炮</td><td class="left">Type 96 Howitzer</td><td class="ut-a">炮兵</td><td>3</td><td>5</td><td class="cost mid">5</td><td>2</td><td>0</td><td>—</td><td class="limit x2">2</td><td class="eff">部署：对敌方支援阵线全体单位造成 1 点伤害</td>
+</tr>
+<tr>
+  <td class="left">零式</td><td class="left">A6M Zero</td><td class="ut-f">战斗机</td><td>4</td><td>3</td><td class="cost low">4</td><td>2</td><td>0</td><td><span class="kw F">奋战</span></td><td class="limit x2">2</td><td class="eff"><span class="star">&#x2726;</span> 奋战。亡计：对敌方全体单位造成 1 点伤害</td>
+</tr>
+<tr>
+  <td class="left">紫电</td><td class="left">N1K2-J Shiden</td><td class="ut-f">战斗机</td><td>5</td><td>5</td><td class="cost high">6</td><td>2</td><td>0</td><td>—</td><td class="limit x1">1</td><td class="eff">部署：对一个敌方战斗机造成 2 点伤害</td>
+</tr>
+<tr>
+  <td class="left">九九式舰爆</td><td class="left">D3A Val</td><td class="ut-o">轰炸机</td><td>3</td><td>4</td><td class="cost low">4</td><td>2</td><td>0</td><td>—</td><td class="limit x3">3</td><td class="eff">部署：对一个敌方单位造成 1 点伤害</td>
+</tr>
+<tr>
+  <td class="left">一式陆攻</td><td class="left">G4M Betty</td><td class="ut-o">轰炸机</td><td>4</td><td>6</td><td class="cost high">6</td><td>3</td><td>0</td><td>—</td><td class="limit x1">1</td><td class="eff">部署：对敌方总部造成 2 点伤害</td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="count">步兵3 · 坦克3 · 炮兵2 · 战斗机2 · 轰炸机2 &nbsp;|&nbsp; 上限分布：<b style="color:#e09060">1张×3</b> · <b style="color:#6cf">2张×6</b> · <b style="color:#fa8">3张×6</b> · <b style="color:var(--y)">4张×2</b> &nbsp;|&nbsp; 特效补全 <b style="color:var(--y)">7</b> 张</div>
+
+<h3>指令</h3>
+<div class="tbl-wrapper">
+<table>
+<thead><tr><th>中文名</th><th>英文名</th><th>费用</th><th>上限</th><th>效果</th><th>条件</th></tr></thead>
+<tbody>
+<tr><td class="left">万岁冲锋</td><td class="left">Banzai Charge</td><td class="cost low">2</td><td class="limit x4">4</td><td class="eff">消灭一个 &#x2264;2 费的敌方单位</td><td class="eff">敌方有 &#x2264;2 费单位</td></tr>
+<tr><td class="left">神风特攻</td><td class="left">Kamikaze</td><td class="cost low">3</td><td class="limit x2">2</td><td class="eff">消灭己方单位，对敌方单位造成 5 点伤害</td><td class="eff">己方场上有人</td></tr>
+<tr><td class="left">武士道</td><td class="left">Bushido</td><td class="cost low">2</td><td class="limit x2">2</td><td class="eff">己方全体步兵单位获得 +2/+0</td><td class="eff">己方有步兵</td></tr>
+<tr><td class="left">玉碎</td><td class="left">Gyokusai</td><td class="cost low">4</td><td class="limit x1">1</td><td class="eff">消灭己方单位，对敌方总部造成该单位攻击力的伤害</td><td class="eff">己方有可牺牲单位</td></tr>
+<tr><td class="left">丛林突袭</td><td class="left">Jungle Raid</td><td class="cost low">3</td><td class="limit x3">3</td><td class="eff">消灭一个攻击力 &lt; 生命值的敌方单位</td><td class="eff">敌方有攻击力 &lt; 生命值的单位</td></tr>
+<tr><td class="left">侦察队</td><td class="left">Recon Squad</td><td class="cost low">3</td><td class="limit x2">2</td><td class="eff"><span class="star">&#x2726;</span> 将两个 1/2 侦察兵加入友方支援阵线（受到伤害时抽一张牌）</td><td class="eff">支援阵线空位≥2</td></tr>
+<tr><td class="left">扩张</td><td class="left">Expansion</td><td class="cost low">1</td><td class="limit x4">4</td><td class="eff">若前线有友方日本单位，抽两张牌</td><td class="eff">己方前线有日本单位</td></tr>
+</tbody>
+</table>
+</div>
+
+<hr>
+<div style="text-align:center;color:var(--d);font-size:.72rem;margin-top:20px">
+  KARDS 卡牌全览 · 平衡版 &nbsp;|&nbsp; 总计 5 阵营 · <b>92 张</b>（64 单位 + 28 指令）<br>
+  同名上限分级：<b style="color:#e09060">1张 ×17</b> · <b style="color:#6cf">2张 ×34</b> · <b style="color:#fa8">3张 ×31</b> · <b style="color:var(--y)">4张 ×10</b>（合计 92）<br>
+  本次为 <b style="color:var(--y)">30</b> 张纯词条单位补全「国家特性特效」，白板卡清零<br>
+ 生成于 GameEngine v2 · 截止 2026-09-29
+</div>
+
+<script>
+/* =========================================================
+   卡图 与游戏 kards.html 中的 IMG_MAP 完全一致
+   自动为每个表格行插入卡图列（英文名 → 图片路径）
+   ========================================================= */
+var IMG_MAP={
+  'Volksgrenadier':'Kards/images/Germany/D_I_Volksgrenadier.jpg',
+  'Panzergrenadier':'Kards/images/Germany/装甲掷弹兵.png',
+  'Sturmpionier':'Kards/images/Germany/突击工兵.png',
+  'MG42 Team':'Kards/images/Germany/D_I_MG42Team.png',
+  'Fallschirmjager':'Kards/images/Germany/D_I_Fallschirmjager.jpg',
+  'Panzer III':'Kards/images/Germany/D_T_Panther.jpg',
+  'StuG IV':'Kards/images/Germany/D_T_Panther.jpg',
+  'Tiger I':'Kards/images/Germany/D_T_TigerI.jpg',
+  'Wespe':'Kards/images/Germany/D_A_88mmFlak.jpg',
+  '88mm Flak':'Kards/images/Germany/D_A_88mmFlak.jpg',
+  'Bf 109 G':'Kards/images/Germany/D_F_Bf109.jpg',
+  'Fw 190 A':'Kards/images/Germany/D_F_Fw190.jpg',
+  'Me 262':'Kards/images/Germany/D_F_Me262.jpg',
+  'Ju 87 Stuka':'Kards/images/Germany/D_B_Stuka.jpg',
+  'Ju 88':'Kards/images/Germany/D_B_Ju88.jpg',
+  'He 177':'Kards/images/Germany/D_B_He177.jpg',
+  'Sudden Strike':'Kards/images/Germany/突然袭击.jpg',
+  'Tactical Strike':'Kards/images/Germany/战术打击.jpg',
+  'Blitzkrieg':'Kards/images/Germany/闪电战.jpg',
+  'Combined Arms':'Kards/images/Germany/协同作战.jpg',
+  'Blockade':'Kards/images/Germany/断水.jpg',
+  'Stuka Dive':'Kards/images/Germany/斯图卡俯冲.jpg',
+  'Mobilized Infantry':'Kards/images/Soviet_Union/S_I_RedArmy.jpg',
+  'Guards Infantry':'Kards/images/Soviet_Union/近卫步兵.jpg',
+  '4th Guards Rifles':'Kards/images/Soviet_Union/S_I_GuardsFlag.jpg',
+  'Guards Infantry 2nd':'Kards/images/Soviet_Union/近卫步兵第二团.jpg',
+  'Assault Sapper':'Kards/images/Soviet_Union/S_I_RuinDefender.jpg',
+  'Sniper':'Kards/images/Soviet_Union/S_I_Sniper.jpg',
+  'Sniper Team':'Kards/images/Soviet_Union/S_I_Sniper.jpg',
+  'Partisan':'Kards/images/Soviet_Union/S_I_Partisan.png',
+  'Ruin Defender':'Kards/images/Soviet_Union/S_I_RuinDefender.jpg',
+  'T-34/76':'Kards/images/Soviet_Union/S_T_T34.jpg',
+  'IS-3':'Kards/images/Soviet_Union/IS-3.jpg',
+  'IS-2':'Kards/images/Soviet_Union/S_T_IS2.jpg',
+  'ZiS-3':'Kards/images/Soviet_Union/S_A_ZIS3.jpg',
+  'Katyusha BM-13':'Kards/images/Soviet_Union/S_A_Katyusha.jpg',
+  'Yak-9':'Kards/images/Soviet_Union/S_F_Yak3.jpg',
+  'La-7':'Kards/images/Soviet_Union/S_F_La7.jpg',
+  'MiG-3':'Kards/images/Soviet_Union/S_F_Mig3.jpg',
+  'Pe-2':'Kards/images/Soviet_Union/S_B_Pe2.jpg',
+  'Tu-2':'Kards/images/Soviet_Union/S_B_Tu2.jpg',
+  'Il-2':'Kards/images/Soviet_Union/S_B_Il2.jpg',
+  'Artillery Blockade':'Kards/images/Soviet_Union/S_A_Katyusha.jpg',
+  'Bloody Sickle':'Kards/images/Soviet_Union/血红的镰刀.jpg',
+  'At All Costs':'Kards/images/Soviet_Union/不惜代价.jpg',
+  'Steel Tide':'Kards/images/Soviet_Union/钢铁洪流.jpg',
+  'Workers Unite':'Kards/images/Soviet_Union/工人们联合.jpg',
+  'Winter Offensive':'Kards/images/Soviet_Union/冬季攻势.jpg',
+  'Human Wave Tactics':'Kards/images/Soviet_Union/人海战术.jpg',
+  '8th Guards Infantry':'Kards/images/Soviet_Union/近卫第8步兵师.jpg',
+  'GI':'Kards/images/USA/U_I_GI.jpg',
+  'Rifle Squad':'Kards/images/USA/U_I_SquadHouse.jpg',
+  'US Marines':'Kards/images/USA/U_I_Marine.jpg',
+  'Rangers':'Kards/images/USA/U_I_Ranger.jpg',
+  'Paratrooper':'Kards/images/USA/空降兵.jpg',
+  'Sherman M4A3':'Kards/images/USA/U_T_Sherman.jpg',
+  'M36 Jackson':'Kards/images/USA/U_T_Pershing.jpg',
+  'M26 Pershing':'Kards/images/USA/U_T_Pershing.jpg',
+  'M3 Stuart':'Kards/images/USA/U_T_Stuart.jpg',
+  '105mm M2':'Kards/images/USA/U_A_105mm.jpg',
+  'M7 Priest':'Kards/images/USA/U_A_M7Priest.jpg',
+  '155mm Long Tom':'Kards/images/USA/U_A_105mm.jpg',
+  'P-51D Mustang':'Kards/images/USA/U_F_P51.jpg',
+  'P-47 Thunderbolt':'Kards/images/USA/U_F_P47.jpg',
+  'P-38 Lightning':'Kards/images/USA/U_F_P38.jpg',
+  'P-40 Warhawk':'Kards/images/USA/U_F_P40.jpg',
+  'B-17 Flying Fortress':'Kards/images/USA/U_B_B17.jpg',
+  'B-25 Mitchell':'Kards/images/USA/U_B_B25.jpg',
+  'B-29 Superfortress':'Kards/images/USA/U_B_B29.jpg',
+  'Death From Above':'Kards/images/USA/U_B_B17.jpg',
+  'War Bonds':'Kards/images/USA/战争债券.jpg',
+  'War Machine':'Kards/images/USA/战争机器.jpg',
+  'Industrial Might':'Kards/images/USA/U_T_Sherman.jpg',
+  'Airborne Division':'Kards/images/USA/空降师.png',
+  'Strategic Bombing':'Kards/images/USA/U_B_B29.jpg',
+  'Home Guard':'Kards/images/UK/B_I_BritInfantry.jpg',
+  'Scottish Paratroopers':'Kards/images/UK/苏格兰伞兵.jpg',
+  'Commandos':'Kards/images/UK/B_I_Commando.jpg',
+  'Royal Engineers':'Kards/images/UK/皇家工兵.jpg',
+  'Desert Rat':'Kards/images/UK/B_I_DesertRat.png',
+  'Paratrooper (UK)':'Kards/images/UK/B_I_Paratrooper.png',
+  'Matilda II':'Kards/images/UK/B_T_Valentine.jpg',
+  'Valentine':'Kards/images/UK/B_T_Valentine.jpg',
+  'Churchill IV':'Kards/images/UK/B_T_Churchill.jpg',
+  'Cromwell':'Kards/images/UK/B_T_Cromwell.jpg',
+  'Cromwell Mk IV':'Kards/images/UK/B_T_Cromwell.jpg',
+  'Crusader':'Kards/images/UK/B_T_Crusader.jpg',
+  '25-pounder':'Kards/images/UK/B_A_25pounder.jpg',
+  '17-pounder':'Kards/images/UK/B_A_25pounder.jpg',
+  'Bofors 40mm':'Kards/images/UK/B_A_Bofors.jpg',
+  'Spitfire Mk V':'Kards/images/UK/B_F_Spitfire.jpg',
+  'Oxford':'Kards/images/UK/牛津.jpg',
+  'Hurricane Mk I':'Kards/images/UK/B_F_Hurricane.jpg',
+  'Typhoon':'Kards/images/UK/B_F_Typhoon.jpg',
+  'Lancaster':'Kards/images/UK/B_B_Lancaster.jpg',
+  'Wellington':'Kards/images/UK/B_B_Wellington.jpg',
+  'Mosquito':'Kards/images/UK/B_B_Wellington.jpg',
+  'Artillery Barrage':'Kards/images/UK/B_A_25pounder.jpg',
+  'RAF Support':'Kards/images/UK/B_F_Spitfire.jpg',
+  'AA Fire':'Kards/images/UK/B_A_Bofors.jpg',
+  'Delay Tactics':'Kards/images/UK/拖延战术.jpg',
+  'Radar Alert':'Kards/images/UK/雷达警报.jpg',
+  'War of Attrition':'Kards/images/UK/B_T_Valentine.jpg',
+  'IJA Squad':'Kards/images/Japan/J_I_IJA.jpg',
+  'Officer':'Kards/images/Japan/J_I_Officer.jpg',
+  'SNLF Marines':'Kards/images/Japan/J_I_Officer.jpg',
+  'Giretsu Squad':'Kards/images/Japan/J_I_Banzai.jpg',
+  'Type 97 Chi-Ha':'Kards/images/Japan/J_T_Type97.jpg',
+  'Type 95 Ha-Go':'Kards/images/Japan/J_T_Type95HaGo.jpg',
+  'Type 3 Chi-Nu':'Kards/images/Japan/J_T_Type3ChiNu.jpg',
+  'Type 1 Ho-Ni':'Kards/images/Japan/J_T_Type3ChiNu.jpg',
+  'Type 94 Mountain Gun':'Kards/images/Japan/J_A_MountainGun.jpg',
+  'Type 96 Howitzer':'Kards/images/Japan/J_A_Type92Gun.jpg',
+  'A6M Zero':'Kards/images/Japan/J_F_Zero.jpg',
+  'Ki-43 Hayabusa':'Kards/images/Japan/J_F_Ki43Hayabusa.jpg',
+  'N1K2-J Shiden':'Kards/images/Japan/J_F_J2MRaiden.jpg',
+  'J2M Raiden':'Kards/images/Japan/J_F_J2MRaiden.jpg',
+  'D3A Val':'Kards/images/Japan/J_B_SuiseiD4Y.jpg',
+  'Suisei D4Y':'Kards/images/Japan/J_B_SuiseiD4Y.jpg',
+  'G4M Betty':'Kards/images/Japan/J_B_G4M.jpg',
+  'Ki-21 Sally':'Kards/images/Japan/J_B_Ki21Sally.jpg',
+  'Ki-49 Helen':'Kards/images/Japan/J_B_Ki49Helen.jpg',
+  'Banzai Charge':'Kards/images/Japan/J_F_Ki43Hayabusa.jpg',
+  'Kamikaze':'Kards/images/Japan/J_B_SuiseiD4Y.jpg',
+  'Bushido':'Kards/images/Japan/J_B_G4M.jpg',
+  'Gyokusai':'Kards/images/Japan/J_B_Ki21Sally.jpg',
+  'Jungle Raid':'Kards/images/Japan/J_B_Ki49Helen.jpg',
+  'Expansion':'Kards/images/Japan/扩张.jpg',
+  'Recon Squad':'Kards/images/Japan/侦察队.jpg',
+  'Scout':'Kards/images/Japan/侦察兵.jpg'
+};
+
+(function(){
+  document.querySelectorAll('.tbl-wrapper table').forEach(function(tbl){
+    var headers=tbl.querySelector('thead tr');
+    // 先识别费用列（在插入卡图列之前，表头与数据行列序一致）
+    // 单位表=部署费(第6列，索引5)，指令表=费用(第3列，索引2)
+    var thTexts=Array.prototype.map.call(headers.children,function(h){return h.textContent.trim()});
+    var costIdx=thTexts.indexOf('部署费');
+    if(costIdx<0)costIdx=thTexts.indexOf('费用');
+
+    // 在英文名列后插入"卡图"表头
+    var imgTh=document.createElement('th');
+    imgTh.textContent='卡图';
+    imgTh.style.width='92px';
+    headers.insertBefore(imgTh,headers.children[2]);
+
+    // 数据行按费用从低到高排序（costIdx 为插入卡图前的真实列索引）
+    var tbody=tbl.querySelector('tbody');
+    var rows=Array.prototype.slice.call(tbody.querySelectorAll('tr'));
+    if(costIdx>=0&&rows.length){
+      rows.sort(function(a,b){
+        var tda=a.children[costIdx], tdb=b.children[costIdx];
+        var va=tda?parseInt(tda.textContent.replace(/[^\d-]/g,''),10)||0:0;
+        var vb=tdb?parseInt(tdb.textContent.replace(/[^\d-]/g,''),10)||0:0;
+        return va-vb;
+      });
+      rows.forEach(function(r){tbody.appendChild(r);});
+    }
+
+    // 每个数据行：英文名 = 第2个td
+    rows.forEach(function(tr){
+      var tds=tr.querySelectorAll('td');
+      if(!tds.length)return;
+      var en=tds[1]?tds[1].textContent.trim():'';
+      var src=IMG_MAP[en];
+      var td=document.createElement('td');
+      td.className='img-cell';
+      if(src){
+        var img=document.createElement('img');
+        img.src=src;img.alt=en;img.loading='lazy';
+        img.onerror=function(){this.parentNode.innerHTML='';this.parentNode.className='img-cell noimg';this.parentNode.textContent='无图'};
+        td.appendChild(img);
+      }else{
+        td.className='img-cell noimg';td.textContent='无图';
+      }
+      tr.insertBefore(td,tr.children[2]);
+    });
+  });
+
+  // ===== 战斗词条加粗 =====
+  // 遍历每个 .eff 单元格的文本节点，将部署/亡计/闪击等战斗词条用 <b> 包裹
+  var BOLD_WORDS=['部署：','亡计：','闪击','冲击','伏击','奋战','守护','重甲','烟幕','压制','召唤','回复','额外','再行动'];
+  var boldRe=new RegExp('('+BOLD_WORDS.join('|')+')','g');
+  function boldTextNode(node){
+    var txt=node.nodeValue;
+    if(!boldRe.test(txt)){boldRe.lastIndex=0;return;}
+    boldRe.lastIndex=0;
+    var parent=node.parentNode;
+    var frag=document.createDocumentFragment();
+    var last=0;var m;
+    while((m=boldRe.exec(txt))!==null){
+      if(m.index>last){frag.appendChild(document.createTextNode(txt.slice(last,m.index)));}
+      var b=document.createElement('b');b.textContent=m[1];frag.appendChild(b);
+      last=m.index+m[1].length;
+      if(m.index+m[1].length>=txt.length)break;
+    }
+    frag.appendChild(document.createTextNode(txt.slice(last)));
+    parent.replaceChild(frag,node);
+  }
+  document.querySelectorAll('td.eff').forEach(function(td){
+    var walk=document.createTreeWalker(td,NodeFilter.SHOW_TEXT);
+    var nodes=[];var n;
+    while((n=walk.nextNode()))nodes.push(n);
+    nodes.forEach(boldTextNode);
+  });
+})();
+
+// ===== 快捷跳转（带顶部偏移的精确滚动）=====
+function goTo(id){
+  var el=document.getElementById(id);
+  if(!el)return;
+  var top=0;
+  if(el.getBoundingClientRect){
+    top=el.getBoundingClientRect().top+(window.pageYOffset||document.documentElement.scrollTop||0)-8;
+  }
+  var scroller=document.scrollingElement||document.documentElement;
+  var start=scroller.scrollTop;
+  var diff=top-start;
+  var duration=350,startT=null;
+  function step(now){
+    if(startT===null)startT=now;
+    var p=Math.min(1,(now-startT)/duration);
+    // easeInOutCubic 平滑
+    var ease=p<.5?4*p*p*p:1-Math.pow(-2*p+2,3)/2;
+    scroller.scrollTop=start+diff*ease;
+    if(p<1)requestAnimationFrame(step);
+  }
+  requestAnimationFrame(step);
+}
+
+</script>
+
+<!-- 战斗手册弹窗 -->
+<div class="kw-modal" id="kw-modal">
+<div class="kw-panel">
+  <div class="kw-tabs">
+    <button class="kw-tab active" id="kw-tab-unit-btn" onclick="switchKwTab('unit')">兵种介绍</button>
+    <button class="kw-tab" id="kw-tab-keyword-btn" onclick="switchKwTab('keyword')">词条介绍</button>
+  </div>
+
+  <!-- ====== 兵种介绍面板 ====== -->
+  <div class="kw-tab-content" id="kw-tab-unit">
+    <div class="ut-card ut-I">
+      <div class="ut-header"><span class="ut-icon ut-I">I</span><div><div class="ut-name">步兵 Infantry</div><div class="ut-sub">地面单位 · 陆军</div></div></div>
+      <div class="ut-desc">核心定位：最基础的<b>陆军单位</b>，是卡组最常见的组成部分。</div>
+      <div class="ut-stats"><span>攻击范围：<b>仅相邻战线</b></span><span>行动：<b>移动或攻击二选一</b></span><span>反击：<b>正常受反击</b></span><span>守护：<b>受守护影响</b></span></div>
+    </div>
+
+    <div class="ut-card ut-T">
+      <div class="ut-header"><span class="ut-icon ut-T">T</span><div><div class="ut-name">坦克 Tank</div><div class="ut-sub">地面单位 · 装甲</div></div></div>
+      <div class="ut-desc">核心定位：高机动性的<b>陆军单位</b>，高费坦克通常具有<b>重甲</b>。坦克可以<b>在同一回合中移动和攻击</b>，顺序不限，但每次动作分别消耗行动费用。</div>
+      <div class="ut-stats"><span>攻击范围：<b>仅相邻战线</b></span><span>行动：<b>可移动+攻击</b></span><span>反击：<b>正常受反击</b></span><span>守护：<b>受守护影响</b></span></div>
+    </div>
+
+    <div class="ut-card ut-A">
+      <div class="ut-header"><span class="ut-icon ut-A">A</span><div><div class="ut-name">炮兵 Artillery</div><div class="ut-sub">地面单位 · 支援</div></div></div>
+      <div class="ut-desc">核心定位：可以在支援阵线上对敌人发起攻击的<b>陆军单位</b>。在友方支援阵线即可直接攻击<b>敌方支援阵线</b>的单位和总部，不受战线位置限制。且可以<b>无视守护</b>直接攻击被守护的目标。<b>不受到反击伤害，也不造成反击伤害</b></div>
+      <div class="ut-stats"><span>攻击范围：<b>任意战线</b></span><span>行动：<b>移动或攻击二选一</b></span><span>反击：<b>不受反击</b></span><span>守护：<b>无视守护</b></span></div>
+    </div>
+
+    <div class="ut-card ut-F">
+      <div class="ut-header"><span class="ut-icon ut-F">F</span><div><div class="ut-name">战斗机 Fighter</div><div class="ut-sub">空军单位 · 制空</div></div></div>
+      <div class="ut-desc">核心定位：<b>空军单位</b>，可以利用空中优势向<b>任意战线</b>发起攻击。拥有<b>被动防御能力</b>——且只要战斗机在场，敌方轰炸机必须先攻击战斗机，才能攻击该战线上的其他目标。</div>
+      <div class="ut-stats"><span>攻击范围：<b>任意战线</b></span><span>行动：<b>移动或攻击二选一</b></span><span>反击：<b>正常受反击</b></span><span>守护：<b>受守护影响</b></span></div>
+    </div>
+
+    <div class="ut-card ut-O">
+      <div class="ut-header"><span class="ut-icon ut-O">B</span><div><div class="ut-name">轰炸机 Bomber</div><div class="ut-sub">空军单位 · 轰炸</div></div></div>
+      <div class="ut-desc">核心定位：<b>空军单位</b>，可以利用空中优势向<b>任意战线</b>发起攻击。可以<b>无视守护</b>直接攻击被守护的目标。但如果敌方战斗机在同一战线，必须先攻击战斗机。<b>不受到反击伤害（战斗机除外），也不造成反击伤害</b></div>
+      <div class="ut-stats"><span>攻击范围：<b>任意战线</b></span><span>行动：<b>移动或攻击二选一</b></span><span>反击：<b>不受反击（打战斗机除外）</b></span><span>守护：<b>无视守护</b></span></div>
+    </div>
+
+    <h3>五大兵种对比速查</h3>
+    <table class="ut-compare">
+      <tr><th>兵种</th><th>攻击范围</th><th>移动与攻击</th><th>攻击时反击</th><th>被攻击时反击</th><th>守护影响</th></tr>
+      <tr class="ut-I-tr"><td>步兵</td><td>仅相邻战线</td><td>二选一</td><td>正常受反击</td><td>正常反击</td><td>受守护影响</td></tr>
+      <tr class="ut-T-tr"><td>坦克</td><td>仅相邻战线</td><td>可移动+攻击</td><td>正常受反击</td><td>正常反击</td><td>受守护影响</td></tr>
+      <tr class="ut-A-tr"><td>炮兵</td><td>任意战线</td><td>二选一</td><td>不受反击</td><td>不反击</td><td>无视守护</td></tr>
+      <tr class="ut-F-tr"><td>战斗机</td><td>任意战线</td><td>二选一</td><td>正常受反击</td><td>正常反击</td><td>受守护影响</td></tr>
+      <tr class="ut-O-tr"><td>轰炸机</td><td>任意战线</td><td>二选一</td><td>不受反击*</td><td>不反击</td><td>无视守护</td></tr>
+    </table>
+    <div class="kw-modal-note">* 轰炸机攻击战斗机时正常受反击 · 以上定义均来自 KARDS 官方游戏指南</div>
+  </div>
+
+  <!-- ====== 词条介绍面板 ====== -->
+  <div class="kw-tab-content" id="kw-tab-keyword" style="display:none">
+    <div class="kw-row"><span class="kw-tag-big G">守护</span><div class="kw-desc">与守护单位<b>相邻的非守护单位和总部</b>无法被<b>轰炸机和炮兵以外的单位</b>攻击。</div></div>
+    <div class="kw-row"><span class="kw-tag-big B">闪击</span><div class="kw-desc">闪击单位可以在<b>进入战场的回合</b>行动（移动/攻击）。</div></div>
+    <div class="kw-row"><span class="kw-tag-big H">重甲</span><div class="kw-desc">单位受到的<b>对战伤害</b>减少 X。</div></div>
+    <div class="kw-row"><span class="kw-tag-big A">伏击</span><div class="kw-desc">伏击单位<b>每回合首次被攻击</b>时，会首先造成反击伤害。若敌方单位因此被消灭，则其无法对伏击单位造成伤害。</div></div>
+    <div class="kw-row"><span class="kw-tag-big S">烟幕</span><div class="kw-desc">拥有烟幕的单位或总部<b>无法被敌方单位攻击</b>。单位攻击或移动后<b>失去烟幕</b>。守护单位、位于前线的单位以及战斗机<b>不能具有烟幕</b>。</div></div>
+    <div class="kw-row"><span class="kw-tag-big F">奋战</span><div class="kw-desc">每回合可以<b>攻击两次</b>。</div></div>
+    <div class="kw-row"><span class="kw-tag-big C">冲击</span><div class="kw-desc">冲击单位首次攻击时，被攻击单位<b>不会造成任何反击伤害</b>。冲击单位攻击单位后，<b>移除冲击</b>。</div></div>
+  </div>
+
+<button class="kw-close" onclick="document.getElementById('kw-modal').classList.remove('show')">关闭</button>
+</div>
+</div>
+<script>
+document.getElementById('kw-modal').addEventListener('click',function(e){
+  if(e.target===this)this.classList.remove('show');
+});
+// 标签页切换
+function switchKwTab(tab){
+  var unitPanel=document.getElementById('kw-tab-unit');
+  var kwPanel=document.getElementById('kw-tab-keyword');
+  var unitBtn=document.getElementById('kw-tab-unit-btn');
+  var kwBtn=document.getElementById('kw-tab-keyword-btn');
+  if(tab==='unit'){
+    unitPanel.style.display='';kwPanel.style.display='none';
+    unitBtn.classList.add('active');kwBtn.classList.remove('active');
+  }else{
+    unitPanel.style.display='none';kwPanel.style.display='';
+    unitBtn.classList.remove('active');kwBtn.classList.add('active');
+  }
+}
+</script>
+
+</body>
+</html>
