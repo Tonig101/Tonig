@@ -94,6 +94,13 @@ body{background:var(--bg);color:var(--w);min-height:100vh;display:flex;justify-c
 .push-zone:active{transform:scale(.96)}
 .push-unafford{border-color:#644;color:#a66;background:rgba(255,50,50,.08)}
 .push-unafford:hover{background:rgba(255,50,50,.15);border-color:#844;transform:none}
+/* 手机推线待定高亮 */
+.card.push-pending{border:2px solid #f9c74f!important;box-shadow:0 0 14px rgba(249,199,79,.5),0 0 24px rgba(249,199,79,.2);animation:pushGlow 1.2s infinite}
+@keyframes pushGlow{0%,100%{box-shadow:0 0 10px rgba(249,199,79,.4)}50%{box-shadow:0 0 22px rgba(249,199,79,.7)}}
+#frontline.push-target{border-color:#f9c74f!important;background:rgba(249,199,79,.08);box-shadow:inset 0 0 30px rgba(249,199,79,.2);cursor:pointer;animation:pushZonePulse 1s infinite}
+@keyframes pushZonePulse{0%,100%{box-shadow:inset 0 0 20px rgba(249,199,79,.15)}50%{box-shadow:inset 0 0 40px rgba(249,199,79,.35)}}
+.push-target-text{color:#f9c74f;font-weight:800;font-size:.78rem;text-align:center;width:100%;animation:blinkText 1s infinite}
+@keyframes blinkText{0%,100%{opacity:1}50%{opacity:.4}}
 
 /* 卡牌 */
 .card{width:128px;border-radius:7px;cursor:default;transition:all .2s;flex-shrink:0;position:relative;user-select:none;background:var(--card);border:1px solid #333}
@@ -2734,12 +2741,12 @@ var GAME={
         // 我方支援单位且可推线
         if(GAME.phase==='play'&&isPlayer&&c.zone==='support'&&GAME.canPush(GAME.player)&&c.canStillMove){
           if(GAME.isTouchDevice){
-            // 手机：点击推线
+            // 手机：点击推线（两步：先选单位→再点前线）
             el.classList.add('clickable');
             el.onclick=function(e){
               e.stopPropagation();
-              GAME.pendingPush=c;
-              GAME.pushToFL();
+              if(GAME.pendingPush===c){GAME.pendingPush=null;GAME.render();return;}
+              GAME.pendingPush=c;GAME.render();
             };
           }else{
             // 电脑：拖拽推线
@@ -2854,8 +2861,14 @@ var GAME={
 
     // 前线：敌方单位 | 分隔 | 我方单位
     var fl=$('frontline');fl.innerHTML='';
+    fl.classList.toggle('push-target',!!GAME.pendingPush&&GAME.isTouchDevice);
+    if(GAME.pendingPush&&GAME.isTouchDevice){fl.onclick=function(){if(GAME.pendingPush)GAME.pushToFL();}}else{fl.onclick=null;}
     if(!pl.fl.length&&!en.fl.length){
-      fl.innerHTML='<span class="empty-text">前线（空）</span>';
+      if(GAME.pendingPush&&GAME.isTouchDevice){
+        fl.innerHTML='<span class="push-target-text">\uD83D\uDC46 \u70B9\u51FB\u6B64\u5904\u63A8\u7EBF\u81F3\u524D\u7EBF</span>';
+      }else{
+        fl.innerHTML='<span class="empty-text">前线（空）</span>';
+      }
     }else{
       if(en.fl.length){
         var enFlDiv=document.createElement('div');enFlDiv.className='fl-group enemy-fl';
