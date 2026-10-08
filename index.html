@@ -608,7 +608,7 @@ body{background:var(--bg);color:var(--w);min-height:100vh;display:flex;justify-c
   #panel h3 { width: 100%; font-size: .7rem; margin: 0; }
   #log { flex: 1 1 100%; max-height: 80px; font-size: .62rem; }
   #prompt-area { flex: 1 1 100%; max-height: 60px; font-size: .62rem; }
-  .panel-actions { width: 100%; justify-content: flex-end; margin-top: 2px; order: -1; }
+  .panel-actions { display: none; }
   .panel-actions .btn-action { padding: 10px 22px; font-size: .85rem; }
 
   /* 卡牌整体 */
@@ -618,21 +618,21 @@ body{background:var(--bg);color:var(--w);min-height:100vh;display:flex;justify-c
   .card .art .type-badge { font-size: .44rem; bottom: 1px; right: 2px; padding: 0 3px; }
   .card .mid { font-size: .6rem; padding: 1px 4px; }
   .card .stats { font-size: .62rem; padding: 1px 4px; }
-  .card .bot { font-size: .5rem; padding: 1px 4px; min-height: 22px; }
-  .card .top { font-size: .58rem; padding: 2px 5px; }
-  .card .cost-badge { width: 20px; height: 20px; font-size: .65rem; top: -2px; left: -2px; }
-  .card .acost-badge { width: 16px; height: 16px; font-size: .52rem; top: -2px; right: -2px; }
+  .card { width: 82px; }
+  .card .art { height: 62px; }
+  .card .art .art-icon { font-size: .85rem; top: 12px; left: 2px; padding: 1px 3px; }
+  .card .art .type-badge { font-size: .42rem; bottom: 1px; right: 2px; padding: 0 3px; }
+  .card .mid { font-size: .56rem; padding: 1px 3px; }
+  .card .stats { font-size: .58rem; padding: 1px 3px; }
+  .card .bot { font-size: .48rem; padding: 1px 3px; min-height: 20px; }
+  .card .top { font-size: .55rem; padding: 2px 4px; }
+  .card .cost-badge { width: 18px; height: 18px; font-size: .6rem; top: -2px; left: -2px; }
+  .card .acost-badge { width: 14px; height: 14px; font-size: .48rem; top: -2px; right: -2px; }
 
-  /* 手牌 */
   .hand-section h3 { font-size: .68rem; }
-  .hand-cards { min-height: 90px; }
-  .hand-cards .card { margin-right: -46px; }
+  .hand-cards { min-height: 84px; }
+  .hand-cards .card { margin-right: -40px; }
   .hand-cards .card:hover { transform: translateY(-5px) scale(1.02); }
-
-  /* HQ 总部 */
-  .hq-card { min-width: 48px; min-height: 66px; padding: 3px; }
-  .hq-card .hq-name { font-size: .56rem; }
-  .hq-card .hq-body { font-size: .9rem; }
   .hq-card .hq-body .hp { font-size: .85rem; }
   .hq-card .hq-stats { font-size: .48rem; gap: 2px; }
   .hq-card .stat { font-size: .48rem; }
@@ -651,6 +651,11 @@ body{background:var(--bg);color:var(--w);min-height:100vh;display:flex;justify-c
   /* 按钮 */
   .btn { padding: 4px 10px; font-size: .68rem; }
   .ctrl-bar { gap: 4px; margin-top: 3px; }
+  /* 结束回合按钮（手机版） */
+  .btn-end-turn-mob { display: block; width: 100%; padding: 12px 0; font-size: .88rem; font-weight: 700; 
+    background: #f9c74f; color: #111; border: none; border-radius: 8px; cursor: pointer; 
+    margin-top: 4px; letter-spacing: 1px; }
+  .btn-end-turn-mob:active { background: #ffe066; transform: scale(0.98); }
   .push-zone { padding: 5px 10px; font-size: .7rem; }
 
   /* 提示弹窗 */
@@ -665,6 +670,9 @@ body{background:var(--bg);color:var(--w);min-height:100vh;display:flex;justify-c
   /* 弃牌堆 */
   #turnInfo { font-size: .7rem; }
 }
+
+/* 桌面端隐藏手机版结束回合按钮 */
+.btn-end-turn-mob { display: none; }
 
 /* ===== 新手教程 ===== */
 /* 新手教程 —— 底部固定栏，无遮蔽滤镜 */
@@ -753,6 +761,7 @@ body{background:var(--bg);color:var(--w);min-height:100vh;display:flex;justify-c
       <button class="btn btn-confirm" id="btnConfirm" onclick="GAME.confirmOrder()" style="display:none">&#10003; 确认使用</button>
       <button class="btn btn-ghost" id="btnCancel" onclick="GAME.cancelAction()" style="display:none">&#8617; 撤销</button>
       <button class="btn btn-red" onclick="GAME.surrender()">&#127987; 投降</button>
+    <button class="btn-end-turn-mob" id="btnEndTurnMob" onclick="GAME.endPlayerTurn()">⏩ 结束回合</button>
     </div>
   </div>
 </div>
@@ -3486,20 +3495,26 @@ var GAME={
     return score;
   },
 
-  // 智能推线（阵营风格增强版）
+  // 智能推线（阵营风格增强版 v2）
   _shouldPush:function(unit,ai,opp){
     var cfg=AI_CONFIG[AI_LEVEL];
     var style=this._getAIStyle();
     if(!cfg.pushSmart)return true;
     if(GAME.flTotal()>=5)return false;
 
-    // 阵营推线激进程度：英国/日本不主动推线
-    if(style.pushAggression<=0)return false;
-    // 美国只在有把握时推（50%概率模拟谨慎）
-    if(style.pushAggression<0.5&&Math.random()>style.pushAggression)return false;
+    // 支援阵线满了就推！不推就卡死了
+    if(ai.support.length>=4)return true;
+    // AI指挥点充足（>=5）：推线开道，不要攒费
+    if(ai.cmd>=5&&ai.support.length>=3)return true;
+
+    // 英国/日本不再死守——支援≥3时仍推线
+    if(style.pushAggression<=0){
+      if(ai.support.length>=3)return true;
+      return false;
+    }
 
     var supportCount=ai.support.filter(function(c){return c.hp>0}).length;
-    if(supportCount<=1)return false;
+    if(supportCount<=1&&ai.support.length<4)return false;
 
     var frontEnemy=opp.fl.filter(function(c){return c.hp>0});
     var avgEnemyAtk=0;
@@ -3507,21 +3522,28 @@ var GAME={
       frontEnemy.forEach(function(c){avgEnemyAtk+=c.effectiveAtk});
       avgEnemyAtk/=frontEnemy.length;
     }
-    if(avgEnemyAtk>=unit.hp&&!unit.hasG)return false;
+    // 濒死单位避免送头（除非支援满了需要清位置）
+    if(avgEnemyAtk>=unit.hp&&!unit.hasG&&ai.support.length<4)return false;
 
     // 德国：闪击单位优先推线
     if(style.pushPreferBlitz&&unit.hasB&&ai.fl.length===0)return true;
-    if(unit.hp<=2&&!unit.hasB)return false;
+    // 低血量单位：支援满了也得推
+    if(unit.hp<=2&&!unit.hasB){
+      if(ai.support.length>=3)return true;
+      return false;
+    }
     if(unit.hasB&&ai.fl.length===0)return true;
-    if(unit.isT&&unit.hp>=3)return true;
+    if(unit.isT&&unit.hp>=2)return true;
     if(unit.hasG)return true;
     if(ai.fl.length>=2)return false;
 
     var oppSupport=opp.support.filter(function(c){return c.hp>0});
     if(oppSupport.length>=2&&unit.effectiveAtk>=3)return true;
 
-    // 苏联：能推就推
-    if(style.pushAggression>=0.8&&unit.hp>=2)return true;
+    // 通用：支援接近满就推
+    if(ai.support.length>=3&&unit.hp>=2)return true;
+    // 有剩余指挥点就推，不攒费
+    if(ai.cmd>=3&&ai.support.length>=2)return true;
 
     return false;
   },
@@ -3548,6 +3570,8 @@ var GAME={
     else if(boardScore>3)reserve=Math.max(reserve,2);
     else if(boardScore<-5)reserve=0;
 
+    // 支援阵线满了就不留费，推线开路
+    if(en.support.length>=4)reserve=0;
     // 防空过：如果预留费导致无牌可出，动态降低预留
     var allAffordableOrders=en.hand.filter(function(c){return c.isOrder&&c.cost<=en.cmd});
     var allAffordableUnits=en.hand.filter(function(c){return !c.isOrder&&c.cost<=en.cmd&&en.support.length<4});
@@ -3615,7 +3639,13 @@ var GAME={
       var movers=en.support.filter(function(c){return c.canStillAct&&self._shouldPush(c,en,pl)});
       var mi=0;
       function stepMove(){
-        if(mi>=movers.length)return smartAttack();
+        if(mi>=movers.length){
+          if(en.support.length<4&&en.cmd>0){
+            var moreU=en.hand.filter(function(c){return !c.isOrder&&c.cost<=en.cmd});
+            if(moreU.length>0){units=moreU.sort(function(a,b){return self._cardValue(b,en,pl)-self._cardValue(a,en,pl)});ui=0;playUnits();return}
+          }
+          return smartAttack()
+        }
         var m=movers[mi++];
         if(en.fl.length>=2||!GAME.canPush(en)){stepMove();return}
         if(en.support.indexOf(m)<0||!m.canStillMove||en.cmd<m.acost){stepMove();return}
