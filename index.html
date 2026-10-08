@@ -2235,7 +2235,7 @@ var GAME={
       if(weak.length){var w=weak[0];w.hp=w.hp+2;w.maxHp=w.maxHp+2;v.healWeakest={card:w}}
     }
     // 三号坦克
-    if(!v.ambushKill&&attacker.effCode==='growOnHit'&&target!==null&&attacker.hp>0&&attacker.attacksThisTurn===1){
+    if(!v.ambushKill&&attacker.effCode==='growOnHit'&&attacker.hp>0&&attacker.attacksThisTurn===1){
       attacker.atk+=1;attacker.hp+=1;attacker.maxHp+=1;v.growOnHit=true;
     }
     // 丘吉尔IV
@@ -2576,6 +2576,14 @@ var GAME={
     else owner.fl.push(card);
     GAME.log(card.cn+' 加入战场（'+targetLine+'）— 不触发部署效果','effect');
     if(!card.canActOnDeploy){card.canAct=false;card.apSpent=99}
+    // 牛津：加入的守护单位获得增益
+    if(card.hasG){
+      var oxfords2=owner.allUnits().filter(function(u){return u.effCode==="oxfordBuff"&&u.hp>0});
+      oxfords2.forEach(function(ox2){
+        card.atk+=1;card.hp+=3;card.maxHp+=3;
+        GAME.log("\uD83D\uDCDC 牛津\u2192"+card.cn+" 获得+1/+3","effect");
+      });
+    }
     return true;
   },
 
@@ -3248,7 +3256,10 @@ var GAME={
       var canSelect=card.zone==='frontline'?card.canStillAtk:card.canStillAct;
       if(!canSelect)return toast('该单位已无法行动');
       GAME.selected=card;GAME.pendingPush=null;
-      if(card.zone==='support'&&GAME.canPush(GAME.player)&&card.canStillMove){
+      if(card.zone==="support"&&GAME.canPush(GAME.player)&&card.canStillMove){
+        if(GAME.isTouchDevice){
+          GAME.pendingPush=card;GAME.pushToFL();return;
+        }
         GAME.pendingPush=card;
       }
       GAME.render();
