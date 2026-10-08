@@ -813,7 +813,8 @@ var AI_LEVEL=1; // 默认简单
 var AI_CONFIG={
   1:{atkHQ:0.5,smartAtk:false,useOrders:false,pushSmart:false,lethalCheck:false,saveCredits:0},
   2:{atkHQ:0.8,smartAtk:true,useOrders:true,pushSmart:true,lethalCheck:true,saveCredits:0},
-  3:{atkHQ:1.0,smartAtk:true,useOrders:true,pushSmart:true,lethalCheck:true,saveCredits:2,hpBonus:10,cmdBonus:2,extraDraw:1}
+  3:{atkHQ:1.0,smartAtk:true,useOrders:true,pushSmart:true,lethalCheck:true,saveCredits:2},
+  4:{atkHQ:1.0,smartAtk:true,useOrders:true,pushSmart:true,lethalCheck:true,saveCredits:3,peekCards:5,godHand:true,seeHand:true}
 };
 // ==================== AI 阵营风格配置 ====================
 var AI_FACTION_STYLE={
@@ -3340,6 +3341,18 @@ var GAME={
     var fc=GAME.flControl();
     if(fc===ai)score+=5;
     else if(fc===opp)score-=5;
+    // 全知：偷看玩家手牌
+    if(AI_LEVEL>=4&&opp.hand.length>0){
+      var oppHandDmg=0,oppHandUnits=0;
+      opp.hand.forEach(function(c){
+        if(c.isOrder&&c.fx&&c.fx.indexOf('dmg')>=0)oppHandDmg+=3;
+        else if(!c.isOrder)oppHandUnits++;
+      });
+      if(oppHandDmg>=opp.hp)score-=15;
+      if(oppHandDmg>=ai.hp)score+=12;
+      if(opp.hand.length<=1)score+=8;
+      if(oppHandUnits>=3)score-=5;
+    }
     return score;
   },
 
@@ -3748,8 +3761,20 @@ var GAME={
     who.maxCmd=Math.min(24,who.baseMaxCmd+who.cmdBonus);
     who.cmd=who.maxCmd;
     if(!skipDraw){
-      // AI定向抽牌：中/困难难度 peek 2张选更适合阵营风格的
-      if(who===GAME.enemy&&AI_LEVEL>=2&&who.deck.length>=2){
+      // AI定向抽牌：中/困难 peek 2张; 全知 peek N张选最优
+      if(who===GAME.enemy&&AI_LEVEL>=4&&who.deck.length>=2){
+        var cfg4=AI_CONFIG[AI_LEVEL];var peekN=Math.min(cfg4.peekCards||5,who.deck.length);
+        var bestI=0,bestV=-9999;
+        for(var pi=0;pi<peekN;pi++){
+          var idx=who.deck.length-1-pi;
+          var vv=GAME._cardValue(who.deck[idx],GAME.enemy,GAME.player);
+          if(vv>bestV){bestV=vv;bestI=pi}
+        }
+        for(var pi=0;pi<=bestI;pi++){
+          if(pi===bestI){who.hand.push(who.deck.pop())}
+          else{var skip=who.deck.pop();who.deck.splice(who.deck.length-pi,0,skip)}
+        }
+      }else if(who===GAME.enemy&&AI_LEVEL>=2&&who.deck.length>=2){
         var c1=who.deck[who.deck.length-1],c2=who.deck[who.deck.length-2];
         var v1=GAME._cardValue(c1,GAME.enemy,GAME.player);
         var v2=GAME._cardValue(c2,GAME.enemy,GAME.player);
@@ -3760,7 +3785,7 @@ var GAME={
       }
     }
     if(who.nextExtraDraw){who.draw(who.nextExtraDraw);GAME.log('\uD83C\uDFA0 战争债券\u2192额外抽'+who.nextExtraDraw+'张牌','effect');who.nextExtraDraw=0;}
-    if(who===GAME.enemy){var cfg3=AI_CONFIG[AI_LEVEL];if(cfg3.cmdBonus){who.cmd+=cfg3.cmdBonus;GAME.log('\uD83D\uDCB0 AI困难加成：指挥点+'+cfg3.cmdBonus,'system')};if(cfg3.extraDraw&&GAME.turn>0){who.draw(cfg3.extraDraw);GAME.log('\uD83D\uDCB0 AI困难加成：额外抽'+cfg3.extraDraw+'张牌','system')}}
+
     // 当前玩家的单位刷新
     who.allUnits().forEach(function(c){c.resetTurn()});
     // 对手被压制的单位：已跳过对手整个回合，现在解除压制
@@ -3813,7 +3838,7 @@ var GAME={
     html+='<div class="diff-row">';
     var aiStyle=AI_FACTION_STYLE[ENEMY_FC]||AI_FACTION_STYLE['D'];
     var diffDescs=[
-      {l:1,icon:'🟢',name:'简单',desc:'随机出牌·演习模式'},{l:2,icon:'🟡',name:'普通',desc:aiStyle.desc||'标准对战'},{l:3,icon:'🔴',name:'困难',desc:(aiStyle.desc||'真实战场')+'(+)'}];
+      {l:1,icon:'\uD83D\uDFE2',name:'\u7B80\u5355',desc:'\u968F\u673A\u51FA\u724C\u00B7\u6F14\u4E60\u6A21\u5F0F'},{l:2,icon:'\uD83D\uDFE1',name:'\u666E\u901A',desc:aiStyle.desc||'\u6807\u51C6\u5BF9\u6218'},{l:3,icon:'\uD83D\uDD34',name:'\u56F0\u96BE',desc:(aiStyle.desc||'\u771F\u5B9E\u6218\u573A')+'\u2191'},{l:4,icon:'\uD83D\uDFE3',name:'\u5168\u77E5',desc:'\u9605\u8BFB\u624B\u724C\u00B7\u795E\u62BD\u00B7\u4E0D\u5361\u624B'}];
     diffDescs.forEach(function(d){
       html+='<div class="diff-btn'+(AI_LEVEL===d.l?' selected':'')+'" data-lv="'+d.l+'" onclick="GAME._selectDiff('+d.l+')"><span class="diff-icon">'+d.icon+'</span><span class="diff-name">'+d.name+'</span><span class="diff-desc">'+d.desc+'</span></div>';
     });
@@ -3933,7 +3958,7 @@ var GAME={
   _initGame:function(playerFc){
     $('overlay').classList.remove('show');$('log').innerHTML='';$('prompt-area').textContent='出牌即生成';
     GAME.player=new Player('你',playerFc);
-    GAME.enemy=new Player('AI对手',ENEMY_FC);var aiCfg=AI_CONFIG[AI_LEVEL];if(aiCfg.hpBonus){GAME.enemy.hp+=aiCfg.hpBonus;GAME.log('\uD83D\uDCB0 AI困难加成：生命+'+aiCfg.hpBonus,'system')}
+    GAME.enemy=new Player('AI对手',ENEMY_FC);
     GAME.turn=0;GAME.phase='play';GAME.selected=null;GAME.pendingPush=null;GAME.pendingEffect=null;GAME.pendingDeploy=null;GAME.gameOver=false;
 
     var playerFirst=Math.random()<0.5;
@@ -3962,6 +3987,21 @@ var GAME={
       var cheapest=pool.reduce(function(a,b){return a[6]<b[6]?a:b},pool[0]);
       var nc=new Card(cheapest);
       nc.owner=GAME.player;GAME.player.hand.push(nc);
+    }
+
+    // AI永不卡手：全知难度确保AI起手至少2张可出牌且全部≤3费
+    if(AI_LEVEL>=4){
+      var aiGuard=0;
+      while(aiGuard<50){
+        var aiPlayable=GAME.enemy.hand.filter(function(c){return c.cost<=3&&!c.isOrder});
+        if(aiPlayable.length>=2&&GAME.enemy.hand.every(function(c){return c.cost<=3||c.isOrder}))break;
+        var aiWorst=GAME.enemy.hand.reduce(function(a,b){return (a.cost*10+(a.isOrder?0:1))>(b.cost*10+(b.isOrder?0:1))?a:b});
+        GAME.enemy.hand=GAME.enemy.hand.filter(function(c){return c!==aiWorst});
+        var aiPos=Math.floor(Math.random()*(GAME.enemy.deck.length+1));
+        GAME.enemy.deck.splice(aiPos,0,aiWorst);
+        var aiIdx=Math.floor(Math.random()*(GAME.enemy.deck.length));
+        GAME.enemy.hand.push(GAME.enemy.deck.splice(aiIdx,1)[0]);aiGuard++;
+      }
     }
 
     if(GAME.playerIsFirst){
