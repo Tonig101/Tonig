@@ -115,6 +115,9 @@ hr{border:none;border-top:1px solid #2a2d3a;margin:20px 0}
 
 <h1>KARDS 卡牌全览</h1>
 
+<div style="text-align:center;margin-bottom:16px"><a href="index.html" style="color:#4fc3f7;text-decoration:none;font-size:.82rem;font-weight:700;border:1px solid #4fc3f7;padding:4px 14px;border-radius:16px;transition:all .2s" onmouseover="this.style.background='rgba(79,195,247,.15)'" onmouseout="this.style.background='none'">← 返回游戏</a></div>
+
+<button id="top-btn" title="返回顶部" onclick="window.scrollTo({top:0,behavior:'smooth'})" style="position:fixed;bottom:60px;right:20px;padding:8px 14px;border-radius:20px;background:#333;color:#ccc;border:none;font-size:.7rem;font-weight:900;cursor:pointer;box-shadow:0 4px 16px rgba(0,0,0,.5);z-index:999;transition:transform .15s" onmouseover="this.style.transform='scale(1.1)'" onmouseout="this.style.transform='scale(1)'">↑ 顶部</button>
 <button id="kw-btn" title="战斗手册" onclick="document.getElementById('kw-modal').classList.add('show')">战斗手册</button>
 
 <!-- 上限分级图例 -->
@@ -127,26 +130,26 @@ hr{border:none;border-top:1px solid #2a2d3a;margin:20px 0}
 
 <!-- 阵营设计理念 -->
 <div class="design">
-  <div class="design-box" onclick="goTo('faction-D')"><div class="dn"><span class="tag D">&#x2716; 德军</span></div><div class="dn slogan">闪电战 · 重甲突袭</div><p>以闪击/重甲为骨架，特效强调<b>装甲滚雪球与反装甲突击</b>：击杀后膨胀、打击坦克与空军增伤、工兵拆除重甲。</p></div>
-  <div class="design-box" onclick="goTo('faction-S')"><div class="dn"><span class="tag S">&#x262D; 苏军</span></div><div class="dn slogan">人海 · 牺牲</div><p>以数量与自我牺牲为核心，特效强调<b>以弱搏强与亡计补员</b>：数量优势、阵亡加入补充兵、掩护回血。</p></div>
-  <div class="design-box" onclick="goTo('faction-U')"><div class="dn"><span class="tag U">&#x2605; 美军</span></div><div class="dn slogan">工业 · 量产</div><p>以资源与补充为主线，特效强调<b>工业补给与联合作战</b>：部署抽牌、阵亡补员、护航机增幅轰炸机。</p></div>
-  <div class="design-box" onclick="goTo('faction-B')"><div class="dn"><span class="tag B">&#x2694; 英军</span></div><div class="dn slogan">要塞 · 坚守</div><p>以守护与重甲为基石，特效强调<b>防御、回血与工事</b>：防护光环、总部回复、反坦克猎手、重型堡垒。</p></div>
-  <div class="design-box" onclick="goTo('faction-J')"><div class="dn"><span class="tag J">&#x2600; 日军</span></div><div class="dn slogan">速攻 · 玉碎</div><p>以低行动费与自毁为核心，特效强调<b>亡计伤害与快速突进</b>：阵亡惩罚、击杀连击、直伤总部。</p></div>
+  <div class="design-box" onclick="goTo('faction-D')" title="点击跳转到德军卡牌"><div class="dn"><span class="tag D">&#x2716; 德军</span></div><div class="dn slogan">闪电战 · 重甲突袭</div><p>以闪击/重甲为骨架，特效强调<b>装甲滚雪球与反装甲突击</b>：击杀后膨胀、打击坦克与空军增伤、工兵拆除重甲。</p></div>
+  <div class="design-box" onclick="goTo('faction-S')" title="点击跳转到苏军卡牌"><div class="dn"><span class="tag S">&#x262D; 苏军</span></div><div class="dn slogan">人海 · 牺牲</div><p>以数量与自我牺牲为核心，特效强调<b>以弱搏强与亡计补员</b>：数量优势、阵亡加入补充兵、掩护回血。</p></div>
+  <div class="design-box" onclick="goTo('faction-U')" title="点击跳转到美军卡牌"><div class="dn"><span class="tag U">&#x2605; 美军</span></div><div class="dn slogan">工业 · 量产</div><p>以资源与补充为主线，特效强调<b>工业补给与联合作战</b>：部署抽牌、阵亡补员、护航机增幅轰炸机。</p></div>
+  <div class="design-box" onclick="goTo('faction-B')" title="点击跳转到英军卡牌"><div class="dn"><span class="tag B">&#x2694; 英军</span></div><div class="dn slogan">要塞 · 坚守</div><p>以守护与重甲为基石，特效强调<b>防御、回血与工事</b>：防护光环、总部回复、反坦克猎手、重型堡垒。</p></div>
+  <div class="design-box" onclick="goTo('faction-J')" title="点击跳转到日军卡牌"><div class="dn"><span class="tag J">&#x2600; 日军</span></div><div class="dn slogan">速攻 · 玉碎</div><p>以低行动费与自毁为核心，特效强调<b>亡计伤害与快速突进</b>：阵亡惩罚、击杀连击、直伤总部。</p></div>
 </div>
 
 
 <div class="summary">
-  <div class="summary-card" onclick="goTo('faction-D')"><div class="s-name tag D">&#x2716; 德军</div><div class="s-total">17张</div><div class="s-detail">12单位 + 5指令</div></div>
-  <div class="summary-card" onclick="goTo('faction-S')"><div class="s-name tag S">&#x262D; 苏军</div><div class="s-total">20张</div><div class="s-detail">14单位 + 6指令</div></div>
-  <div class="summary-card" onclick="goTo('faction-U')"><div class="s-name tag U">&#x2605; 美军</div><div class="s-total">17张</div><div class="s-detail">12单位 + 5指令</div></div>
-  <div class="summary-card" onclick="goTo('faction-B')"><div class="s-name tag B">&#x2694; 英军</div><div class="s-total">20张</div><div class="s-detail">14单位 + 6指令</div></div>
-  <div class="summary-card" onclick="goTo('faction-J')"><div class="s-name tag J">&#x2600; 日军</div><div class="s-total">18张</div><div class="s-detail">12单位 + 6指令</div></div>
+  <div class="summary-card" onclick="goTo('faction-D')" title="点击跳转到德军卡牌"><div class="s-name tag D">&#x2716; 德军</div><div class="s-total">18张</div><div class="s-detail">12单位 + 6指令</div></div>
+  <div class="summary-card" onclick="goTo('faction-S')" title="点击跳转到苏军卡牌"><div class="s-name tag S">&#x262D; 苏军</div><div class="s-total">21张</div><div class="s-detail">14单位 + 7指令</div></div>
+  <div class="summary-card" onclick="goTo('faction-U')" title="点击跳转到美军卡牌"><div class="s-name tag U">&#x2605; 美军</div><div class="s-total">18张</div><div class="s-detail">12单位 + 6指令</div></div>
+  <div class="summary-card" onclick="goTo('faction-B')" title="点击跳转到英军卡牌"><div class="s-name tag B">&#x2694; 英军</div><div class="s-total">20张</div><div class="s-detail">14单位 + 6指令</div></div>
+  <div class="summary-card" onclick="goTo('faction-J')" title="点击跳转到日军卡牌"><div class="s-name tag J">&#x2600; 日军</div><div class="s-total">19张</div><div class="s-detail">12单位 + 7指令</div></div>
 </div>
 
 <!-- ================================================================ -->
 <!-- 德军 D -->
 <!-- ================================================================ -->
-<h2 id="faction-D"><span class="tag D">&#x2716; 德军</span> Wehrmacht — 闪击突击 <span style="font-size:.72rem;color:var(--d);margin-left:auto">单位 12 + 指令 5 = 17张</span></h2>
+<h2 id="faction-D"><span class="tag D">&#x2716; 德军</span> Wehrmacht — 闪击突击 <span style="font-size:.72rem;color:var(--d);margin-left:auto">单位 12 + 指令 6 = 18张</span></h2>
 
 <h3>单位</h3>
 <div class="tbl-wrapper">
@@ -214,7 +217,7 @@ hr{border:none;border-top:1px solid #2a2d3a;margin:20px 0}
 <!-- ================================================================ -->
 <!-- 苏军 S -->
 <!-- ================================================================ -->
-<h2 id="faction-S"><span class="tag S">&#x262D; 苏军</span> Soviet Union — 人海牺牲 <span style="font-size:.72rem;color:var(--d);margin-left:auto">单位 14 + 指令 6 = 20张</span></h2>
+<h2 id="faction-S"><span class="tag S">&#x262D; 苏军</span> Soviet Union — 人海牺牲 <span style="font-size:.72rem;color:var(--d);margin-left:auto">单位 14 + 指令 7 = 21张</span></h2>
 
 <h3>单位</h3>
 <div class="tbl-wrapper">
@@ -289,7 +292,7 @@ hr{border:none;border-top:1px solid #2a2d3a;margin:20px 0}
 <!-- ================================================================ -->
 <!-- 美军 U -->
 <!-- ================================================================ -->
-<h2 id="faction-U"><span class="tag U">&#x2605; 美军</span> United States — 工业跳费 <span style="font-size:.72rem;color:var(--d);margin-left:auto">单位 12 + 指令 5 = 17张</span></h2>
+<h2 id="faction-U"><span class="tag U">&#x2605; 美军</span> United States — 工业跳费 <span style="font-size:.72rem;color:var(--d);margin-left:auto">单位 12 + 指令 6 = 18张</span></h2>
 
 <h3>单位</h3>
 <div class="tbl-wrapper">
@@ -431,7 +434,7 @@ hr{border:none;border-top:1px solid #2a2d3a;margin:20px 0}
 <!-- ================================================================ -->
 <!-- 日军 J -->
 <!-- ================================================================ -->
-<h2 id="faction-J"><span class="tag J">&#x2600; 日军</span> Imperial Japan — 速攻玉碎 <span style="font-size:.72rem;color:var(--d);margin-left:auto">单位 12 + 指令 6 = 18张</span></h2>
+<h2 id="faction-J"><span class="tag J">&#x2600; 日军</span> Imperial Japan — 速攻玉碎 <span style="font-size:.72rem;color:var(--d);margin-left:auto">单位 12 + 指令 7 = 19张</span></h2>
 
 <h3>单位</h3>
 <div class="tbl-wrapper">
@@ -500,8 +503,8 @@ hr{border:none;border-top:1px solid #2a2d3a;margin:20px 0}
 
 <hr>
 <div style="text-align:center;color:var(--d);font-size:.72rem;margin-top:20px">
-  KARDS 卡牌全览 · 平衡版 &nbsp;|&nbsp; 总计 5 阵营 · <b>92 张</b>（64 单位 + 28 指令）<br>
-  同名上限分级：<b style="color:#e09060">1张 ×17</b> · <b style="color:#6cf">2张 ×34</b> · <b style="color:#fa8">3张 ×31</b> · <b style="color:var(--y)">4张 ×10</b>（合计 92）<br>
+  KARDS 卡牌全览 · 平衡版 &nbsp;|&nbsp; 总计 5 阵营 · <b>96 张</b>（64 单位 + 32 指令）<br>
+  同名上限分级：<b style="color:#e09060">1张 ×17</b> · <b style="color:#6cf">2张 ×34</b> · <b style="color:#fa8">3张 ×31</b> · <b style="color:var(--y)">4张 ×10</b>（合计 96）<br>
   本次为 <b style="color:var(--y)">30</b> 张纯词条单位补全「国家特性特效」，白板卡清零<br>
  生成于 GameEngine v2 · 截止 2026-09-29
 </div>
@@ -641,7 +644,7 @@ var IMG_MAP={
   'Jungle Raid':'images/Japan/丛林突袭.png',
   'Expansion':'images/Japan/扩张.jpg',
   'Recon Squad':'images/Japan/侦察队.jpg',
-  'Scout':'images/Japan/侦察兵.jpg'
+  'Scout':'images/Japan/侦察兵.png'
 };
 
 (function(){
