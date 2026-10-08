@@ -813,7 +813,7 @@ var AI_LEVEL=1; // 默认简单
 var AI_CONFIG={
   1:{atkHQ:0.5,smartAtk:false,useOrders:false,pushSmart:false,lethalCheck:false,saveCredits:0},
   2:{atkHQ:0.8,smartAtk:true,useOrders:true,pushSmart:true,lethalCheck:true,saveCredits:0},
-  3:{atkHQ:1.0,smartAtk:true,useOrders:true,pushSmart:true,lethalCheck:true,saveCredits:2}
+  3:{atkHQ:1.0,smartAtk:true,useOrders:true,pushSmart:true,lethalCheck:true,saveCredits:2,hpBonus:10,cmdBonus:2,extraDraw:1}
 };
 // ==================== AI 阵营风格配置 ====================
 var AI_FACTION_STYLE={
@@ -3760,6 +3760,7 @@ var GAME={
       }
     }
     if(who.nextExtraDraw){who.draw(who.nextExtraDraw);GAME.log('\uD83C\uDFA0 战争债券\u2192额外抽'+who.nextExtraDraw+'张牌','effect');who.nextExtraDraw=0;}
+    if(who===GAME.enemy){var cfg3=AI_CONFIG[AI_LEVEL];if(cfg3.cmdBonus){who.cmd+=cfg3.cmdBonus;GAME.log('\uD83D\uDCB0 AI困难加成：指挥点+'+cfg3.cmdBonus,'system')};if(cfg3.extraDraw&&GAME.turn>0){who.draw(cfg3.extraDraw);GAME.log('\uD83D\uDCB0 AI困难加成：额外抽'+cfg3.extraDraw+'张牌','system')}}
     // 当前玩家的单位刷新
     who.allUnits().forEach(function(c){c.resetTurn()});
     // 对手被压制的单位：已跳过对手整个回合，现在解除压制
@@ -3932,7 +3933,7 @@ var GAME={
   _initGame:function(playerFc){
     $('overlay').classList.remove('show');$('log').innerHTML='';$('prompt-area').textContent='出牌即生成';
     GAME.player=new Player('你',playerFc);
-    GAME.enemy=new Player('AI对手',ENEMY_FC);
+    GAME.enemy=new Player('AI对手',ENEMY_FC);var aiCfg=AI_CONFIG[AI_LEVEL];if(aiCfg.hpBonus){GAME.enemy.hp+=aiCfg.hpBonus;GAME.log('\uD83D\uDCB0 AI困难加成：生命+'+aiCfg.hpBonus,'system')}
     GAME.turn=0;GAME.phase='play';GAME.selected=null;GAME.pendingPush=null;GAME.pendingEffect=null;GAME.pendingDeploy=null;GAME.gameOver=false;
 
     var playerFirst=Math.random()<0.5;
