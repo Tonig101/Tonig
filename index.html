@@ -3103,7 +3103,7 @@ var GAME={
         var uiDiv=document.createElement('div');uiDiv.className='ui-icons';
         icons.forEach(function(ic){
           var img=document.createElement('img');
-          img.src=ic.src;img.alt=ic.src.split('/').pop().replace('.png','');
+          img.src=ic.src;img.alt=ic.src.split('/').pop().replace(/\.(png|jpg)$/,'');
           img.title=img.alt;uiDiv.appendChild(img);
         });
         d.appendChild(uiDiv);
