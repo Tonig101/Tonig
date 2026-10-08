@@ -1,0 +1,338 @@
+﻿  // ==================== AI 辅助函数（增强版 v2） ====================
+
+  // 综合局势评估：正数=AI优势，负数=玩家优势
+  _evalBoard:function(ai,opp){
+    var score=0;
+    score+=(ai.hp-opp.hp)*0.5;
+    var myPower=0,oppPower=0,myCount=0,oppCount=0;
+    ai.allUnits().forEach(function(c){if(c.hp>0){myPower+=c.effectiveAtk+c.hp;myCount++}});
+    opp.allUnits().forEach(function(c){if(c.hp>0){oppPower+=c.effectiveAtk+c.hp;oppCount++}});
+    score+=(myPower-oppPower)*1.0;
+    score+=(myCount-oppCount)*2;
+    score+=(ai.hand.length-opp.hand.length)*1.5;
+    score+=(ai.cmd-opp.cmd)*0.3;
+    var fc=GAME.flControl();
+    if(fc===ai)score+=5;
+    else if(fc===opp)score-=5;
+    return score;
+  },
+
+  // 威胁排序
+  _threatRank:function(unit){
+    var threat=0;
+    threat+=unit.effectiveAtk*2.0;
+    threat+=unit.hp*0.5;
+    if(unit.hasB)threat+=unit.effectiveAtk*1.5;
+    if(unit.hasFr)threat+=unit.effectiveAtk*1.0;
+    if(unit.hasG)threat+=4;
+    if(unit.isA||unit.isO)threat+=5;
+    if(unit.effCode==='drawOnDmg'||unit.effCode==='draw1')threat+=5;
+    return threat;
+  },
+
+  // 卡牌价值（增强版）
+  _cardValue:function(card,ai,opp){
+    var cfg=AI_CONFIG[AI_LEVEL];var score=0;
+    var oppUnits=opp.allUnits().filter(function(x){return x.hp>0});
+    var myUnits=ai.allUnits().filter(function(x){return x.hp>0});
+    var board=GAME._evalBoard(ai,opp);
+
+    if(!card.isOrder){
+      var costEff=(card.atk*1.5+card.hp*1.0)/Math.max(1,card.cost);
+      score+=card.atk*1.5+card.hp*1.0;
+      if(costEff>3)score+=3;
+      if(card.hasB)score+=4;
+      if(card.hasG)score+=3;
+      if(card.hasA)score+=2;
+      if(card.hasFr)score+=5;
+      if(card.hasH)score+=1;
+      if(card.armor>0)score+=card.armor*1.5;
+      if(board<0&&card.cost<=3)score+=3;
+      if(board>5&&card.cost>=5)score+=4;
+    }else{
+      if(card.fx&&card.fx.indexOf('dmg')>=0){
+        score+=5;
+        if(oppUnits.length>=3)score+=5;
+        if(board<0)score+=8;
+        if(cfg.lethalCheck){
+          var lethal=GAME._calcLethal(ai,opp,card);
+          if(lethal)score+=30;
+        }
+      }
+      if(card.fx==='draw1'||card.fx==='draw2'){
+        if(ai.hand.length<=3)score+=8;
+        else if(ai.hand.length<=5)score+=4;
+      }
+      if(card.fx&&card.fx.indexOf('buff')>=0){
+        if(myUnits.length>=2)score+=6;
+      }
+      if(card.fx==='addCmd'||card.fx==='bondAddCmd')score+=8;
+      if(card.condCode==='countermeasure')score+=4;
+    }
+    return score;
+  },
+
+  // 斩杀计算（可选额外牌）
+  _calcLethal:function(ai,opp,extraCard){
+    var total=0;
+    ai.allUnits().forEach(function(c){
+      if(c.hp>0&&c.canStillAtk)total+=c.effectiveAtk;
+    });
+    ai.hand.forEach(function(c){
+      if(c.isOrder&&c.cost<=ai.cmd){
+        if(c.fx==='dmg4hq')total+=4;
+        else if(c.fx==='dmgAll1')total+=1;
+        else if(c.fx==='dmgAll2')total+=2;
+        else if(c.fx&&c.fx.indexOf('dmg')>=0)total+=3;
+      }
+    });
+    if(extraCard){
+      if(extraCard.fx==='dmg4hq')total+=4;
+      else if(extraCard.fx&&extraCard.fx.indexOf('dmg')>=0)total+=3;
+    }
+    return total>=opp.hp;
+  },
+
+  // 攻击目标评分（增强版）
+  _targetScore:function(attacker,target,ai,opp){
+    if(!target)return 100;
+    var score=0;
+    var atkDmg=Math.max(0,attacker.effectiveAtk-(target.armor||0));
+    var counterDmg=Math.max(0,target.effectiveAtk-(attacker.armor||0));
+    var willKill=atkDmg>=target.hp;
+    var willDie=counterDmg>=attacker.hp;
+    var board=GAME._evalBoard(ai,opp);
+
+    if(willKill)score+=15;
+    if(willDie)score-=12;
+    var myLoss=counterDmg;
+    var theirLoss=Math.min(atkDmg,target.hp);
+    score+=(theirLoss-myLoss)*0.8;
+    score+=GAME._threatRank(target)*1.0;
+    // 过杀惩罚
+    if(willKill&&atkDmg>target.hp+3)score-=6;
+    if(target.hasG)score+=7;
+    if(target.isA||target.isO)score+=6;
+    if(board<-5)score+=5;
+    return score;
+  },
+
+  // 智能推线（增强版）
+  _shouldPush:function(unit,ai,opp){
+    var cfg=AI_CONFIG[AI_LEVEL];
+    if(!cfg.pushSmart)return true;
+    if(GAME.flTotal()>=5)return false;
+
+    var supportCount=ai.support.filter(function(c){return c.hp>0}).length;
+    if(supportCount<=1)return false;
+
+    var frontEnemy=opp.fl.filter(function(c){return c.hp>0});
+    var avgEnemyAtk=0;
+    if(frontEnemy.length>0){
+      frontEnemy.forEach(function(c){avgEnemyAtk+=c.effectiveAtk});
+      avgEnemyAtk/=frontEnemy.length;
+    }
+    if(avgEnemyAtk>=unit.hp&&!unit.hasG)return false;
+
+    if(unit.hp<=2&&!unit.hasB)return false;
+    if(unit.hasB&&ai.fl.length===0)return true;
+    if(unit.isT&&unit.hp>=3)return true;
+    if(unit.hasG)return true;
+    if(ai.fl.length>=2)return false;
+
+    var oppSupport=opp.support.filter(function(c){return c.hp>0});
+    if(oppSupport.length>=2&&unit.effectiveAtk>=3)return true;
+
+    return false;
+  },
+
+  // ==================== AI 回合（智能版 v2） ====================
+  enemyTurn:function(){
+    if(GAME.gameOver)return;
+    showTurnBanner('AI 回合','enemy');
+    var en=GAME.enemy,pl=GAME.player,cfg=AI_CONFIG[AI_LEVEL];
+    GAME.turn++;
+    var skipFirstDraw=(GAME.turn===1&&!GAME.playerIsFirst);
+    GAME._startTurn(en,skipFirstDraw);
+    GAME.log('\u2550\u2550\u2550 第'+GAME.turn+'回合 \u00b7 AI回合 \u2550\u2550\u2550','system');
+    if(GAME.turn===1&&!GAME.playerIsFirst)GAME.log('\u26A1 AI先手首回合不抽牌','system');
+    var firstMark=GAME.playerIsFirst?'\u2694\uFE0F先手':'\u27A1\uFE0F后手';
+    $('turnInfo').textContent='第'+GAME.turn+'回合 \u00b7 AI回合 \u00b7 '+firstMark;GAME.render();
+
+    var self=this;
+    // 动态留费：优势时留更多
+    var boardScore=cfg.pushSmart?self._evalBoard(en,pl):0;
+    var reserve=cfg.saveCredits||0;
+    if(boardScore>8)reserve=Math.max(reserve,3);
+    else if(boardScore>3)reserve=Math.max(reserve,2);
+    else if(boardScore<-5)reserve=0;
+
+    // 1) 指令
+    var orders=en.hand.filter(function(c){
+      return c.isOrder&&c.cost<=en.cmd-reserve;
+    }).sort(function(a,b){return self._cardValue(b,en,pl)-self._cardValue(a,en,pl)});
+
+    var oi=0;
+    function playOrder(){
+      if(oi>=orders.length)return playUnits();
+      var c=orders[oi++];
+      if(en.hand.indexOf(c)<0||c.cost>en.cmd){playOrder();return}
+      if(!cfg.useOrders&&!cfg.lethalCheck){playOrder();return}
+      if(!cfg.useOrders){var chk=checkOrderCondition(c,en);if(!chk.ok){playOrder();return}}
+      var aiCond=checkOrderCondition(c,en);
+      if(!aiCond.ok){GAME.log('AI '+c.cn+' 条件不满足：'+aiCond.msg,'ai');playOrder();return}
+      en.hand=en.hand.filter(function(x){return x!==c});en.cmd-=c.cost;
+      GAME.log('AI使用指令 <b>'+c.cn+'</b>','ai');showOrderCardPlayed(c,false);GAME.execOrder(en,c);
+      GAME.render();if(GAME.checkEnd())return;setTimeout(playOrder,1200);
+    }
+
+    // 2) 单位
+    var units=en.hand.filter(function(c){
+      return !c.isOrder&&c.cost<=en.cmd-reserve&&en.support.length<4;
+    }).sort(function(a,b){return self._cardValue(b,en,pl)-self._cardValue(a,en,pl)});
+    var ui=0;
+
+    function playUnits(){
+      if(ui>=units.length)return smartMove();
+      var c=units[ui++];
+      if(en.hand.indexOf(c)<0||c.cost>en.cmd||en.support.length>=4){playUnits();return}
+      en.hand=en.hand.filter(function(x){return x!==c});en.cmd-=c.cost;
+      c.zone='support';c.owner=en;c.justDeployed=true;c.justPlayed=true;
+      // 智能选侧：靠敌方前线近的一侧
+      if(c.isA||c.isO)c.supSide='R'; // 远程躲后面
+      else if(pl.fl.length>0)c.supSide='L'; // 敌方有前线→靠左
+      else c.supSide=Math.random()<0.5?'L':'R';
+      en.support.push(c);
+      GAME.log('AI部署 '+UI[c.ut]+' <b>'+c.cn+'</b>','ai');showCardPlayed(c,false);
+      var aiHeavy=c.ut!=='X'&&(c.atk+c.hp)>=10;
+      var aiAnimDur=aiHeavy?800:650;
+      setTimeout(function(){c.justPlayed=false},aiAnimDur);
+      var countered=GAME.checkCounterOrder(en,c);
+      if(countered){
+        GAME.log('\u26D4 '+c.cn+' 被反制！','effect');
+        en.support=en.support.filter(function(x){return x!==c});
+        c.zone='hand';c.justDeployed=false;c.owner=null;en.hand.push(c);
+      }else{
+        if(!c.joinedNotDeployed){
+          setTimeout(function(){playDeployFX(c,aiHeavy)},aiAnimDur);
+          GAME.triggerDeploy(c,en);
+        }
+        if(!c.canActOnDeploy){c.canAct=false;c.apSpent=99}
+      }
+      GAME.render();if(GAME.checkEnd())return;setTimeout(playUnits,1000);
+    }
+
+    // 3) 推线
+    function smartMove(){
+      if(!cfg.pushSmart){smartAttack();return}
+      var movers=en.support.filter(function(c){return c.canStillAct&&self._shouldPush(c,en,pl)});
+      var mi=0;
+      function stepMove(){
+        if(mi>=movers.length)return smartAttack();
+        var m=movers[mi++];
+        if(en.fl.length>=2||!GAME.canPush(en)){stepMove();return}
+        if(en.support.indexOf(m)<0||!m.canStillMove||en.cmd<m.acost){stepMove();return}
+        var aiOldEl=findCardEl(m);
+        var aiOldRect=aiOldEl?aiOldEl.getBoundingClientRect():null;
+        en.cmd-=m.acost;
+        en.support=en.support.filter(function(x){return x!==m});
+        en.fl.push(m);m.zone='frontline';m.spendAP(1);
+        if(m.hasS)m.smokescreenActive=false;
+        GAME.log('AI '+m.cn+' \u27A1 推线至前线 <span style="color:#f9c74f;font-weight:700">\u26A1'+m.effAcost+'</span>','ai');
+        GAME.render();if(GAME.checkEnd())return;
+        setTimeout(function(){
+          var aiNewEl=findCardEl(m);
+          playPushTrailFromRect(aiOldRect,aiNewEl,m);
+        },50);
+        setTimeout(stepMove,1200);
+      }
+      stepMove();
+    }
+
+    // 4) 攻击（v2 增强版）
+    function smartAttack(){
+      if(GAME.checkEnd())return;
+      var atkrs=en.allUnits().filter(function(c){return c.canStillAtk});
+      if(!atkrs.length){aiEnd();return}
+
+      var cfg2=AI_CONFIG[AI_LEVEL];
+      var lethal=cfg2.lethalCheck?self._calcLethal(en,pl):false;
+
+      if(cfg2.smartAtk){
+        // ===== 中/困难：攻击规划 =====
+        // 先解守护（如果有），再按威胁度分配攻击
+        var ai2=0;
+        function stepFight(){
+          if(ai2>=atkrs.length||GAME.checkEnd()){aiEnd();return}
+          var a=atkrs[ai2++];if(!a.canStillAtk){stepFight();return}
+          var tgs=GAME.getTargets(a);if(!tgs.length){stepFight();return}
+
+          // 斩杀检查（实时重算，因为场上状态在变化）
+          if(cfg2.lethalCheck&&self._calcLethal(en,pl)){
+            var hqTgt=null;
+            for(var j=0;j<tgs.length;j++){if(tgs[j].card===null){hqTgt=tgs[j];break}}
+            if(hqTgt){GAME.doAttack(a,hqTgt);GAME.render();if(GAME.checkEnd())return;setTimeout(stepFight,800);return}
+          }
+
+          // 构建候选目标列表
+          var candidates=[];
+          tgs.forEach(function(t){
+            if(t.card===null){
+              // HQ目标：在损伤竞赛中落后时提高优先级
+              var hqScore=50;
+              var board=self._evalBoard(en,pl);
+              if(board<-3)hqScore+=25;
+              if(pl.hp<=8)hqScore+=20;
+              if(a.effectiveAtk>=4)hqScore+=10;
+              candidates.push({t:t,score:hqScore});
+            }else{
+              var s=self._targetScore(a,t.card,en,pl);
+              candidates.push({t:t,score:s});
+            }
+          });
+
+          // 找最高分
+          var best=null,bestScore=-9999;
+          candidates.forEach(function(ct){
+            if(ct.score>bestScore){bestScore=ct.score;best=ct.t;}
+          });
+
+          if(best){
+            GAME.doAttack(a,best);GAME.render();
+            if(GAME.checkEnd())return;
+            // 重新获取攻击者列表（可能变化了）
+            atkrs=en.allUnits().filter(function(c){return c.canStillAtk});
+            setTimeout(stepFight,800);
+          }else{stepFight()}
+        }
+        stepFight();
+      }else{
+        // ===== 简单：概率打脸 =====
+        var ai2=0;
+        function stepFight(){
+          if(ai2>=atkrs.length||GAME.checkEnd()){aiEnd();return}
+          var a=atkrs[ai2++];if(!a.canStillAtk){stepFight();return}
+          var tgs=GAME.getTargets(a);if(!tgs.length){stepFight();return}
+          var ut=tgs.filter(function(x){return x.card!==null}).sort(function(x,y){return x.card.hp-y.card.hp});
+          var ht=tgs.filter(function(x){return x.card===null});
+          if(ht.length&&Math.random()<cfg2.atkHQ){
+            GAME.doAttack(a,ht[0]);GAME.render();if(GAME.checkEnd())return;setTimeout(stepFight,800)
+          }else if(ut.length){
+            GAME.doAttack(a,ut[0]);GAME.render();if(GAME.checkEnd())return;setTimeout(stepFight,800)
+          }else if(ht.length){
+            GAME.doAttack(a,ht[0]);GAME.render();if(GAME.checkEnd())return;setTimeout(stepFight,800)
+          }else{stepFight()}
+        }
+        stepFight();
+      }
+    }
+
+    function aiEnd(){
+      GAME.cleanup(GAME.player);GAME.cleanup(GAME.enemy);
+      GAME.enemy.allUnits().forEach(function(c){c.tmpAtk=0;c.tmpAcost=0});
+      if(GAME.checkEnd())return;
+      GAME.log('AI回合结束','system');GAME.phase='play';
+      setTimeout(function(){GAME.playerTurn()},800);
+    }
+    try{playOrder()}catch(e){console.error(e);aiEnd()}
+  },

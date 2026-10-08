@@ -1,0 +1,208 @@
+﻿  // ==================== AI 辅助函数 ====================
+  _cardValue:function(card,ai,opp){
+    var cfg=AI_CONFIG[AI_LEVEL];var score=0;
+    if(!card.isOrder){
+      score+=card.atk*1.5+card.hp*1.0;
+      if(card.hasB)score+=3;
+      if(card.hasG)score+=2;
+      if(card.hasA)score+=2;
+      if(card.hasFr)score+=4;
+    }
+    var oppUnits=opp.allUnits().filter(function(x){return x.hp>0});
+    var myUnits=ai.allUnits().filter(function(x){return x.hp>0});
+    if(myUnits.length<oppUnits.length){
+      if(card.effCode&&card.effCode.indexOf('dmg')>=0)score+=5;
+    }
+    if(myUnits.length>oppUnits.length){
+      if(!card.isOrder&&card.cost>=5)score+=3;
+    }
+    if(cfg.lethalCheck){
+      var lethal=GAME._calcLethal(ai,opp);
+      if(lethal&&card.isOrder&&card.effCode&&card.effCode.indexOf('dmg')>=0)score+=20;
+    }
+    if(ai.hand.length<=2&&card.effCode==='draw1')score+=4;
+    return score;
+  },
+
+  _calcLethal:function(ai,opp){
+    var total=0;
+    ai.allUnits().forEach(function(c){
+      if(c.hp>0&&c.canStillAtk)total+=c.effectiveAtk;
+    });
+    ai.hand.forEach(function(c){
+      if(c.isOrder&&c.cost<=ai.cmd&&c.fx==='dmg4hq')total+=4;
+      if(c.isOrder&&c.cost<=ai.cmd&&c.effCode&&c.effCode.indexOf('dmg')>=0)total+=2;
+    });
+    return total>=opp.hp;
+  },
+
+  _targetScore:function(attacker,target,ai,opp){
+    if(!target)return 100;
+    var score=0;
+    var dmg=Math.max(0,attacker.effectiveAtk-(target.armor||0));
+    if(dmg>=target.hp)score+=10;
+    var myLoss=Math.max(0,target.effectiveAtk-(attacker.armor||0));
+    if(myLoss>=attacker.hp)score-=5;
+    score+=target.atk*1.0+target.hp*0.5;
+    if(target.hasG)score+=3;
+    if(target.hasB)score+=2;
+    if(target.isA||target.isO)score+=4;
+    return score;
+  },
+
+  _shouldPush:function(unit,ai,opp){
+    var cfg=AI_CONFIG[AI_LEVEL];
+    if(!cfg.pushSmart)return true;
+    if(GAME.flTotal()>=5)return false;
+    if(unit.hp<=2&&opp.allUnits().some(function(c){return c.atk>=unit.hp}))return false;
+    if(unit.hasB&&(!GAME.flControl()||GAME.flControl()===ai))return true;
+    if(unit.isT)return true;
+    if(unit.hasG)return true;
+    return false;
+  },
+
+  // ==================== AI 回合（智能版） ====================
+  enemyTurn:function(){
+    if(GAME.gameOver)return;
+    showTurnBanner('AI 回合','enemy');
+    var en=GAME.enemy,pl=GAME.player,cfg=AI_CONFIG[AI_LEVEL];
+    GAME.turn++;
+    var skipFirstDraw=(GAME.turn===1&&!GAME.playerIsFirst);
+    GAME._startTurn(en,skipFirstDraw);
+    GAME.log('\u2550\u2550\u2550 第'+GAME.turn+'回合 \u00b7 AI回合 \u2550\u2550\u2550','system');
+    if(GAME.turn===1&&!GAME.playerIsFirst)GAME.log('\u26A1 AI先手首回合不抽牌','system');
+    var firstMark=GAME.playerIsFirst?'\u2694\uFE0F先手':'\u27A1\uFE0F后手';
+    GAME.render();
+
+    var self=this;
+    var reserve=cfg.saveCredits||0;
+
+    // 1) 先打指令（按价值排序）
+    var orders=en.hand.filter(function(c){
+      return c.isOrder&&c.cost<=en.cmd-reserve;
+    }).sort(function(a,b){return self._cardValue(b,en,pl)-self._cardValue(a,en,pl)});
+
+    var oi=0;
+    function playOrder(){
+      if(oi>=orders.length)return playUnits();
+      var c=orders[oi++];
+      if(en.hand.indexOf(c)<0||c.cost>en.cmd){playOrder();return}
+      if(!cfg.useOrders&&!cfg.lethalCheck){playOrder();return}
+      if(!cfg.useOrders){var chk=checkOrderCondition(c,en);if(!chk.ok){playOrder();return}}
+      var aiCond=checkOrderCondition(c,en);
+      if(!aiCond.ok){GAME.log('AI '+c.cn+' 条件不满足：'+aiCond.msg,'ai');playOrder();return}
+      en.hand=en.hand.filter(function(x){return x!==c});en.cmd-=c.cost;
+      GAME.log('AI使用指令 <b>'+c.cn+'</b>','ai');showOrderCardPlayed(c,false);GAME.execOrder(en,c);
+      GAME.render();if(GAME.checkEnd())return;setTimeout(playOrder,1200);
+    }
+
+    // 2) 再部署单位（按价值排序）
+    var units=en.hand.filter(function(c){
+      return !c.isOrder&&c.cost<=en.cmd-reserve&&en.support.length<4;
+    }).sort(function(a,b){return self._cardValue(b,en,pl)-self._cardValue(a,en,pl)});
+    var ui=0;
+
+    function playUnits(){
+      if(ui>=units.length)return smartMove();
+      var c=units[ui++];
+      if(en.hand.indexOf(c)<0||c.cost>en.cmd||en.support.length>=4){playUnits();return}
+      en.hand=en.hand.filter(function(x){return x!==c});en.cmd-=c.cost;
+      c.zone='support';c.owner=en;c.justDeployed=true;c.justPlayed=true;c.supSide=Math.random()<0.5?'L':'R';en.support.push(c);
+      GAME.log('AI部署 '+UI[c.ut]+' <b>'+c.cn+'</b>','ai');showCardPlayed(c,false);
+      var aiHeavy=c.ut!=='X'&&(c.atk+c.hp)>=10;
+      var aiAnimDur=aiHeavy?800:650;
+      setTimeout(function(){c.justPlayed=false},aiAnimDur);
+      var countered=GAME.checkCounterOrder(en,c);
+      if(countered){
+        GAME.log('\u26D4 '+c.cn+' 被反制！','effect');
+        en.support=en.support.filter(function(x){return x!==c});
+        c.zone='hand';c.justDeployed=false;c.owner=null;en.hand.push(c);
+      }else{
+        if(!c.joinedNotDeployed){
+          setTimeout(function(){playDeployFX(c,aiHeavy)},aiAnimDur);
+          GAME.triggerDeploy(c,en);
+        }
+        if(!c.canActOnDeploy){c.canAct=false;c.apSpent=99}
+      }
+      GAME.render();if(GAME.checkEnd())return;setTimeout(playUnits,1000);
+    }
+
+    // 3) 智能推线
+    function smartMove(){
+      var movers=en.support.filter(function(c){return c.canStillAct&&self._shouldPush(c,en,pl)});
+      var mi=0;
+      function stepMove(){
+        if(mi>=movers.length)return smartAttack();
+        var m=movers[mi++];
+        if(en.fl.length>=2||!GAME.canPush(en)){stepMove();return}
+        if(en.support.indexOf(m)<0||!m.canStillMove||en.cmd<m.acost){stepMove();return}
+        var aiOldEl=findCardEl(m);
+        var aiOldRect=aiOldEl?aiOldEl.getBoundingClientRect():null;
+        en.cmd-=m.acost;
+        en.support=en.support.filter(function(x){return x!==m});
+        en.fl.push(m);m.zone='frontline';m.spendAP(1);
+        if(m.hasS)m.smokescreenActive=false;
+        GAME.log('AI '+m.cn+' \u27A1 推线至前线 <span style="color:#f9c74f;font-weight:700">\u26A1'+m.effAcost+'</span>','ai');
+        GAME.render();if(GAME.checkEnd())return;
+        setTimeout(function(){
+          var aiNewEl=findCardEl(m);
+          playPushTrailFromRect(aiOldRect,aiNewEl,m);
+        },50);
+        setTimeout(stepMove,1200);
+      }
+      stepMove();
+    }
+
+    // 4) 智能攻击
+    function smartAttack(){
+      if(GAME.checkEnd())return;
+      var atkrs=en.allUnits().filter(function(c){return c.canStillAtk});
+      if(!atkrs.length){aiEnd();return}
+      atkrs.sort(function(a,b){return b.effectiveAtk-a.effectiveAtk});
+      var cfg2=AI_CONFIG[AI_LEVEL];var lethal=cfg2.lethalCheck?self._calcLethal(en,pl):false;
+      var ai=0;
+      function stepFight(){
+        if(ai>=atkrs.length||GAME.checkEnd()){aiEnd();return}
+        var a=atkrs[ai++];if(!a.canStillAtk){stepFight();return}
+        var tgs=GAME.getTargets(a);if(!tgs.length){stepFight();return}
+
+        // 斩杀阶段：全员打脸
+        if(lethal){
+          var hqTgt=null;
+          for(var j=0;j<tgs.length;j++){if(tgs[j].card===null){hqTgt=tgs[j];break}}
+          if(hqTgt){GAME.doAttack(a,hqTgt);GAME.render();if(GAME.checkEnd())return;setTimeout(stepFight,1000);return}
+        }
+
+        // 智能选目标
+        if(cfg2.smartAtk){
+          var best=null,bestScore=-999;
+          tgs.forEach(function(t){
+            var s=self._targetScore(a,t.card,en,pl);
+            if(s>bestScore){bestScore=s;best=t;}
+          });
+          if(best){GAME.doAttack(a,best);GAME.render();if(GAME.checkEnd())return;setTimeout(stepFight,1000)}
+          else{stepFight()}
+        }else{
+          var ut=tgs.filter(function(x){return x.card!==null}).sort(function(x,y){return x.card.hp-y.card.hp});
+          var ht=tgs.filter(function(x){return x.card===null});
+          var t=ut.length?ut[0]:(ht.length?ht[0]:null);
+          if(!t){stepFight();return}
+          if(cfg2.atkHQ<1.0&&ut.length&&ht.length&&Math.random()>cfg2.atkHQ){
+            GAME.doAttack(a,ut[0]);GAME.render();if(GAME.checkEnd())return;setTimeout(stepFight,1000)
+          }else{
+            GAME.doAttack(a,t);GAME.render();if(GAME.checkEnd())return;setTimeout(stepFight,1000)
+          }
+        }
+      }
+      stepFight();
+    }
+
+    function aiEnd(){
+      GAME.cleanup(GAME.player);GAME.cleanup(GAME.enemy);
+      GAME.enemy.allUnits().forEach(function(c){c.tmpAtk=0;c.tmpAcost=0});
+      if(GAME.checkEnd())return;
+      GAME.log('AI回合结束','system');GAME.phase='play';
+      setTimeout(function(){GAME.playerTurn()},800);
+    }
+    try{playOrder()}catch(e){console.error(e);aiEnd()}
+  },

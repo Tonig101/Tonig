@@ -1,0 +1,12 @@
+﻿    // 敌方阵营选择
+    html+='<div class="enemy-row"><span class="enemy-label">⚔ 敌方国家：</span><div class="enemy-fc-grid">';
+    fkeys.forEach(function(k){
+      html+='<div class="enemy-fc-btn'+(ENEMY_FC===k?' selected':'')+'" data-efc="'+k+'" onclick="GAME._selectEnemyFc('''+k+''')">'+FA_ICON[k]+'</div>';
+    });
+    html+='</div></div>';
+    // 难度选择
+    html+='<div class="diff-row">';
+    [{l:1,icon:'🟢',name:'简单',desc:'演习模式'},{l:2,icon:'🟡',name:'普通',desc:'标准对战'},{l:3,icon:'🔴',name:'困难',desc:'真实战场'}].forEach(function(d){
+      html+='<div class="diff-btn'+(AI_LEVEL===d.l?' selected':'')+'" data-lv="'+d.l+'" onclick="GAME._selectDiff('+d.l+')"><span class="diff-icon">'+d.icon+'</span><span class="diff-name">'+d.name+'</span><span class="diff-desc">'+d.desc+'</span></div>';
+    });
+    html+='</div>';
