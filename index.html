@@ -2990,7 +2990,7 @@ var GAME={
     // 被守护 — 优先级3（仅非守护单位；由 render 阶段 markGuarded 后单独补充）
     // 重甲(H) — 优先级4（按护甲等级显示对应图标）
     if(c.kw&&c.kw.indexOf('H')>=0&&c.armor>0){
-      var lv=Math.min(c.armor,3);icons.push({src:'images/UI/重甲'+lv+'.png',pri:4});
+      var lv=Math.min(c.armor,3);icons.push({src:'images/UI/重甲'+lv+'.jpg',pri:4});
     }
     // 奋战(F) — 优先级5
     if(c.hasFr)icons.push({src:'images/UI/奋战.jpg',pri:5});
@@ -4744,15 +4744,19 @@ document.addEventListener('click',function(e){
   popup.querySelector('#kwp-title').textContent=kwName;
   popup.querySelector('#kwp-body').innerHTML=desc;
   // 定位：与新手教程提示框位置一致（结束回合按钮下方）
-  var endBtn=$('btnEndPlay');
-  if(endBtn){
-    var r=endBtn.getBoundingClientRect();
+  var endBtn=$("btnEndPlay");
+  var mobBtn=$("btnEndTurnMob");
+  var targetBtn=(GAME.isTouchDevice&&mobBtn)?mobBtn:(endBtn);
+  if(targetBtn){
+    var r=targetBtn.getBoundingClientRect();
+    if(r.bottom===0&&endBtn){r=endBtn.getBoundingClientRect();}
+    if(r.bottom===0){r={left:window.innerWidth/2-180,bottom:window.innerHeight-100};}
     var l=r.left;if(l+360>window.innerWidth-12)l=window.innerWidth-372;
-    popup.style.left=l+'px';popup.style.top=(r.bottom+8)+'px';
-    popup.style.right='auto';popup.style.bottom='auto';popup.style.transform='none';
+    popup.style.left=l+"px";popup.style.top=(r.bottom+8)+"px";
+    popup.style.right="auto";popup.style.bottom="auto";popup.style.transform="none";
   }else{
-    popup.style.left='50%';popup.style.top='auto';popup.style.bottom='64px';popup.style.transform='translateX(-50%)';
-    popup.style.right='auto';
+    popup.style.left="50%";popup.style.top="auto";popup.style.bottom="64px";popup.style.transform="translateX(-50%)";
+    popup.style.right="auto";
   }
   popup.classList.add('show');
   e.stopPropagation();
