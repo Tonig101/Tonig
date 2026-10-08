@@ -1681,15 +1681,14 @@ Card.prototype={
   spendAP:function(n){this.apSpent+=(n||1);this.hasActedThisTurn=true},
   // 当前是否还能进行任何行动（未锁定/未压制/有剩余行动点/付得起行动费）
   get canStillAct(){
-    var hasCmd=!this.owner||this.owner.cmd>=this.effAcost;
-    return this.canAct&&this.hp>0&&!this.pinned&&this.apLeft()>0&&hasCmd;
+    return this.canAct&&this.hp>0&&!this.pinned&&this.apLeft()>0;
   },
   // 是否还能移动：在支援阵线、且有剩余行动点（所有兵种均可推线，消耗行动费和1AP）
   get canStillMove(){
     if(!this.canStillAct)return false;
     // 非坦克单位：已攻击则不能移动（移动和攻击二选一）
     if(!this.isT&&this.attacksThisTurn>0)return false;
-    return this.zone==='support';
+    var hasCmd=!this.owner||this.owner.cmd>=this.effAcost;return this.zone==='support'&&hasCmd;
   },
   // 是否还能攻击：有剩余行动点、且未超过攻击次数上限（无奋战限1次，奋战限2次）
   get canStillAtk(){
@@ -3239,8 +3238,6 @@ var GAME={
       // 选择攻击者：前线看能否攻击，支援看能否行动（推线或攻击）
       var canSelect=card.zone==='frontline'?card.canStillAtk:card.canStillAct;
       if(!canSelect)return toast('该单位已无法行动');
-      // 预判行动费用
-      if(GAME.player.cmd<card.effAcost)return toast('指挥点不足（需'+card.effAcost+'点行动费）');
       GAME.selected=card;GAME.pendingPush=null;
       if(card.zone==='support'&&GAME.canPush(GAME.player)&&card.canStillMove){
         GAME.pendingPush=card;
@@ -3250,8 +3247,6 @@ var GAME={
       // 选择攻击目标
       if(!GAME.selected)return toast('请先选择你的攻击单位');
       if(GAME.selected.owner!==GAME.player)return;
-      // 预判攻击费用
-      if(GAME.player.cmd<GAME.selected.acost)return toast('指挥点不足（需'+GAME.selected.acost+'点攻击费）');
       var tgs=GAME.getTargets(GAME.selected);var found=null;
       for(var i=0;i<tgs.length;i++){if(tgs[i].card===card){found=tgs[i];break}}
       if(!found)return toast('无法攻击此目标（前线阻挡/射程不足/守护保护）');
@@ -3732,6 +3727,7 @@ var GAME={
           var oppFA2=self._calcFieldAtk(pl);
           if(myFA2.total>=pl.hp){var effectiveAtkHQ=1.0} // 能斩杀→全打脸
           else{var effectiveAtkHQ=isJapan?1.0:cfg2.atkHQ} // 日本简单难度也全力打脸
+          var ht=tgs.filter(function(t){return t.card===null});var ut=tgs.filter(function(t){return t.card!==null});
           if(ht.length&&Math.random()<effectiveAtkHQ){
             GAME.doAttack(a,ht[0]);GAME.render();if(GAME.checkEnd())return;setTimeout(stepFight,800)
           }else if(ut.length){
