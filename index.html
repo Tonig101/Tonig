@@ -1,5 +1,4 @@
-<!DOCTYPE html>
-<html lang="zh-CN">
+﻿<html lang="zh-CN">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -62,7 +61,7 @@ body{background:var(--bg);color:var(--w);min-height:100vh;display:flex;justify-c
 .hand-section h3{font-size:.76rem;color:var(--d);margin-bottom:4px}
 .hand-cards{display:flex;gap:0;flex-wrap:nowrap;min-height:116px;padding:3px 0;overflow-x:auto;overflow-y:visible}
 /* 手牌单行轻微叠放：后一张叠在前一张上 */
-.hand-cards .card{margin-right:-34px}
+.hand-cards .card{margin-right:-44px}
 .hand-cards .card:last-child{margin-right:0}
 .hand-cards .card:hover{transform:translateY(-8px) scale(1.04);z-index:8;box-shadow:0 10px 24px rgba(0,0,0,.6),0 0 18px rgba(68,170,136,.2)}
 .hand-cards .card.dragging{opacity:.35;transform:translateY(-6px);z-index:9;box-shadow:0 8px 20px rgba(0,0,0,.5)}
@@ -94,6 +93,13 @@ body{background:var(--bg);color:var(--w);min-height:100vh;display:flex;justify-c
 .push-zone:active{transform:scale(.96)}
 .push-unafford{border-color:#644;color:#a66;background:rgba(255,50,50,.08)}
 .push-unafford:hover{background:rgba(255,50,50,.15);border-color:#844;transform:none}
+/* 手机推线待定高亮 */
+.card.push-pending{border:2px solid #f9c74f!important;box-shadow:0 0 14px rgba(249,199,79,.5),0 0 24px rgba(249,199,79,.2);animation:pushGlow 1.2s infinite}
+@keyframes pushGlow{0%,100%{box-shadow:0 0 10px rgba(249,199,79,.4)}50%{box-shadow:0 0 22px rgba(249,199,79,.7)}}
+#frontline.push-target{border-color:#f9c74f!important;background:rgba(249,199,79,.08);box-shadow:inset 0 0 30px rgba(249,199,79,.2);cursor:pointer;animation:pushZonePulse 1s infinite}
+@keyframes pushZonePulse{0%,100%{box-shadow:inset 0 0 20px rgba(249,199,79,.15)}50%{box-shadow:inset 0 0 40px rgba(249,199,79,.35)}}
+.push-target-text{color:#f9c74f;font-weight:800;font-size:.78rem;text-align:center;width:100%;animation:blinkText 1s infinite}
+@keyframes blinkText{0%,100%{opacity:1}50%{opacity:.4}}
 
 /* 卡牌 */
 .card{width:128px;border-radius:7px;cursor:default;transition:all .2s;flex-shrink:0;position:relative;user-select:none;background:var(--card);border:1px solid #333}
@@ -101,7 +107,9 @@ body{background:var(--bg);color:var(--w);min-height:100vh;display:flex;justify-c
 .card.clickable:hover{transform:translateY(-4px);box-shadow:0 6px 20px rgba(0,0,0,.5),0 0 15px rgba(68,170,136,.15)}
 
 .card .top{display:flex;justify-content:space-between;align-items:center;padding:4px 7px;font-size:.68rem;font-weight:700;color:#ccc}
-.card .art{height:100px;display:flex;align-items:center;justify-content:center;font-size:1.8rem;position:relative;overflow:hidden}
+.card .art{height:100px;display:flex;align-items:center;justify-content:center;font-size:1.8rem;position:relative;overflow:hidden;background:#1a1c28}
+.card .art::before{content:'';position:absolute;top:0;left:-100%;width:100%;height:100%;background:linear-gradient(90deg,transparent 0%,rgba(255,255,255,.04) 50%,transparent 100%);animation:skelShimmer 1.4s infinite;z-index:0;pointer-events:none}
+@keyframes skelShimmer{0%{left:-100%}100%{left:100%}}
 .card .art .art-overlay{position:absolute;top:0;left:0;right:0;bottom:0;background:linear-gradient(180deg,rgba(0,0,0,.2) 0%,rgba(0,0,0,.55) 70%);z-index:1;pointer-events:none}
 .card .art .art-icon{position:absolute;top:22px;left:4px;font-size:1.2rem;z-index:4;filter:drop-shadow(0 1px 3px rgba(0,0,0,.8));background:rgba(0,0,0,.5);border-radius:4px;padding:2px 4px;cursor:pointer;transition:transform .2s,box-shadow .2s,background .2s;transform-origin:left top}
 .card .art .art-icon:hover{transform:scale(1.2);background:rgba(0,0,0,.75);box-shadow:0 0 16px rgba(0,255,200,.6),0 0 30px rgba(0,255,200,.25)}
@@ -112,6 +120,16 @@ body{background:var(--bg);color:var(--w);min-height:100vh;display:flex;justify-c
 @keyframes popIn{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:translateY(0)}}
 .type-popup .tp-header{display:flex;align-items:center;gap:6px;margin-bottom:4px}
 .type-popup .tp-icon{font-size:1.1rem}
+
+/* 加载屏幕 */
+#loading-screen{position:fixed;top:0;left:0;width:100%;height:100%;background:var(--bg);z-index:99999;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;transition:opacity .4s}
+#loading-screen.fade-out{opacity:0;pointer-events:none}
+.loading-spinner{width:44px;height:44px;border:3px solid #2a2d3a;border-top-color:var(--g);border-radius:50%;animation:spin .8s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.loading-text{color:#888;font-size:.85rem}
+.loading-bar-wrap{width:220px;height:4px;background:#1a1c28;border-radius:2px;overflow:hidden}
+.loading-bar-fill{height:100%;width:0%;background:var(--g);border-radius:2px;transition:width .3s}
+.loading-pct{color:#aaa;font-size:.7rem;min-width:36px;text-align:center}
 .type-popup .tp-name{font-weight:700;font-size:.78rem}
 .type-popup .tp-sub{font-size:.6rem;color:#888}
 .type-popup .tp-desc{margin:4px 0;line-height:1.4;color:#ccc}
@@ -192,6 +210,23 @@ body{background:var(--bg);color:var(--w);min-height:100vh;display:flex;justify-c
 .fc-detail .section-title{color:#aaa;font-size:.7rem;font-weight:700;margin-bottom:3px;text-transform:uppercase;letter-spacing:1px}
 .fc-detail .section-body{color:#ccc;font-size:.76rem;line-height:1.5}
 .fc-detail .section-body em{color:var(--y);font-style:normal;font-weight:600}
+
+/* 难度选择 */
+.diff-row{display:flex;justify-content:center;gap:10px;margin:16px 0}
+.diff-btn{flex:1;max-width:140px;padding:10px 8px;border:2px solid #333;border-radius:10px;background:#1a1c28;color:#aaa;cursor:pointer;transition:all .2s;text-align:center}
+.diff-btn:hover{border-color:#f9c74f;color:#eee}
+.diff-btn.selected{border-color:#f9c74f;background:rgba(249,199,79,.1);color:#f9c74f;box-shadow:0 0 0 2px rgba(249,199,79,.3)}
+.diff-btn .diff-icon{font-size:1.4rem;display:block;margin-bottom:2px}
+.diff-btn .diff-name{font-size:.78rem;font-weight:700}
+.diff-btn .diff-desc{font-size:.55rem;color:#666;margin-top:2px}
+.diff-btn.selected .diff-desc{color:#998}
+/* 敌方阵营选择 */
+.enemy-row{display:flex;align-items:center;justify-content:center;gap:12px;margin:14px 0}
+.enemy-row .enemy-label{color:#888;font-size:.75rem;font-weight:700}
+.enemy-fc-grid{display:flex;gap:6px}
+.enemy-fc-btn{width:40px;height:40px;border-radius:8px;border:2px solid #333;background:#1a1c28;color:#aaa;cursor:pointer;font-size:1rem;transition:all .2s;display:flex;align-items:center;justify-content:center}
+.enemy-fc-btn:hover{border-color:#f9c74f;color:#eee}
+.enemy-fc-btn.selected{border-color:#f9c74f;box-shadow:0 0 0 2px rgba(249,199,79,.4)}
 .fc-start-row{margin-top:18px;display:flex;justify-content:center;gap:12px}
 .deck-preview{margin-top:4px}
 .deck-type-row{margin-bottom:8px}
@@ -572,8 +607,8 @@ body{background:var(--bg);color:var(--w);min-height:100vh;display:flex;justify-c
   #panel h3 { width: 100%; font-size: .7rem; margin: 0; }
   #log { flex: 1 1 100%; max-height: 80px; font-size: .62rem; }
   #prompt-area { flex: 1 1 100%; max-height: 60px; font-size: .62rem; }
-  .panel-actions { width: 100%; justify-content: flex-end; margin-top: 2px; }
-  .panel-actions .btn-action { padding: 6px 14px; font-size: .75rem; }
+  .panel-actions { display: none; }
+  .panel-actions .btn-action { padding: 10px 22px; font-size: .85rem; }
 
   /* 卡牌整体 */
   .card { width: 88px; }
@@ -582,21 +617,22 @@ body{background:var(--bg);color:var(--w);min-height:100vh;display:flex;justify-c
   .card .art .type-badge { font-size: .44rem; bottom: 1px; right: 2px; padding: 0 3px; }
   .card .mid { font-size: .6rem; padding: 1px 4px; }
   .card .stats { font-size: .62rem; padding: 1px 4px; }
-  .card .bot { font-size: .5rem; padding: 1px 4px; min-height: 22px; }
-  .card .top { font-size: .58rem; padding: 2px 5px; }
-  .card .cost-badge { width: 20px; height: 20px; font-size: .65rem; top: -2px; left: -2px; }
-  .card .acost-badge { width: 16px; height: 16px; font-size: .52rem; top: -2px; right: -2px; }
+  .card { width: 82px; }
+  .card .art { height: 62px; }
+  .card .art .art-icon { font-size: .85rem; top: 12px; left: 2px; padding: 1px 3px; }
+  .card .art .type-badge { font-size: .42rem; bottom: 1px; right: 2px; padding: 0 3px; }
+  .card .mid { font-size: .56rem; padding: 1px 3px; }
+  .card .stats { font-size: .58rem; padding: 1px 3px; }
+  .card .bot { font-size: .48rem; padding: 1px 3px; min-height: 20px; }
+  .card .ui-icons img { width: 24px; height: 24px; }
+  .card .top { font-size: .55rem; padding: 2px 4px; }
+  .card .cost-badge { width: 18px; height: 18px; font-size: .6rem; top: -2px; left: -2px; }
+  .card .acost-badge { width: 14px; height: 14px; font-size: .48rem; top: -2px; right: -2px; }
 
-  /* 手牌 */
   .hand-section h3 { font-size: .68rem; }
-  .hand-cards { min-height: 90px; }
-  .hand-cards .card { margin-right: -46px; }
+  .hand-cards { min-height: 84px; }
+  .hand-cards .card { margin-right: 4px; }
   .hand-cards .card:hover { transform: translateY(-5px) scale(1.02); }
-
-  /* HQ 总部 */
-  .hq-card { min-width: 48px; min-height: 66px; padding: 3px; }
-  .hq-card .hq-name { font-size: .56rem; }
-  .hq-card .hq-body { font-size: .9rem; }
   .hq-card .hq-body .hp { font-size: .85rem; }
   .hq-card .hq-stats { font-size: .48rem; gap: 2px; }
   .hq-card .stat { font-size: .48rem; }
@@ -615,6 +651,11 @@ body{background:var(--bg);color:var(--w);min-height:100vh;display:flex;justify-c
   /* 按钮 */
   .btn { padding: 4px 10px; font-size: .68rem; }
   .ctrl-bar { gap: 4px; margin-top: 3px; }
+  /* 结束回合按钮（手机版） */
+  .btn-end-turn-mob { display: block; width: 100%; padding: 12px 0; font-size: .88rem; font-weight: 700; 
+    background: #f9c74f; color: #111; border: none; border-radius: 8px; cursor: pointer; 
+    margin-top: 4px; letter-spacing: 1px; }
+  .btn-end-turn-mob:active { background: #ffe066; transform: scale(0.98); }
   .push-zone { padding: 5px 10px; font-size: .7rem; }
 
   /* 提示弹窗 */
@@ -630,10 +671,14 @@ body{background:var(--bg);color:var(--w);min-height:100vh;display:flex;justify-c
   #turnInfo { font-size: .7rem; }
 }
 
+/* 桌面端隐藏手机版结束回合按钮 */
+@media (min-width: 821px) { .btn-end-turn-mob { display: none; } }
+
 /* ===== 新手教程 ===== */
 /* 新手教程 —— 底部固定栏，无遮蔽滤镜 */
-#tut-tooltip{position:fixed;z-index:9999;background:#1a1d2e;border:2px solid #f9c74f;border-radius:10px;padding:12px 20px;max-width:420px;width:auto;pointer-events:auto;box-shadow:0 6px 24px rgba(0,0,0,.45);display:none}
+#tut-tooltip{position:fixed;z-index:9999;background:#1a1d2e;border:2px solid #f9c74f;border-radius:10px;padding:12px 20px;max-width:360px;width:360px;pointer-events:auto;box-shadow:0 6px 24px rgba(0,0,0,.45);display:none;right:260px;bottom:120px;left:auto;top:auto;transform:none;max-height:45vh;overflow-y:auto}
 #tut-tooltip.show{display:block}
+.tut-action{color:#f9c74f;font-weight:bold}
 #tut-tooltip h3{color:#f9c74f;font-size:.92rem;margin:0 0 6px}
 #tut-tooltip .tut-body{font-size:.8rem;line-height:1.55;color:#ccc;margin-bottom:10px}
 #tut-tooltip .tut-body b{color:#fff}
@@ -656,6 +701,62 @@ body{background:var(--bg);color:var(--w);min-height:100vh;display:flex;justify-c
 #kw-popup .kwp-header h3{color:#fb4;font-size:.88rem;margin:0}
 #kw-popup .kwp-body{font-size:.76rem;line-height:1.55;color:#bbb}
 #kw-popup .kwp-body b{color:#fff}
+
+/* 调度手牌面板 */
+.mulligan-overlay{position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:2000;display:flex;align-items:center;justify-content:center}
+.mulligan-panel{background:#1a1d28;border:2px solid #3a3d4a;border-radius:16px;padding:24px 28px;max-width:700px;width:95%;max-height:90vh;overflow-y:auto;text-align:center}
+.mulligan-panel h2{font-size:1.3rem;color:#f9c74f;margin-bottom:4px}
+.mulligan-hint{font-size:.78rem;color:#999;margin-bottom:16px}
+.mulligan-cards{display:flex;flex-wrap:wrap;gap:12px;justify-content:center;margin-bottom:20px}
+.mulligan-card{width:100px;background:#232636;border:2px solid #333;border-radius:10px;padding:6px;cursor:pointer;transition:all .2s;position:relative;text-align:center}
+.mulligan-card:hover{border-color:#777;transform:translateY(-3px)}
+.mulligan-card.selected{border-color:#f9c74f;box-shadow:0 0 12px rgba(249,199,79,.4);transform:translateY(-4px)}
+.mulligan-card.selected::after{content:'🔄';position:absolute;top:-8px;right:-6px;font-size:1.2rem}
+.mulligan-card img{width:100%;height:auto;border-radius:6px;display:block}
+.mulligan-card-info{font-size:.7rem;color:#ccc;margin-top:4px;line-height:1.3}
+.mulligan-card-info .cost{color:#f9c74f;font-weight:700}
+.mulligan-tag{font-size:.6rem;padding:1px 6px;border-radius:8px;display:inline-block;margin-top:2px}
+.mulligan-tag.order{background:rgba(249,199,79,.2);color:#f9c74f}
+.mulligan-tag.unit{background:rgba(100,200,150,.2);color:#8cbaa0}
+.mulligan-btns{display:flex;gap:12px;justify-content:center}
+/* ===== 沙盒模式 ===== */
+#sandbox{position:fixed;inset:0;background:rgba(0,0,0,.72);z-index:10000;display:none;justify-content:center;align-items:center}
+#sandbox.show{display:flex}
+.sb-panel{background:#14161f;border:2px solid var(--y);border-radius:14px;max-width:880px;width:94vw;max-height:92vh;display:flex;flex-direction:column;overflow:hidden}
+.sb-head{display:flex;justify-content:space-between;align-items:center;padding:12px 18px;border-bottom:1px solid #2a2d3a;background:#181b26}
+.sb-head h2{margin:0;font-size:1.05rem;color:var(--y);letter-spacing:2px}
+.sb-head b{color:#888;font-size:.68rem;font-weight:600}
+.sb-body{flex:1;overflow-y:auto;padding:14px 18px}
+.sb-config{display:flex;flex-wrap:wrap;gap:10px 22px;padding:10px 0 14px;margin-bottom:10px;border-bottom:1px solid #262a37;align-items:center}
+.sb-fc-pick{display:flex;align-items:center;gap:6px;font-size:.78rem;color:#ccc}
+.sb-fc-pick select{background:#1e2030;color:#eee;border:1px solid #333;border-radius:4px;padding:4px 6px;font-size:.76rem}
+.sb-toggle{display:flex;align-items:center;gap:6px;font-size:.76rem;color:#ddd;cursor:pointer;user-select:none}
+.sb-toggle input{width:14px;height:14px;accent-color:var(--y);cursor:pointer}
+.sb-act{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.sb-act .btn{font-size:.66rem;padding:5px 10px}
+.sb-filters{display:flex;gap:8px;flex-wrap:wrap;margin:4px 0 10px;align-items:center}
+.sb-filters select{background:#1e2030;color:#eee;border:1px solid #333;border-radius:4px;padding:4px 6px;font-size:.74rem}
+.sb-filters label{font-size:.66rem;color:#888}
+.sb-count{font-size:.7rem;color:#f9c74f;font-weight:700}
+.sb-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px}
+.sb-card{background:var(--card);border:1px solid #2e3240;border-radius:8px;padding:8px;cursor:pointer;transition:transform .12s,border-color .12s;text-align:left;position:relative;overflow:hidden}
+.sb-card:hover{transform:translateY(-2px);border-color:var(--y)}
+.sb-card .sb-img{width:100%;height:60px;object-fit:cover;border-radius:4px;border:1px solid #333;background:#222;display:flex;align-items:center;justify-content:center;color:#666;font-size:.6rem;overflow:hidden}
+.sb-card .sb-img img{width:100%;height:100%;object-fit:cover}
+.sb-card .sb-name{font-size:.74rem;font-weight:800;color:var(--w);margin-top:6px;line-height:1.2}
+.sb-card .sb-cn{font-size:.6rem;color:#999;margin-top:2px}
+.sb-card .sb-meta{font-size:.66rem;color:#ccc;margin-top:5px;line-height:1.4}
+.sb-card .sb-meta .atk{color:#f9744a}.sb-card .sb-meta .hpv{color:#4ecca3}.sb-card .sb-meta .cst{color:#f9c74f}.sb-card .sb-meta .acst{color:#7bd0e0}
+.sb-card .sb-eff{font-size:.6rem;color:#aab;margin-top:5px;line-height:1.35;border-top:1px solid #2a2d3a;padding-top:4px}
+.sb-badge{position:absolute;top:4px;left:4px;font-size:.6rem;padding:1px 6px;border-radius:3px;font-weight:800;color:#000}
+.sb-badge.ut-I{background:#8b9}.sb-badge.ut-T{background:#fd0}.sb-badge.ut-A{background:#f66}
+.sb-badge.ut-F{background:#6bf}.sb-badge.ut-O{background:#c8f}.sb-badge.ut-X{background:#f9c74f}
+.sb-tip{font-size:.68rem;color:#888;text-align:center;margin-top:12px;line-height:1.6}
+/* 教程单位高亮脉冲动画 */
+@keyframes tut-pulse {
+  0%, 100% { box-shadow: 0 0 4px 2px rgba(255,215,0,0.4); }
+  50% { box-shadow: 0 0 12px 6px rgba(255,215,0,0.9); }
+}
 </style>
 </head>
 <body>
@@ -665,6 +766,7 @@ body{background:var(--bg);color:var(--w);min-height:100vh;display:flex;justify-c
     <span style="font-weight:900;font-size:.95rem;letter-spacing:2px;color:#bbb">KARDS</span>
     <span style="font-size:.68rem;color:#444">二战卡牌对战 · 三条阵线</span>
     <button class="btn btn-ghost" onclick="GAME.newGame()" style="font-size:.68rem">&#128260; 新游戏</button>
+    <button class="btn btn-ghost" onclick="GAME.showSandbox()" style="font-size:.68rem;color:#f9c74f;border-color:#f9c74f">&#128300; 沙盒</button>
   </div>
 
   <!-- 敌方 -->
@@ -717,6 +819,7 @@ body{background:var(--bg);color:var(--w);min-height:100vh;display:flex;justify-c
       <button class="btn btn-confirm" id="btnConfirm" onclick="GAME.confirmOrder()" style="display:none">&#10003; 确认使用</button>
       <button class="btn btn-ghost" id="btnCancel" onclick="GAME.cancelAction()" style="display:none">&#8617; 撤销</button>
       <button class="btn btn-red" onclick="GAME.surrender()">&#127987; 投降</button>
+    <button class="btn-end-turn-mob" id="btnEndTurnMob" onclick="GAME.endPlayerTurn()">⏩ 结束回合</button>
     </div>
   </div>
 </div>
@@ -734,6 +837,40 @@ body{background:var(--bg);color:var(--w);min-height:100vh;display:flex;justify-c
 <div id="overlay"><div id="dialog"></div></div>
 <div id="card-toast" class="card-toast"></div>
 <div id="faction-select" style="display:none"></div>
+
+<!-- 沙盒模式 -->
+<div id="sandbox">
+  <div class="sb-panel">
+    <div class="sb-head">
+      <h2>&#128300; 沙盒模式</h2>
+      <b>自由构筑 · 模拟对战</b>
+      <button class="btn btn-ghost" onclick="GAME.closeSandbox()" style="font-size:.7rem">关闭</button>
+    </div>
+    <div class="sb-body">
+      <div class="sb-config">
+        <div class="sb-fc-pick">我方国家：
+          <select id="sb-fc" onchange="SETNB.fc=this.value">
+            <option value="D">&#x2716; 德军</option><option value="S">&#x262D; 苏军</option>
+            <option value="U">&#x2605; 美军</option><option value="B">&#x2694; 英军</option><option value="J">&#x2600; 日军</option>
+          </select>
+        </div>
+        <label class="sb-toggle"><input type="checkbox" id="sb-ai" checked onchange="SETNB.changeAi(this.checked)"> AI 对手（关=敌方挂机）</label>
+        <label class="sb-toggle"><input type="checkbox" id="sb-cmd" checked onchange="SETNB.changeCmd(this.checked)"> 无限指挥点</label>
+        <label class="sb-toggle"><input type="checkbox" id="sb-atk" onchange="SETNB.changeAtk(this.checked)"> 无限攻击次数</label>
+        <div class="sb-act">
+          <button class="btn btn-green" onclick="GAME.startSandboxGame()">&#9989; 开始沙盒对战</button>
+          <button class="btn btn-ghost" onclick="SETNB.fillHand()">&#129533; 副满手牌</button>
+          <button class="btn btn-ghost" onclick="SETNB.clearHand()">&#128465; 清空手牌</button>
+          <button class="btn btn-ghost" onclick="SETNB.cmdApply()" title="将无限指挥点状态立即应用到当前指挥点">&#9889; 应用指挥点</button>
+        </div>
+      </div>
+      <div class="sb-filters" id="sb-filters"></div>
+      <div class="sb-count" id="sb-count"></div>
+      <div class="sb-grid" id="sb-grid"></div>
+      <div class="sb-tip">从卡库中点击任意卡牌即可<b style="color:#f9c74f">加入我方手牌</b>（最多9张）。无限指挥点/无限攻击即时生效；AI关闭时敌方回合直接空过，便于测试连招与结算。</div>
+    </div>
+  </div>
+</div>
 
 <!-- 移动端竖屏提示 -->
 <div id="rotate-prompt">
@@ -772,169 +909,203 @@ var FA={D:'德军',S:'苏军',U:'美军',B:'英军',J:'日军'};
 var FA_EN={D:'Wehrmacht',S:'Soviet Union',U:'United States',B:'British Empire',J:'Imperial Japan'};
 var FA_ICON={D:'\u2716',S:'\u262D',U:'\u2605',B:'\u2694',J:'\u2600'};
 var FA_COLOR={D:'#667',S:'#c44',U:'#482',B:'#a62',J:'#b82'};
+// ==================== AI 难度配置 ====================
+var AI_LEVEL=1; // 默认简单
+var AI_CONFIG={
+  1:{atkHQ:0.5,smartAtk:false,useOrders:false,pushSmart:false,lethalCheck:false,saveCredits:0},
+  2:{atkHQ:0.8,smartAtk:true,useOrders:true,pushSmart:true,lethalCheck:true,saveCredits:1},
+  3:{atkHQ:1.0,smartAtk:true,useOrders:true,pushSmart:true,lethalCheck:true,saveCredits:2,peekCards:2,seeHandChance:0.5},
+  4:{atkHQ:1.0,smartAtk:true,useOrders:true,pushSmart:true,lethalCheck:true,saveCredits:3,hpBonus:10,cmdBonus:2,extraDraw:1,peekCards:5,godHand:true,seeHand:true,seeHandChance:1}
+};
+// ==================== AI 阵营风格配置 ====================
+var AI_FACTION_STYLE={
+  D:{desc:'闪击突击·战术弹性',cardPref:{blitz:8,tank:5,infantry:2,artillery:1,fighter:2,bomber:3,guard:1,draw:3,rampCmd:1},orderWeights:{blitzFront:10,kill2c:8,dmg2t4:7,cooperateTank:6,dmg3all:5,discard2:4},attackHQWeight:0.30,attackTypeWeights:{artillery:10,bomber:9,fighter:5,tank:4,infantry:2,draw:8,guard:3},pushAggression:0.9,pushPreferBlitz:true,targetLowestHp:false,avoidTrade:true,reserveBonus:0},
+  S:{desc:'人海牺牲·炮兵压制',cardPref:{blitz:2,tank:3,infantry:8,artillery:7,fighter:2,bomber:2,guard:3,draw:3,rampCmd:1},orderWeights:{dmg2allSelf1:9,cmd1d2:8,buffTanks:7,dmg1allTargets:6,dmg1self1draw1:6,humanWave:5,pin1fl:4},attackHQWeight:0.10,attackTypeWeights:{artillery:5,bomber:5,fighter:4,tank:4,infantry:3,draw:3,guard:2},pushAggression:0.8,pushPreferBlitz:false,targetLowestHp:true,avoidTrade:false,reserveBonus:0},
+  U:{desc:'工业跳费·前线支援',cardPref:{blitz:3,tank:4,infantry:5,artillery:5,fighter:5,bomber:5,guard:2,draw:5,rampCmd:10},orderWeights:{cmd2Draw1Next:10,rk:9,cmd1:8,copyBigDraw1:7,summonPara:6,dmg3supCmd1:6},attackHQWeight:0.20,attackTypeWeights:{bomber:9,fighter:8,artillery:6,tank:5,infantry:4,draw:4,guard:3},pushAggression:0.4,pushPreferBlitz:false,targetLowestHp:false,avoidTrade:true,reserveBonus:1},
+  B:{desc:'守护消耗·防守反击',cardPref:{blitz:2,tank:4,infantry:5,artillery:4,fighter:5,bomber:3,guard:10,draw:3,rampCmd:1},orderWeights:{heal3CondDmg1All:9,dmg2allAir:8,retreatAll:7,pin1:6,dmg2allDrawIfWipe:5,radarAlert:5},attackHQWeight:0.10,attackTypeWeights:{bomber:10,fighter:8,artillery:5,tank:5,infantry:4,draw:3,guard:2},pushAggression:0.0,pushPreferBlitz:false,targetLowestHp:false,avoidTrade:true,reserveBonus:2},
+  J:{desc:'速攻玉碎·精准移除',cardPref:{blitz:9,tank:5,infantry:8,artillery:3,fighter:3,bomber:5,guard:1,draw:4,rampCmd:1},orderWeights:{kill2c:9,buffInfAtk2:8,sacrificeDmg5:7,destroySelfDmgHq:6,destroyLowAtk:5,summonScout:5,draw2:5},attackHQWeight:1.0,attackTypeWeights:{hq:10,artillery:3,bomber:4,fighter:3,tank:2,infantry:1,draw:2,guard:1},pushAggression:0.0,pushPreferBlitz:false,targetLowestHp:false,avoidTrade:true,reserveBonus:0}
+};
+
+var ENEMY_FC='D'; // 默认敌方阵营
 var FA_DATA={
   D:{name:'德军',en:'Wehrmacht',tag:'闪击突击',color:'#667',
     build:'以<em>闪击</em>为核心的中速节奏。虎式坦克和装甲掷弹兵提供高攻高甲的地面压制力，88mm Flak伏击炮兵克制敌方推进。Bf109/Fw190战斗机争夺制空权，Ju87斯图卡轰炸机直击总部。',
     play:'前期用国民掷弹兵和三号坦克闪击抢占前线，中期虎式+88mm Flak形成<em>铁壁+伏击</em>双重防线。战斗机护航轰炸机对总部施压，闪电战指令可让已部署单位立即行动。',
-    tactic:'1. <em>闪击速攻</em>：三号坦克/装甲掷弹兵部署即行动，首回合抢占前线\n2. <em>虎式堡垒</em>：重甲2+亡计全体2伤，攻守兼备\n3. <em>88mm伏击</em>：炮兵伏击+不受反击，完美反制坦克冲锋\n4. <em>断水+斯图卡</em>：手牌破坏+全体3伤清场combo'},
+    tactic:'1. <em>闪击速攻</em>：三号坦克/装甲掷弹兵部署即行动，首回合抢占前线\n2. <em>虎式堡垒</em>：重甲2+亡计全体2伤，攻守兼备\n3. <em>88mm伏击</em>：炮兵伏击+不受反击，完美反制坦克冲锋\n4. <em>断水+斯图卡</em>：手牌破坏+全体3伤清场combo',
+    build2:'以<em>重甲控制和资源压制</em>为核心的慢速体系。虎式坦克+88mm Flak+Me262形成重甲铁三角，断水消耗敌方手牌资源，He177轰炸机提供持续的制空打击。',
+    play2:'前期国民掷弹兵闪击占线拖延，中期快速升费打出虎式坦克形成前线壁垒。88mm Flak伏击保护支援阵线，Me262守护限制敌方空军。断水+斯图卡组合终结，闪电战可在关键回合打出致命突袭。',
+    tactic2:'1. <em>重甲铁三角</em>：虎式(重甲2)+88mm(伏击)+Me262(守护)，攻守一体\n2. <em>资源压制</em>：断水弃敌方手牌，配合斯图卡全体3伤清场\n3. <em>闪电战突袭</em>：攒费后闪电战让重甲单位立即出击\n4. <em>He177压制</em>：部署炸全体1伤+打脸压制血线'},
   S:{name:'苏军',en:'Soviet Union',tag:'人海牺牲',color:'#c44',
     build:'以<em>牺牲换取场面</em>的慢速体系。动员兵亡计随机打2，近卫步兵守护+受伤回血形成前线铁壁。IS2重甲坦克亡计随机3伤，喀秋莎全体1伤清场，冬季攻势全场同伤。',
     play:'前期动员兵3攻突脸+亡计随机打2，中期近卫步兵守护+ZiS3 buff友方单位形成不死防线，后期IS2+喀秋莎+冬季攻势全场覆盖。不惜代价和血红的镰刀以总部血换场面优势。',
-    tactic:'1. <em>动员牺牲</em>：动员兵亡计随机打2，以少换多\n2. <em>近卫铁壁</em>：守护+受伤回血，前线不可逾越\n3. <em>冬季攻势</em>：1费全场1伤（含己方），玉石俱焚\n4. <em>钢铁洪流</em>：坦克全体+2/+2，IS2变8/9亡计3伤'},
+    tactic:'1. <em>动员牺牲</em>：动员兵亡计随机打2，以少换多\n2. <em>近卫铁壁</em>：守护+受伤回血，前线不可逾越\n3. <em>冬季攻势</em>：1费全场1伤（含己方），玉石俱焚\n4. <em>钢铁洪流</em>：坦克全体+2/+2，IS2变8/9亡计3伤',
+    build2:'以<em>快攻人海和廉价压制</em>为核心的极速体系。红海军步兵0费充数+不惜代价1费抽2牌加速，人海战术给全体步兵+2/+0形成群体压制，血红的镰刀直接打脸5伤终结。',
+    play2:'前期红海军步兵0费占支援线+动员兵闪击冲前线制造亡计伤害，不惜代价卖血抽牌续航。中期T-34闪击推进+ZiS3增强车组buff场攻，冬季攻势配合人海战术大规模清场+群体buff。后期血红的镰刀+喀秋莎终结比赛。',
+    tactic2:'1. <em>0费起手</em>：红海军步兵0费填线，不惜代价1费抽2加速\n2. <em>人海压制</em>：人海战术给全体步兵+2/+0，廉价单位变威胁\n3. <em>冬季混战</em>：冬季攻势全场1伤+人海战术+buff，混乱中取胜\n4. <em>血红终结</em>：血红的镰刀5伤直击总部，无视防线'},
   U:{name:'美军',en:'United States',tag:'工业跳费',color:'#482',
     build:'以<em>工业产能和精准移除</em>为核心的中速控制。战争债券/工业动员跳费抽牌，M26潘兴重甲坦克亡计3伤，155mm长汤姆前线清场，P51/P38争夺制空。',
     play:'前期步兵班送死跳费+游骑兵冲击抽牌，海军陆战队伏击防守，中期M4谢尔曼闪击推进+105mm/155mm炮兵清场。战争债券跳费后高费回合连续打出B17/B25轰炸机直击总部，死神降临随机消灭提供无解移除。',
-    tactic:'1. <em>工业跳费</em>：战争债券+工业动员，最快到达高费\n2. <em>精准移除</em>：死神降临随机消灭，155mm前线1伤清场\n3. <em>空降突袭</em>：空降师加入2个2/2，支援阵线瞬间填充\n4. <em>战略轰炸</em>：6费对支援阵线敌方全体目标3伤，减少敌方指挥点槽'},
+    tactic:'1. <em>工业跳费</em>：战争债券+工业动员，最快到达高费\n2. <em>精准移除</em>：死神降临随机消灭，155mm前线1伤清场\n3. <em>空降突袭</em>：空降师加入2个2/2，支援阵线瞬间填充\n4. <em>战略轰炸</em>：6费对支援阵线敌方全体目标3伤，减少敌方指挥点槽',
+    build2:'以<em>空军轰炸和精准打击</em>为核心的中速体系。P38/P47/P51三战斗机争夺制空权，B17/B25/B29三轰炸机层层加码直击总部，战略轰炸6费对支援阵线3伤+减指挥点槽彻底瓦解敌方节奏。',
+    play2:'前期战争债券跳费+工业动员找高费单位，中期P38/P47拦截敌方空军。高费后B17全体1伤+B29全体2伤连续轰炸，战略轰炸对支援阵线3伤同时减费。死神降临随机消灭作为单解，M26潘兴重甲坦克殿后守线。',
+    tactic2:'1. <em>制空权争夺</em>：P38/P47/P51三战斗机轮换压制敌方空军\n2. <em>轰炸机梯队</em>：B17(全体1伤)→B25(随机2伤)→B29(全体2伤)\n3. <em>战略轰炸</em>：6费支援阵线3伤+减费，彻底瓦解敌方节奏\n4. <em>工业补给</em>：战争债券+工业动员跳费，确保高费回合持续输出'},
   B:{name:'英军',en:'British Empire',tag:'守护防守',color:'#a62',
     build:'以<em>守护和防守反击</em>为核心的慢速控制。本土防卫军/苏格兰近卫/丘吉尔IV三层守护保护总部，17磅炮伏击反制进攻，25磅炮buff增强单位。蚊式烟幕轰炸机安全输出。',
     play:'前期本土防卫军1费守护卡位，中期苏格兰近卫+玛蒂尔达II形成<em>守护+重甲</em>防线。17磅炮伏击惩罚敌方进攻，喷火/飓风争夺制空。兰卡斯特3伤直击总部，拖延战术打乱敌方阵线。',
-    tactic:'1. <em>多层守护</em>：本土防卫军→苏格兰近卫→丘吉尔IV，总部不可触及\n2. <em>伏击反制</em>：17磅炮伏击，敌方进攻必遭惩罚\n3. <em>拖延战术</em>：敌方全体撤退，前线退支援/手牌，直接瓦解敌方阵线\n4. <em>防空+消耗</em>：防空火力2伤清空军，消耗战1伤+抽牌滚雪球'},
+    tactic:'1. <em>多层守护</em>：本土防卫军→苏格兰近卫→丘吉尔IV，总部不可触及\n2. <em>伏击反制</em>：17磅炮伏击，敌方进攻必遭惩罚\n3. <em>拖延战术</em>：敌方全体撤退，前线退支援/手牌，直接瓦解敌方阵线\n4. <em>防空+消耗</em>：防空火力2伤清空军，消耗战1伤+抽牌滚雪球',
+    build2:'以<em>反制消耗和持久战</em>为核心的慢速疲劳体系。拖延战术打乱敌方阵线+消耗战持续抽牌滚雪球，防空火力2伤清空军+雷达警报1伤打断节奏，牛津志愿军亡计随机2伤增加反制密度。',
+    play2:'前期本土防卫军1费守护卡位+牛津志愿军送死亡计2伤换牌，中期17磅炮伏击+防空火力清场。消耗战1费全场1伤+抽牌持续滚雪球，拖延战术打乱敌方推进节奏。后期丘吉尔IV重甲2守护+皇家工兵回血形成不死堡垒，兰卡斯特3伤收尾。',
+    tactic2:'1. <em>拖延消耗</em>：拖延战术+消耗战组合，反复打乱+抽牌滚雪球\n2. <em>防空反制</em>：防空火力2伤+雷达警报1伤，清空军打断节奏\n3. <em>堡垒持久</em>：丘吉尔IV重甲2+守护+皇家工兵回血\n4. <em>疲劳胜利</em>：持续消耗敌方资源，拖到后期碾压'},
   J:{name:'日军',en:'Imperial Japan',tag:'速攻玉碎',color:'#b82',
     build:'以<em>闪击速攻和玉碎牺牲</em>为核心的快攻节奏。步兵小队1费闪击抢占前线，海军陆战队伏击防守，95式轻战车烟幕掩护。神风特攻/玉碎牺牲己方单位换取巨额伤害。',
     play:'前期步兵小队闪击+97式中战车闪击双线推进，海军陆战队伏击反制。中期150mm榴弹炮支援清场+零式/紫电争夺制空。神风特攻牺牲单位5伤点杀，玉碎牺牲单位对总部造成等同攻击力伤害——<em>以命换命</em>。',
-    tactic:'1. <em>闪击抢线</em>：步兵小队1费闪击，首回合前线占位\n2. <em>玉碎终结</em>：牺牲高攻单位，攻击力直伤总部\n3. <em>神风点杀</em>：牺牲任意单位→5伤，消灭关键目标\n4. <em>万岁冲锋</em>：2费消灭≤2费敌军，精准移除前期威胁'}
+    tactic:'1. <em>闪击抢线</em>：步兵小队1费闪击，首回合前线占位\n2. <em>玉碎终结</em>：牺牲高攻单位，攻击力直伤总部\n3. <em>神风点杀</em>：牺牲任意单位→5伤，消灭关键目标\n4. <em>万岁冲锋</em>：2费消灭≤2费敌军，精准移除前期威胁',
+    build2:'以<em>精准控制和场面压制</em>为核心的中速体系。万岁冲锋2费移除低费单位+丛林突袭精准消灭低攻高血单位+神风特攻5伤点杀，三重移除覆盖所有敌方威胁。扩张1费抽2牌+武士道全体步兵+2/+0提供资源与场面优势。',
+    play2:'前期步兵小队闪击占线+万岁冲锋移除低费防守单位，中期海军陆战队伏击防守+97式中战车闪击推进。扩张抽牌保持手牌优势，丛林突袭清理敌方支援阵线的炮兵/轰炸机。玉碎牺牲残血高攻单位直接打脸终结，武士道给步兵群体buff增加压制力。',
+    tactic2:'1. <em>三重移除</em>：万岁冲锋(≤2费)+丛林突袭(低攻高血)+神风(5伤点杀)\n2. <em>扩张抽牌</em>：前线有日本单位时抽2张，资源不枯竭\n3. <em>玉碎直伤</em>：牺牲高攻单位，攻击力满额转化为总部伤害\n4. <em>武士道压制</em>：全体步兵+2/+0，多单位同时进攻施压'}
 };
 var UT={I:'步兵',T:'坦克',A:'炮兵',F:'战斗机',O:'轰炸机',X:'指令'};
 var IMG_MAP={
   // ===== 德国 D (步兵/坦克/炮兵/战斗/轰炸) =====
-  'Volksgrenadier':'images/Germany/D_I_Volksgrenadier.png',
+  'Volksgrenadier':'images/Germany/D_I_Volksgrenadier.jpg',
+  'Volksgrenadier 2':'images/Germany/D_I_Volksgrenadier.jpg',
   'Panzergrenadier':'images/Germany/装甲掷弹兵.png',
   'Sturmpionier':'images/Germany/突击工兵.png',
   'MG42 Team':'images/Germany/D_I_MG42Team.png',
-  'Fallschirmjager':'images/Germany/D_I_Fallschirmjager.png',
-  'Panzer III':'images/Germany/D_T_Panther.png',
-  'StuG IV':'images/Germany/D_T_Panther.png',
-  'Tiger I':'images/Germany/D_T_TigerI.png',
-  'Wespe':'images/Germany/D_A_88mmFlak.png',
-  '88mm Flak':'images/Germany/D_A_88mmFlak.png',
-  'Bf 109 G':'images/Germany/D_F_Bf109.png',
-  'Fw 190 A':'images/Germany/D_F_Fw190.png',
-  'Me 262':'images/Germany/D_F_Me262.png',
-  'Ju 87 Stuka':'images/Germany/D_B_Stuka.png',
-  'Ju 88':'images/Germany/D_B_Ju88.png',
-  'He 177':'images/Germany/D_B_He177.png',
+  'Fallschirmjager':'images/Germany/D_I_Fallschirmjager.jpg',
+  'Panzer III':'images/Germany/D_T_Panther.jpg',
+  'StuG IV':'images/Germany/D_T_Panther.jpg',
+  'Tiger I':'images/Germany/D_T_TigerI.jpg',
+  'Wespe':'images/Germany/D_A_88mmFlak.jpg',
+  '88mm Flak':'images/Germany/D_A_88mmFlak.jpg',
+  'Bf 109 G':'images/Germany/D_F_Bf109.jpg',
+  'Fw 190 A':'images/Germany/D_F_Fw190.jpg',
+  'Me 262':'images/Germany/D_F_Me262.jpg',
+  'Ju 87 Stuka':'images/Germany/D_B_Stuka.jpg',
+  'Ju 88':'images/Germany/D_B_Ju88.jpg',
+  'He 177':'images/Germany/D_B_He177.jpg',
   // 德国指令
   'Sudden Strike':'images/Germany/突然袭击.jpg',
-  'Tactical Strike':'images/Germany/战术打击.png',
-  'Blitzkrieg':'images/Germany/闪电战.png',
-  'Combined Arms':'images/Germany/协同作战.png',
-  'Blockade':'images/Germany/断水.png',
+  'Tactical Strike':'images/Germany/战术打击.jpg',
+  'Blitzkrieg':'images/Germany/闪电战.jpg',
+  'Combined Arms':'images/Germany/协同作战.jpg',
+  'Blockade':'images/Germany/断水.jpg',
   'Stuka Dive':'images/Germany/斯图卡俯冲.jpg',
   // ===== 苏联 S =====
-  'Mobilized Infantry':'images/Soviet_Union/S_I_RedArmy.png',
+  'Mobilized Infantry':'images/Soviet_Union/S_I_RedArmy.jpg',
   'Guards Infantry':'images/Soviet_Union/近卫步兵.jpg',
-  '4th Guards Rifles':'images/Soviet_Union/S_I_GuardsFlag.png',
+  '4th Guards Rifles':'images/Soviet_Union/S_I_GuardsFlag.jpg',
   'Guards Infantry 2nd':'images/Soviet_Union/近卫步兵第二团.jpg',
-  'Assault Sapper':'images/Soviet_Union/S_I_RuinDefender.png',
-  'Sniper':'images/Soviet_Union/S_I_Sniper.png',
-  'Sniper Team':'images/Soviet_Union/S_I_Sniper.png',
+  'Assault Sapper':'images/Soviet_Union/S_I_RuinDefender.jpg',
+  'Sniper':'images/Soviet_Union/S_I_Sniper.jpg',
+  'Sniper Team':'images/Soviet_Union/S_I_Sniper.jpg',
   'Partisan':'images/Soviet_Union/S_I_Partisan.png',
-  'Ruin Defender':'images/Soviet_Union/S_I_RuinDefender.png',
-  'T-34/76':'images/Soviet_Union/S_T_T34.png',
-  'IS-3':'images/Soviet_Union/IS-3.png',
-  'IS-2':'images/Soviet_Union/S_T_IS2.png',
-  'ZiS-3':'images/Soviet_Union/S_A_ZIS3.png',
-  'Katyusha BM-13':'images/Soviet_Union/S_A_Katyusha.png',
-  'Yak-9':'images/Soviet_Union/S_F_Yak3.png',
-  'La-7':'images/Soviet_Union/S_F_La7.png',
-  'MiG-3':'images/Soviet_Union/S_F_Mig3.png',
-  'Pe-2':'images/Soviet_Union/S_B_Pe2.png',
-  'Tu-2':'images/Soviet_Union/S_B_Tu2.png',
-  'Il-2':'images/Soviet_Union/S_B_Il2.png',
+  'Ruin Defender':'images/Soviet_Union/S_I_RuinDefender.jpg',
+  'T-34/76':'images/Soviet_Union/S_T_T34.jpg',
+  'IS-3':'images/Soviet_Union/IS-3.jpg',
+  'IS-2':'images/Soviet_Union/S_T_IS2.jpg',
+  'ZiS-3':'images/Soviet_Union/S_A_ZIS3.jpg',
+  'Katyusha BM-13':'images/Soviet_Union/S_A_Katyusha.jpg',
+  'Yak-9':'images/Soviet_Union/S_F_Yak3.jpg',
+  'La-7':'images/Soviet_Union/S_F_La7.jpg',
+  'MiG-3':'images/Soviet_Union/S_F_Mig3.jpg',
+  'Pe-2':'images/Soviet_Union/S_B_Pe2.jpg',
+  'Tu-2':'images/Soviet_Union/S_B_Tu2.jpg',
+  'Il-2':'images/Soviet_Union/S_B_Il2.jpg',
   // 苏联指令
-  'Artillery Blockade':'images/Soviet_Union/S_A_Katyusha.png',
-  'Bloody Sickle':'images/Soviet_Union/血红的镰刀.png',
-  'At All Costs':'images/Soviet_Union/不惜代价.png',
-  'Steel Tide':'images/Soviet_Union/钢铁洪流.png',
-  'Workers Unite':'images/Soviet_Union/工人们联合.png',
-  'Winter Offensive':'images/Soviet_Union/冬季攻势.png',
-  'Human Wave Tactics':'images/Soviet_Union/人海战术.png',
-  '8th Guards Infantry':'images/Soviet_Union/近卫第8步兵师.png',
+  'Artillery Blockade':'images/Soviet_Union/S_A_Katyusha.jpg',
+  'Bloody Sickle':'images/Soviet_Union/血红的镰刀.jpg',
+  'At All Costs':'images/Soviet_Union/不惜代价.jpg',
+  'Steel Tide':'images/Soviet_Union/钢铁洪流.jpg',
+  'Workers Unite':'images/Soviet_Union/工人们联合.jpg',
+  'Winter Offensive':'images/Soviet_Union/冬季攻势.jpg',
+  'Human Wave Tactics':'images/Soviet_Union/人海战术.jpg',
+  '8th Guards Infantry':'images/Soviet_Union/近卫第8步兵师.jpg',
   // ===== 美国 U =====
-  'GI':'images/USA/U_I_GI.png',
-  'Rifle Squad':'images/USA/U_I_SquadHouse.png',
-  'US Marines':'images/USA/U_I_Marine.png',
-  'Rangers':'images/USA/U_I_Ranger.png',
-  'Paratrooper':'images/USA/空降兵.png',
-  'Sherman M4A3':'images/USA/U_T_Sherman.png',
-  'M36 Jackson':'images/USA/U_T_Pershing.png',
-  'M26 Pershing':'images/USA/U_T_Pershing.png',
-  'M3 Stuart':'images/USA/U_T_Stuart.png',
-  '105mm M2':'images/USA/U_A_105mm.png',
-  'M7 Priest':'images/USA/U_A_M7Priest.png',
-  '155mm Long Tom':'images/USA/U_A_105mm.png',
-  'P-51D Mustang':'images/USA/U_F_P51.png',
-  'P-47 Thunderbolt':'images/USA/U_F_P47.png',
-  'P-38 Lightning':'images/USA/U_F_P38.png',
-  'P-40 Warhawk':'images/USA/U_F_P40.png',
-  'B-17 Flying Fortress':'images/USA/U_B_B17.png',
-  'B-25 Mitchell':'images/USA/U_B_B25.png',
-  'B-29 Superfortress':'images/USA/U_B_B29.png',
+  'GI':'images/USA/U_I_GI.jpg',
+  'Rifle Squad':'images/USA/U_I_SquadHouse.jpg',
+  'US Marines':'images/USA/U_I_Marine.jpg',
+  'Rangers':'images/USA/U_I_Ranger.jpg',
+  'Paratrooper':'images/USA/空降兵.jpg',
+  'Sherman M4A3':'images/USA/U_T_Sherman.jpg',
+  'M36 Jackson':'images/USA/U_T_Pershing.jpg',
+  'M26 Pershing':'images/USA/U_T_Pershing.jpg',
+  'M3 Stuart':'images/USA/U_T_Stuart.jpg',
+  '105mm M2':'images/USA/U_A_105mm.jpg',
+  'M7 Priest':'images/USA/U_A_M7Priest.jpg',
+  '155mm Long Tom':'images/USA/U_A_105mm.jpg',
+  'P-51D Mustang':'images/USA/U_F_P51.jpg',
+  'P-47 Thunderbolt':'images/USA/U_F_P47.jpg',
+  'P-38 Lightning':'images/USA/U_F_P38.jpg',
+  'P-40 Warhawk':'images/USA/U_F_P40.jpg',
+  'B-17 Flying Fortress':'images/USA/U_B_B17.jpg',
+  'B-25 Mitchell':'images/USA/U_B_B25.jpg',
+  'B-29 Superfortress':'images/USA/U_B_B29.jpg',
   // 美国指令
-  'Death From Above':'images/USA/U_B_B17.png',
-  'War Bonds':'images/USA/战争债券.png',
-  'War Machine':'images/USA/战争机器.png',
-  'Industrial Might':'images/USA/U_T_Sherman.png',
+  'Death From Above':'images/USA/U_B_B17.jpg',
+  'War Bonds':'images/USA/战争债券.jpg',
+  'War Machine':'images/USA/战争机器.jpg',
+  'Industrial Might':'images/USA/U_T_Sherman.jpg',
   'Airborne Division':'images/USA/空降师.png',
-  'Strategic Bombing':'images/USA/U_B_B29.png',
+  'Strategic Bombing':'images/USA/U_B_B29.jpg',
   // ===== 英国 B =====
-  'Home Guard':'images/UK/B_I_BritInfantry.png',
-  'Scottish Paratroopers':'images/UK/苏格兰伞兵.png',
-  'Commandos':'images/UK/B_I_Commando.png',
-  'Royal Engineers':'images/UK/皇家工兵.png',
+  'Home Guard':'images/UK/B_I_BritInfantry.jpg',
+  'Scottish Paratroopers':'images/UK/苏格兰伞兵.jpg',
+  'Commandos':'images/UK/B_I_Commando.jpg',
+  'Royal Engineers':'images/UK/皇家工兵.jpg',
   'Desert Rat':'images/UK/B_I_DesertRat.png',
   'Paratrooper (UK)':'images/UK/B_I_Paratrooper.png',
-  'Matilda II':'images/UK/B_T_Valentine.png',
-  'Valentine':'images/UK/B_T_Valentine.png',
-  'Churchill IV':'images/UK/B_T_Churchill.png',
-  'Cromwell':'images/UK/B_T_Cromwell.png',
-  'Cromwell Mk IV':'images/UK/B_T_Cromwell.png',
-  'Crusader':'images/UK/B_T_Crusader.png',
-  '25-pounder':'images/UK/B_A_25pounder.png',
-  '17-pounder':'images/UK/B_A_25pounder.png',
-  'Bofors 40mm':'images/UK/B_A_Bofors.png',
-  'Spitfire Mk V':'images/UK/B_F_Spitfire.png',
-  'Hurricane Mk I':'images/UK/B_F_Hurricane.png',
-  'Typhoon':'images/UK/B_F_Typhoon.png',
-  'Oxford':'images/UK/牛津.png',
-  'Lancaster':'images/UK/B_B_Lancaster.png',
-  'Wellington':'images/UK/B_B_Wellington.png',
-  'Mosquito':'images/UK/B_B_Wellington.png',
+  'Matilda II':'images/UK/B_T_Valentine.jpg',
+  'Valentine':'images/UK/B_T_Valentine.jpg',
+  'Churchill IV':'images/UK/B_T_Churchill.jpg',
+  'Cromwell':'images/UK/B_T_Cromwell.jpg',
+  'Cromwell Mk IV':'images/UK/B_T_Cromwell.jpg',
+  'Crusader':'images/UK/B_T_Crusader.jpg',
+  '25-pounder':'images/UK/B_A_25pounder.jpg',
+  '17-pounder':'images/UK/B_A_25pounder.jpg',
+  'Bofors 40mm':'images/UK/B_A_Bofors.jpg',
+  'Spitfire Mk V':'images/UK/B_F_Spitfire.jpg',
+  'Hurricane Mk I':'images/UK/B_F_Hurricane.jpg',
+  'Typhoon':'images/UK/B_F_Typhoon.jpg',
+  'Oxford':'images/UK/牛津.jpg',
+  'Lancaster':'images/UK/B_B_Lancaster.jpg',
+  'Wellington':'images/UK/B_B_Wellington.jpg',
+  'Mosquito':'images/UK/B_B_Wellington.jpg',
   // 英国指令
-  'Artillery Barrage':'images/UK/B_A_25pounder.png',
-  'RAF Support':'images/UK/B_F_Spitfire.png',
-  'AA Fire':'images/UK/B_A_Bofors.png',
-  'Delay Tactics':'images/UK/拖延战术.png',
-  'Radar Alert':'images/UK/雷达警报.png',
-  'War of Attrition':'images/UK/B_T_Valentine.png',
+  'Artillery Barrage':'images/UK/B_A_25pounder.jpg',
+  'RAF Support':'images/UK/B_F_Spitfire.jpg',
+  'AA Fire':'images/UK/B_A_Bofors.jpg',
+  'Delay Tactics':'images/UK/拖延战术.jpg',
+  'Radar Alert':'images/UK/雷达警报.jpg',
+  'War of Attrition':'images/UK/B_T_Valentine.jpg',
   // ===== 日本 J =====
-  'IJA Squad':'images/Japan/J_I_IJA.png',
-  'Officer':'images/Japan/J_I_Officer.png',
-  'SNLF Marines':'images/Japan/J_I_Officer.png',
-  'Giretsu Squad':'images/Japan/J_I_Banzai.png',
-  'Type 97 Chi-Ha':'images/Japan/J_T_Type97.png',
-  'Type 95 Ha-Go':'images/Japan/J_T_Type95HaGo.png',
-  'Type 3 Chi-Nu':'images/Japan/J_T_Type3ChiNu.png',
-  'Type 1 Ho-Ni':'images/Japan/J_T_Type3ChiNu.png',
-  'Type 94 Mountain Gun':'images/Japan/J_A_MountainGun.png',
-  'Type 96 Howitzer':'images/Japan/J_A_Type92Gun.png',
-  'A6M Zero':'images/Japan/J_F_Zero.png',
-  'Ki-43 Hayabusa':'images/Japan/J_F_Ki43Hayabusa.png',
-  'N1K2-J Shiden':'images/Japan/J_F_J2MRaiden.png',
-  'J2M Raiden':'images/Japan/J_F_J2MRaiden.png',
-  'D3A Val':'images/Japan/J_B_SuiseiD4Y.png',
-  'Suisei D4Y':'images/Japan/J_B_SuiseiD4Y.png',
-  'G4M Betty':'images/Japan/J_B_G4M.png',
-  'Ki-21 Sally':'images/Japan/J_B_Ki21Sally.png',
-  'Ki-49 Helen':'images/Japan/J_B_Ki49Helen.png',
+  'IJA Squad':'images/Japan/J_I_IJA.jpg',
+  'Officer':'images/Japan/J_I_Officer.jpg',
+  'SNLF Marines':'images/Japan/J_I_Officer.jpg',
+  'Giretsu Squad':'images/Japan/J_I_Banzai.jpg',
+  'Type 97 Chi-Ha':'images/Japan/J_T_Type97.jpg',
+  'Type 95 Ha-Go':'images/Japan/J_T_Type95HaGo.jpg',
+  'Type 3 Chi-Nu':'images/Japan/J_T_Type3ChiNu.jpg',
+  'Type 1 Ho-Ni':'images/Japan/J_T_Type3ChiNu.jpg',
+  'Type 94 Mountain Gun':'images/Japan/J_A_MountainGun.jpg',
+  'Type 96 Howitzer':'images/Japan/J_A_Type92Gun.jpg',
+  'A6M Zero':'images/Japan/J_F_Zero.jpg',
+  'Ki-43 Hayabusa':'images/Japan/J_F_Ki43Hayabusa.jpg',
+  'N1K2-J Shiden':'images/Japan/J_F_J2MRaiden.jpg',
+  'J2M Raiden':'images/Japan/J_F_J2MRaiden.jpg',
+  'D3A Val':'images/Japan/J_B_SuiseiD4Y.jpg',
+  'Suisei D4Y':'images/Japan/J_B_SuiseiD4Y.jpg',
+  'G4M Betty':'images/Japan/J_B_G4M.jpg',
+  'Ki-21 Sally':'images/Japan/J_B_Ki21Sally.jpg',
+  'Ki-49 Helen':'images/Japan/J_B_Ki49Helen.jpg',
   // 日本指令
-  'Banzai Charge':'images/Japan/J_F_Ki43Hayabusa.png',
-  'Kamikaze':'images/Japan/J_B_SuiseiD4Y.png',
-  'Bushido':'images/Japan/J_B_G4M.png',
-  'Gyokusai':'images/Japan/J_B_Ki21Sally.png',
-  'Jungle Raid':'images/Japan/J_B_Ki49Helen.png',
+  'Banzai Charge':'images/Japan/J_F_Ki43Hayabusa.jpg',
+  'Kamikaze':'images/Japan/J_B_SuiseiD4Y.jpg',
+  'Bushido':'images/Japan/J_B_G4M.jpg',
+  'Gyokusai':'images/Japan/J_B_Ki21Sally.jpg',
+  'Jungle Raid':'images/Japan/丛林突袭.png',
   'Expansion':'images/Japan/扩张.jpg',
-  'Recon Squad':'images/Japan/侦察队.png',
+  'Recon Squad':'images/Japan/侦察队.jpg',
   'Scout':'images/Japan/侦察兵.png'
 };
 var UI={I:'\uD83E\uDE96',T:'\uD83D\uDEE1\uFE0F',A:'\uD83D\uDCA3',F:'\u2708\uFE0F',O:'\uD83D\uDE80',X:'\uD83D\uDCDC'};
@@ -1276,6 +1447,59 @@ function playAttackLine(fromEl,toEl){
       },300)
     },400)
   });
+}
+
+// ===== 链式伤害攻击线特效（用于部署/指令/亡计造成的伤害） =====
+// sourceEl: 攻击来源的DOM元素（单位卡牌或总部）
+// targets: [{card:unitCard/或null, isHq:bool, owner:playerObj, dmg:number}, ...]
+// staggerMs: 每个目标之间的间隔毫秒
+function _chainDmgFX(sourceEl, targets, staggerMs) {
+  var p=new Promise(function(resolve) {
+    if (!sourceEl || !targets || !targets.length) { resolve(); return; }
+    staggerMs = staggerMs || 900;
+    var idx = 0;
+    var remaining = targets.length;
+    function oneDone() {
+      remaining--;
+      if (remaining <= 0) resolve();
+    }
+    function next() {
+      if (idx >= targets.length) return;
+      var t = targets[idx];
+      var toEl;
+      if (t.isHq) {
+        toEl = findHQEl(t.owner);
+      } else if (t.card) {
+        toEl = findCardEl(t.card);
+      }
+      idx++;
+      if (!toEl) { oneDone(); setTimeout(next, 50); return; }
+      playAttackLine(sourceEl, toEl).then(function () {
+        return delay(150);
+      }).then(function () {
+        if (t.isHq) {
+          floatDamage(toEl, t.dmg);
+        } else if (t.card && t.dmg > 0) {
+          GAME.showDmgEffect(t.card, t.dmg);
+        }
+        oneDone();
+      });
+      if (idx < targets.length) setTimeout(next, staggerMs);
+    }
+    setTimeout(next, 150);
+  });
+  GAME._pendingAnims.push(p);
+  p.then(function(){var i=GAME._pendingAnims.indexOf(p);if(i>=0)GAME._pendingAnims.splice(i,1)});
+  return p;
+}
+
+function _applyDmg(unit, amount) {
+  if (amount <= 0) return;
+  unit.hp -= amount;
+  if (unit.hasHealOnDmg && amount > 0) {
+    unit.owner.hp += amount;
+    unit.owner.maxHp += amount;
+  }
 }
 
 // ===== 出牌展示条 =====
@@ -1627,15 +1851,14 @@ Card.prototype={
   spendAP:function(n){this.apSpent+=(n||1);this.hasActedThisTurn=true},
   // 当前是否还能进行任何行动（未锁定/未压制/有剩余行动点/付得起行动费）
   get canStillAct(){
-    var hasCmd=!this.owner||this.owner.cmd>=this.effAcost;
-    return this.canAct&&this.hp>0&&!this.pinned&&this.apLeft()>0&&hasCmd;
+    return this.canAct&&this.hp>0&&!this.pinned&&this.apLeft()>0;
   },
   // 是否还能移动：在支援阵线、且有剩余行动点（所有兵种均可推线，消耗行动费和1AP）
   get canStillMove(){
     if(!this.canStillAct)return false;
     // 非坦克单位：已攻击则不能移动（移动和攻击二选一）
     if(!this.isT&&this.attacksThisTurn>0)return false;
-    return this.zone==='support';
+    var hasCmd=!this.owner||this.owner.cmd>=this.effAcost;return this.zone==='support'&&hasCmd;
   },
   // 是否还能攻击：有剩余行动点、且未超过攻击次数上限（无奋战限1次，奋战限2次）
   get canStillAtk(){
@@ -1754,6 +1977,111 @@ Player.prototype.getPlayable=function(){
 };
 Player.prototype.allUnits=function(){return this.support.concat(this.fl)};
 
+// ==================== 沙盒模式 ====================
+var SANDBOX={active:false,unlimitedCmd:true,aiOn:true,unlimitedAtk:false};
+var SETNB={
+  fc:'D', fcF:'全部', typeF:'全部', costF:'全部',
+  changeCmd:function(v){SANDBOX.unlimitedCmd=v;SETNB.cmdApply()},
+  changeAtk:function(v){SANDBOX.unlimitedAtk=v;GAME.log((v?'🔁 已开启无限攻击次数（我方单位可连续攻击）':'⏹ 已关闭无限攻击次数'),'system')},
+  changeAi:function(v){SANDBOX.aiOn=v;GAME.log((v?'🤖 AI对手：开启':'⏸ AI对手：关闭（敌方回合将直接空过）'),'system')},
+  // 将无限指挥点开关立即应用到当前指挥点
+  cmdApply:function(plc){
+    var pl=plc||GAME.player;
+    if(!pl)return;
+    if(SANDBOX.unlimitedCmd){pl.cmd=999;pl.maxCmd=999;pl.baseMaxCmd=999;}
+    else if(pl.cmd>=900){pl.baseMaxCmd=5;pl.maxCmd=5;pl.cmd=5;}
+    if(SANDBOX.aiOn&&pl===GAME.enemy&&SANDBOX.unlimitedCmd===false){pl.cmd=999;pl.maxCmd=999;}
+    GAME.render();
+  },
+  // 渲染卡库列表（根据筛选条件）
+  render:function(){
+    var typeF=SETNB.typeF,fcF=SETNB.fcF,costF=SETNB.costF;
+    var list=CP.filter(function(d){
+      if(fcF!=='全部'&&d[2]!==fcF)return false;
+      if(typeF!=='全部'){
+        if(typeF==='单位'){if(d[3]==='X')return false}
+        else if(typeF==='指令'){if(d[3]!=='X')return false}
+        else if(d[3]!==typeF)return false;
+      }
+      var cost=d[3]==='X'?d[4]:d[6];
+      if(costF!=='全部'&&String(cost)!==costF)return false;
+      return true;
+    });
+    // 按名分组避免在卡库中显示为多份（每个卡种仅一条）
+    var seen={};var uniq=[];
+    list.forEach(function(d){if(!seen[d[0]]){seen[d[0]]=1;uniq.push(d)}});
+    var grid=$('sb-grid');grid.innerHTML='';
+    $('sb-count').textContent='匹配 '+uniq.length+' 张 · 点击加入手牌';
+    if(!uniq.length){grid.innerHTML='<span style="color:#888;font-size:.72rem;grid-column:1/-1;text-align:center;padding:20px">没有匹配的卡牌</span>';return}
+    var imgFn=function(src){return src?('<img src="'+src+'" onerror="this.style.display=\'none\'">'):'无图'};
+    uniq.forEach(function(d){
+      var isOrder=d[3]==='X';
+      var tile=document.createElement('div');tile.className='sb-card';
+      var kwMap={G:'守护',B:'闪击',H:'重甲',A:'伏击',S:'烟幕',F:'奋战',C:'冲击'};
+      var meta='';
+      if(isOrder){
+        meta='<span class="cst">&#9889;'+d[4]+'</span>';
+      }else{
+        var kwStr='';
+        if(d[9]){for(var i=0;i<d[9].length;i++){if(kwMap[d[9][i]])kwStr+=' '+kwMap[d[9][i]]}}
+        meta='<span class="atk">&#9876;'+d[4]+'</span> <span class="hpv">&#10084;'+d[5]+'</span> <span class="cst">&#9889;'+d[6]+'</span> <span class="acst">&#9889;'+d[7]+'</span>'+(d[8]?' <span>&#128737;'+d[8]+'</span>':'')+(kwStr?' <span style="color:#f9c74f">'+kwStr+'</span>':'');
+      }
+      tile.innerHTML='<span class="sb-badge ut-'+(isOrder?'X':d[3])+'">'+(isOrder?'指令':UT[d[3]])+'</span>'
+        +'<div class="sb-img">'+imgFn(IMG_MAP[d[1]]||'')+'</div>'
+        +'<div class="sb-name">'+d[0]+'</div>'
+        +'<div class="sb-cn">'+d[1]+'</div>'
+        +'<div class="sb-meta">'+meta+'</div>'
+        +(isOrder?('<div class="sb-eff">'+d[6]+'</div>'):(d[10]?'<div class="sb-eff">'+d[10]+'</div>':''));
+      tile.title='点击加入手牌';
+      tile.onclick=function(){SETNB.addToHand(d)};
+      grid.appendChild(tile);
+    });
+  },
+  // 生成筛选下拉框
+  buildFilters:function(){
+    var f=$('sb-filters');
+    var h='<label>阵营</label><select id="f-fc" onchange="SETNB.fcF=this.value;SETNB.render()">';
+    h+='<option value="全部">全部</option><option value="D">德军</option><option value="S">苏军</option><option value="U">美军</option><option value="B">英军</option><option value="J">日军</option></select>';
+    h+='<label>类型</label><select id="f-type" onchange="SETNB.typeF=this.value;SETNB.render()">';
+    h+='<option value="全部">全部</option><option value="单位">单位</option><option value="I">步兵</option><option value="T">坦克</option><option value="A">炮兵</option><option value="F">战斗机</option><option value="O">轰炸机</option><option value="指令">指令</option></select>';
+    h+='<label>费用</label><select id="f-cost" onchange="SETNB.costF=this.value;SETNB.render()">';
+    h+='<option value="全部">全部</option>';
+    for(var c=0;c<=9;c++)h+='<option value="'+c+'">'+c+'费</option>';
+    h+='</select>';
+    f.innerHTML=h;
+  },
+  fillFiltersState:function(){
+    var f1=$('f-fc');if(f1)f1.value=SETNB.fcF;
+    var f2=$('f-type');if(f2)f2.value=SETNB.typeF;
+    var f3=$('f-cost');if(f3)f3.value=SETNB.costF;
+  },
+  addToHand:function(d){
+    if(GAME.player&&GAME.player.hand.length>=9)return toast('手牌已满（最多9张）');
+    if(!GAME.player){toast('请先开始沙盒对战');return}
+    var c=new Card(d);
+    c.owner=GAME.player;c.zone='hand';
+    GAME.player.hand.push(c);
+    GAME.log('🔬 添加 <b>'+c.cn+'</b> 到我方手牌','system');
+    GAME.render();
+  },
+  fillHand:function(){
+    if(!GAME.player)return toast('请先开始沙盒对战');
+    var pool=CP;
+    var guard=0;
+    while(GAME.player.hand.length<9&&guard<60){
+      var d=pool[Math.floor(Math.random()*pool.length)];
+      var c=new Card(d);c.owner=GAME.player;c.zone='hand';
+      GAME.player.hand.push(c);guard++;
+    }
+    GAME.log('🖐 沙盒：手牌已抽满至 9 张','system');GAME.render();
+  },
+  clearHand:function(){
+    if(!GAME.player)return toast('请先开始沙盒对战');
+    GAME.player.hand.length=0;
+    GAME.log('🗑 沙盒：已清空我放手牌','system');GAME.render();
+  }
+};
+
 // ==================== 游戏状态 ====================
 var GAME={
   player:null, enemy:null,
@@ -1765,6 +2093,7 @@ var GAME={
   pendingOrder:null,
   _dragCard:null, _dragPush:null,
   gameOver:false,
+  _pendingAnims:[],
   isTouchDevice:(function(){if(!('ontouchstart'in window)&&!(navigator.maxTouchPoints>0))return false;if(window.matchMedia&&window.matchMedia('(pointer:coarse)').matches)return true;return false;})(),
 
   // ---------- 前线控制 ----------
@@ -1807,10 +2136,11 @@ var GAME={
         else{GAME.log('无目标可消灭','system')}
         break;
       case'heal3CondDmg1All':
-        who.hp=who.hp+3;who.maxHp=who.maxHp+3;GAME.log('\uD83D\uDC89 皇家空军支援\u2192总部回复3生命('+who.hp+'\u2764)','effect');
+        who.hp=who.hp+3;who.maxHp=who.maxHp+3;GAME.log('\uD83D\uDC89 \u7687\u5BB6\u7A7A\u519B\u652F\u63F4\u2192\u603B\u90E8\u56DE\u590D3\u751F\u547D('+who.hp+'\u2764)','effect');
         if(who.hp>opp.hp){
-          opp.allUnits().forEach(function(x,i){x.hp-=1;setTimeout(function(){GAME.showDmgEffect(x,1)},i*80)});
-          GAME.log('\uD83C\uDFAF 皇家空军支援\u2192友方总部生命值更高，敌方全体单位1伤','effect');
+          var h3Units=opp.allUnits().slice();h3Units.forEach(function(x){_applyDmg(x,1)});
+          var h3HQEl=findHQEl(who);_chainDmgFX(h3HQEl,h3Units.map(function(x){return{card:x,isHq:false,dmg:1}}));
+          GAME.log('\uD83C\uDFAF \u7687\u5BB6\u7A7A\u519B\u652F\u63F4\u2192\u53CB\u65B9\u603B\u90E8\u751F\u547D\u503C\u66F4\u9AD8\uFF0C\u654C\u65B9\u5168\u4F53\u5355\u4F4D1\u4F24','effect');
         }
         break;
       case'blitzFront':
@@ -1828,9 +2158,15 @@ var GAME={
         for(var i=0;i<d2;i++){var di=Math.floor(Math.random()*opp.hand.length);var dc=opp.hand.splice(di,1)[0];GAME.log('\uD83D\uDCDD 断水\u2192'+dc.cn+' 被弃','effect')}
         break;
       case'dmg3all':
-        opp.allUnits().forEach(function(x,i){x.hp-=3;setTimeout(function(){GAME.showDmgEffect(x,3)},i*80)});GAME.log('\uD83D\uDCA3 斯图卡俯冲\u2192敌方全体单位3伤','effect');break;
+        var o3aUnits=opp.allUnits().slice();o3aUnits.forEach(function(x){_applyDmg(x,3)});
+        var o3aTargets=o3aUnits.map(function(x){return{card:x,isHq:false,dmg:3}});
+        var hqElO3a=findHQEl(who);_chainDmgFX(hqElO3a,o3aTargets);
+        GAME.log('\uD83D\uDCA3\u65AF\u56FE\u5361\u4FEF\u51B2\u2192\u654C\u65B9\u5168\u4F53\u5355\u4F4D3\u4F24','effect');break;
       case'dmg2allSelf1':
-        opp.allUnits().forEach(function(x,i){x.hp-=2;setTimeout(function(){GAME.showDmgEffect(x,2)},i*80)});who.hp-=1;var hqEl3=findHQEl(who);if(hqEl3)floatDamage(hqEl3,1);GAME.log('\uD83D\uDCA3 不惜代价\u2192敌方全体单位2伤，自身总部1伤','effect');break;
+        var d2aUnits=opp.allUnits().slice();d2aUnits.forEach(function(x){_applyDmg(x,2)});
+        who.hp-=1;
+        var d2aHQEl=findHQEl(who);_chainDmgFX(d2aHQEl,d2aUnits.map(function(x){return{card:x,isHq:false,dmg:2}}).concat([{isHq:true,owner:who,dmg:1}]));
+        GAME.log('\uD83D\uDCA3 \u4E0D\u60DC\u4EE3\u4EF7\u2192\u654C\u65B9\u5168\u4F53\u5355\u4F4D2\u4F24\uFF0C\u81EA\u8EAB\u603B\u90E81\u4F24','effect');break;
       case'buffTanks':
         who.allUnits().forEach(function(x){if(x.isT&&x.hp>0){x.atk+=2;x.hp+=2;x.maxHp+=2;var bte=findCardEl(x);if(bte){floatDamage(bte,2,'heal','left');floatDamage(bte,2,'heal','right')}}});GAME.log('\uD83D\uDEE1 钢铁洪流\u2192己方全体坦克单位+2/+2','effect');break;
       case'cooperateTank':
@@ -1839,13 +2175,21 @@ var GAME={
         if(tanks.length&&infCount>0){var tgt=tanks[0];tgt.atk+=infCount;tgt.hp+=infCount;tgt.maxHp+=infCount;var cte=findCardEl(tgt);if(cte){floatDamage(cte,infCount,'heal','left');floatDamage(cte,infCount,'heal','right')}GAME.log('\uD83D\uDEE1 协同作战\u2192'+tgt.cn+' +'+infCount+'/'+infCount+'（'+infCount+'个步兵）','effect')}
         break;
       case'dmg1allTargets':
-        opp.hp-=1;var ohq=findHQEl(opp);if(ohq)floatDamage(ohq,1);
-        opp.allUnits().forEach(function(x,i){x.hp-=1;setTimeout(function(){GAME.showDmgEffect(x,1)},i*60)});
-        who.hp-=1;var whq=findHQEl(who);if(whq)floatDamage(whq,1);
-        who.allUnits().forEach(function(x,i){x.hp-=1;setTimeout(function(){GAME.showDmgEffect(x,1)},i*60+250)});
-        GAME.log('\u2744 冬季攻势\u2192全场1点伤害（双方总部+双方单位）','effect');break;
+        opp.hp-=1;
+        var wtOppUnits=opp.allUnits().slice();wtOppUnits.forEach(function(x){_applyDmg(x,1)});
+        who.hp-=1;
+        var wtSelfUnits=who.allUnits().slice();wtSelfUnits.forEach(function(x){_applyDmg(x,1)});
+        var wtHQEl=findHQEl(who);
+        var wtTargets=[{isHq:true,owner:opp,dmg:1}];
+        wtOppUnits.forEach(function(x){wtTargets.push({card:x,isHq:false,dmg:1})});
+        wtTargets.push({isHq:true,owner:who,dmg:1});
+        wtSelfUnits.forEach(function(x){wtTargets.push({card:x,isHq:false,dmg:1})});
+        _chainDmgFX(wtHQEl,wtTargets);
+        GAME.log('\u2744\u51AC\u5B63\u653B\u52BF\u2192\u5168\u573A1\u70B9\u4F24\u5BB3\uFF08\u53CC\u65B9\u603B\u90E8+\u53CC\u65B9\u5355\u4F4D\uFF09','effect');break;
       case'pin1fl':
-        opp.fl.forEach(function(x){x.hp-=1;GAME.showDmgEffect(x,1);x.pinned=true;x.canAct=false;x.apSpent=99;x.hasActedThisTurn=true});GAME.log('\uD83D\uDCA2 炮火封锁\u2192敌方前线全体1伤+压制','effect');break;
+        var pfUnits=opp.fl.slice();pfUnits.forEach(function(x){_applyDmg(x,1);x.pinned=true;x.canAct=false;x.apSpent=99;x.hasActedThisTurn=true});
+        var pfHQEl=findHQEl(who);_chainDmgFX(pfHQEl,pfUnits.map(function(x){return{card:x,isHq:false,dmg:1}}));
+        GAME.log('\uD83D\uDCA2 \u70AE\u706B\u5C01\u9501\u2192\u654C\u65B9\u524D\u7EBF\u5168\u4F531\u4F24+\u538B\u5236','effect');break;
       case'cmd2Draw1Next':
         who.cmdBonus+=2;who.maxCmd=Math.min(24,who.baseMaxCmd+who.cmdBonus);who.nextExtraDraw=1;GAME.log('\u26A1 战争债券\u2192最大指挥点+2，下回合额外抽1牌','effect');break;
       case'copyBigDraw1':
@@ -1877,14 +2221,20 @@ var GAME={
       case'dmg3supCmd1':
         var supTargets=opp.support.filter(function(u){return u.hp>0});
         if(supTargets.length){
-          supTargets.forEach(function(u,i){u.hp-=3;setTimeout(function(){GAME.showDmgEffect(u,3)},i*80)});
+          supTargets.forEach(function(u){_applyDmg(u,3)});
         }
-        opp.hp-=3;var hqElSB=findHQEl(opp);if(hqElSB)floatDamage(hqElSB,3);
+        opp.hp-=3;
+        var sbHQEl=findHQEl(who);
+        var sbTargets=supTargets.map(function(u){return{card:u,isHq:false,dmg:3}});
+        sbTargets.push({isHq:true,owner:opp,dmg:3});
+        _chainDmgFX(sbHQEl,sbTargets);
         GAME.log('\uD83D\uDCA5 战略轰炸\u2192支援阵线敌方全体目标各3伤','effect');
         opp.baseMaxCmd=Math.max(0,opp.baseMaxCmd-1);opp.maxCmd=Math.min(24,opp.baseMaxCmd+opp.cmdBonus);if(opp.cmd>opp.maxCmd)opp.cmd=opp.maxCmd;GAME.log('\uD83D\uDCA5 战略轰炸\u2192敌方失去1点指挥点槽（剩余'+opp.maxCmd+'）','effect')
         break;
       case'dmg2allAir':
-        var airIdx=0;opp.allUnits().forEach(function(x){if(x.isF||x.isO){x.hp-=2;setTimeout(function(){GAME.showDmgEffect(x,2)},airIdx*100);airIdx++}});GAME.log('\uD83D\uDCA3 防空火力\u2192敌方空军2伤','effect');break;
+        var airUnits=opp.allUnits().filter(function(x){return x.isF||x.isO});airUnits.forEach(function(x){_applyDmg(x,2)});
+        var aHQEl=findHQEl(who);_chainDmgFX(aHQEl,airUnits.map(function(x){return{card:x,isHq:false,dmg:2}}));
+        GAME.log('\uD83D\uDCA3 \u9632\u7A7A\u706B\u529B\u2192\u654C\u65B9\u7A7A\u519B2\u4F24','effect');break;
       case'retreatAll':
         var oppSupport=opp.support.slice();opp.support=[];
         oppSupport.forEach(function(x){x.zone='hand';x.hp=x.maxHp;opp.hand.push(x);});
@@ -1898,24 +2248,31 @@ var GAME={
         var revN=Math.min(3,opp.hand.length);var revIdx=[];for(var ri=0;ri<revN;ri++){var rj=Math.floor(Math.random()*opp.hand.length);if(revIdx.indexOf(rj)<0)revIdx.push(rj)}
         var rev=revIdx.map(function(idx){return opp.hand[idx].cn});GAME.log('\uD83D\uDD0D 雷达警报\u2192敌方手牌：'+rev.join('、'),'effect');break;
       case'dmg2allDrawIfWipe':
-        opp.allUnits().forEach(function(x,i){x.hp-=2;setTimeout(function(){GAME.showDmgEffect(x,2)},i*60)});var allDead=opp.allUnits().every(function(x){return x.hp<=0});if(allDead){who.draw(1);GAME.log('\uD83D\uDCA3 消耗战\u2192敌方全体单位2伤，全灭抽1牌','effect')}else{GAME.log('\uD83D\uDCA3 消耗战\u2192敌方全体单位2伤','effect')}
+        var xhUnits=opp.allUnits().slice();xhUnits.forEach(function(x){_applyDmg(x,2)});var allDead=xhUnits.every(function(x){return x.hp<=0});
+        var xhHQEl=findHQEl(who);_chainDmgFX(xhHQEl,xhUnits.map(function(x){return{card:x,isHq:false,dmg:2}}));
+        if(allDead){who.draw(1);GAME.log('\uD83D\uDCA3 \u6D88\u8017\u6218\u2192\u654C\u65B9\u5168\u4F53\u5355\u4F4D2\u4F24\uFF0C\u5168\u706D\u62BD1\u724C','effect')}else{GAME.log('\uD83D\uDCA3 \u6D88\u8017\u6218\u2192\u654C\u65B9\u5168\u4F53\u5355\u4F4D2\u4F24','effect')}
         break;
       case'sacrificeDmg3':
       case'sacrificeDmg5':
         var sac=who.allUnits().filter(function(x){return x.hp>0});
-        if(sac.length){var s=sac[0];s.hp=0;var ets=opp.allUnits().filter(function(x){return x.hp>0});if(ets.length){ets[0].hp-=5;GAME.showDmgEffect(ets[0],5);GAME.log('💀 神风特攻→牺牲'+s.cn+'，'+ets[0].cn+' 5伤','effect')}GAME.cleanup(who,1500);GAME.cleanup(opp,1500)}
+        if(sac.length){var s=sac[0];s.hp=0;var ets=opp.allUnits().filter(function(x){return x.hp>0});if(ets.length){_applyDmg(ets[0],5);var skSacEl=findCardEl(s);_chainDmgFX(skSacEl,[{card:ets[0],isHq:false,dmg:5}]);GAME.log('\uD83D\uDC80 \u795E\u98CE\u7279\u653B\u2192\u727A\u7272'+s.cn+'\uFF0C'+ets[0].cn+' 5\u4F24','effect')}GAME.cleanup(who,1500);GAME.cleanup(opp,1500)}
         break;
       case'buffInfAtk2':
         who.allUnits().forEach(function(x){if(x.isI&&x.hp>0){x.atk+=2;var bie=findCardEl(x);if(bie)floatDamage(bie,2,'heal','left')}});GAME.log('\u2694 武士道\u2192己方步兵全体+2/+0','effect');break;
       case'destroySelfDmgHq':
         var sac2=who.allUnits().filter(function(x){return x.hp>0&&x.atk>0});
-        if(sac2.length){var s2=sac2[0];var dmgH=s2.effectiveAtk;s2.hp=0;opp.hp-=dmgH;var hqEl5=findHQEl(opp);if(hqEl5)floatDamage(hqEl5,dmgH);GAME.log('💀 玉碎→牺牲'+s2.cn+'，敌方总部'+dmgH+'伤','effect');GAME.cleanup(who,1500)}
+        if(sac2.length){var s2=sac2[0];var dmgH=s2.effectiveAtk;s2.hp=0;opp.hp-=dmgH;var ysSacEl=findCardEl(s2);_chainDmgFX(ysSacEl,[{isHq:true,owner:opp,dmg:dmgH}]);GAME.log('\uD83D\uDC80 \u7389\u788E\u2192\u727A\u7272'+s2.cn+'\uFF0C\u654C\u65B9\u603B\u90E8'+dmgH+'\u4F24','effect');GAME.cleanup(who,1500)}
         break;
       case'draw2':
         who.draw(2);GAME.log('📋 扩张→抽2张牌','effect');break;
     }
     GAME.cleanup(opp,1500);
     GAME.cleanup(who,1500);
+  },
+
+  waitAnims:function(){
+    if(!GAME._pendingAnims.length)return Promise.resolve();
+    return Promise.all(GAME._pendingAnims.slice());
   },
 
   // ---------- 获取可攻击目标（完整规则 - 基于位置邻接的守护）----------
@@ -2078,6 +2435,11 @@ var GAME={
     // 攻击者消耗1个行动点（坦克2AP可攻击后仍可移动，其他1AP攻击后锁死）
     attacker.spendAP(1);
     attacker.attacksThisTurn++;
+    // 沙盒：无限攻击次数（我方单位攻击后不消耗行动点/次数，可连续攻击）
+    if(SANDBOX.active&&SANDBOX.unlimitedAtk&&atkOwner===GAME.player){
+      attacker.attacksThisTurn=0;attacker.apSpent=0;attacker.hasActedThisTurn=false;
+      atkOwner.cmd+=attacker.effAcost;
+    }
     if(attacker.hasS)attacker.smokescreenActive=false;
     var chargeActive=attacker.hasC;
 
@@ -2173,7 +2535,7 @@ var GAME={
       if(weak.length){var w=weak[0];w.hp=w.hp+2;w.maxHp=w.maxHp+2;v.healWeakest={card:w}}
     }
     // 三号坦克
-    if(!v.ambushKill&&attacker.effCode==='growOnHit'&&target!==null&&attacker.hp>0&&attacker.attacksThisTurn===1){
+    if(!v.ambushKill&&attacker.effCode==='growOnHit'&&attacker.hp>0&&attacker.attacksThisTurn===1){
       attacker.atk+=1;attacker.hp+=1;attacker.maxHp+=1;v.growOnHit=true;
     }
     // 丘吉尔IV
@@ -2338,18 +2700,22 @@ var GAME={
       case'dr_cmd1':
         owner.cmdBonus++;owner.maxCmd=Math.min(24,owner.baseMaxCmd+owner.cmdBonus);GAME.log('\u2620 亡计：'+card.cn+' 提供+1指挥点槽','effect');break;
       case'dr_dmg3':
-        var ts=opp.allUnits();if(ts.length){var t=randPick(ts);t.hp-=3;GAME.showDmgEffect(t,3);GAME.log('\u2620 亡计：'+card.cn+' 对'+t.cn+'造成3点伤害','effect')}
+        var ts=opp.allUnits();if(ts.length){var t=randPick(ts);_applyDmg(t,3);var dr3El=findCardEl(card);_chainDmgFX(dr3El,[{card:t,isHq:false,dmg:3}]);GAME.log('\u2620 \u4EA1\u8BA1\uFF1A'+card.cn+' \u5BF9'+t.cn+'\u9020\u62103\u70B9\u4F24\u5BB3','effect')}
         break;
       case'dr_dmg2all':
-        opp.allUnits().forEach(function(u,i){u.hp-=2;setTimeout(function(){GAME.showDmgEffect(u,2)},i*80)});GAME.log('\u2620 亡计：'+card.cn+' 对敌方全体单位造成2点伤害','effect');break;
+        var dr2aUnits=opp.allUnits().slice();dr2aUnits.forEach(function(u){_applyDmg(u,2)});
+        var dr2aEl=findCardEl(card);_chainDmgFX(dr2aEl,dr2aUnits.map(function(u){return{card:u,isHq:false,dmg:2}}));
+        GAME.log('\u2620 \u4EA1\u8BA1\uFF1A'+card.cn+' \u5BF9\u654C\u65B9\u5168\u4F53\u5355\u4F4D\u9020\u62102\u70B9\u4F24\u5BB3','effect');break;
       case'dr_dmg1all':
-        opp.allUnits().forEach(function(u,i){u.hp-=1;setTimeout(function(){GAME.showDmgEffect(u,1)},i*60)});GAME.log('\u2620 亡计：'+card.cn+' 对敌方全体单位造成1点伤害','effect');break;
+        var dr1aUnits=opp.allUnits().slice();dr1aUnits.forEach(function(u){_applyDmg(u,1)});
+        var dr1aEl=findCardEl(card);_chainDmgFX(dr1aEl,dr1aUnits.map(function(u){return{card:u,isHq:false,dmg:1}}));
+        GAME.log('\u2620 \u4EA1\u8BA1\uFF1A'+card.cn+' \u5BF9\u654C\u65B9\u5168\u4F53\u5355\u4F4D\u9020\u62101\u70B9\u4F24\u5BB3','effect');break;
       case'dr_dmg1hq':
-        opp.hp-=1;var dhq1h=findHQEl(opp);if(dhq1h)floatDamage(dhq1h,1);GAME.log('\u2620 亡计：'+card.cn+' 对敌方总部造成1点伤害','effect');break;
+        opp.hp-=1;var dr1hEl=findCardEl(card);_chainDmgFX(dr1hEl,[{isHq:true,owner:opp,dmg:1}]);GAME.log('\u2620 \u4EA1\u8BA1\uFF1A'+card.cn+' \u5BF9\u654C\u65B9\u603B\u90E8\u9020\u62101\u70B9\u4F24\u5BB3','effect');break;
       case'dr_dmg2hq':
-        opp.hp-=2;var dhq2h=findHQEl(opp);if(dhq2h)floatDamage(dhq2h,2);GAME.log('\u2620 亡计：'+card.cn+' 对敌方总部造成2点伤害','effect');break;
+        opp.hp-=2;var dr2hEl=findCardEl(card);_chainDmgFX(dr2hEl,[{isHq:true,owner:opp,dmg:2}]);GAME.log('\u2620 \u4EA1\u8BA1\uFF1A'+card.cn+' \u5BF9\u654C\u65B9\u603B\u90E8\u9020\u62102\u70B9\u4F24\u5BB3','effect');break;
       case'dr_dmg2':
-        var d2ts=opp.allUnits().filter(function(u){return u.hp>0});if(d2ts.length){var d2t=randPick(d2ts);d2t.hp-=2;GAME.showDmgEffect(d2t,2);GAME.log('\u2620 亡计：'+card.cn+' 对'+d2t.cn+'造成2点伤害','effect')}
+        var d2ts=opp.allUnits().filter(function(u){return u.hp>0});if(d2ts.length){var d2t=randPick(d2ts);_applyDmg(d2t,2);var dr2El=findCardEl(card);_chainDmgFX(dr2El,[{card:d2t,isHq:false,dmg:2}]);GAME.log('\u2620 \u4EA1\u8BA1\uFF1A'+card.cn+' \u5BF9'+d2t.cn+'\u9020\u62102\u70B9\u4F24\u5BB3','effect')}
         break;
       case'dr_buffAtk1':
         var bAll=owner.allUnits().filter(function(u){return u.hp>0});if(bAll.length){var b=randPick(bAll);b.atk+=1;var bEl2=findCardEl(b);if(bEl2)floatDamage(bEl2,1,'heal','left');GAME.log('\u2620 亡计：'+card.cn+' 使'+b.cn+' +1攻击','effect')}
@@ -2443,34 +2809,35 @@ var GAME={
   // 在选定目标上结算效果
   resolveEffectOnTarget:function(code,owner,sourceCard,target){
     var opp=owner===GAME.player?GAME.enemy:GAME.player;
+    var srcEl=findCardEl(sourceCard)||findHQEl(owner);
     switch(code){
-      case'dmg1':target.hp-=1;GAME.showDmgEffect(target,1);GAME.log('\uD83C\uDFAF 对'+target.cn+'造成1点伤害','effect');break;
-      case'dmg2':target.hp-=2;GAME.showDmgEffect(target,2);GAME.log('\uD83C\uDFAF 对'+target.cn+'造成2点伤害','effect');break;
-      case'dmg1self1draw1':target.hp-=1;GAME.showDmgEffect(target,1);owner.hp-=1;var hqEl2=findHQEl(owner);if(hqEl2)floatDamage(hqEl2,1);owner.draw(1);GAME.log('\uD83C\uDFAF \uD83D\uDC80 镰刀\u2192'+target.cn+' 1伤，自身总部1伤，抽1牌','effect');break;
+      case'dmg1':_applyDmg(target,1);_chainDmgFX(srcEl,[{card:target,isHq:false,dmg:1}]);GAME.log('\uD83C\uDFAF 对'+target.cn+'造成1点伤害','effect');break;
+      case'dmg2':_applyDmg(target,2);_chainDmgFX(srcEl,[{card:target,isHq:false,dmg:2}]);GAME.log('\uD83C\uDFAF 对'+target.cn+'造成2点伤害','effect');break;
+      case'dmg1self1draw1':_applyDmg(target,1);owner.hp-=1;_chainDmgFX(srcEl,[{card:target,isHq:false,dmg:1},{isHq:true,owner:owner,dmg:1}]);owner.draw(1);GAME.log('\uD83C\uDFAF \uD83D\uDC80 镰刀\u2192'+target.cn+' 1伤，自身总部1伤，抽1牌','effect');break;
       case'heal2':target.hp=target.hp+2;target.maxHp=target.maxHp+2;var hEl=findCardEl(target);if(hEl)floatDamage(hEl,2,'heal','right');GAME.log('\uD83C\uDFAF 回复'+target.cn+' 2点生命','effect');break;
       case'buff1':target.atk+=1;target.hp+=1;target.maxHp+=1;var bEl=findCardEl(target);if(bEl){floatDamage(bEl,1,'heal','left');floatDamage(bEl,1,'heal','right')}GAME.log('\uD83C\uDFAF '+target.cn+' 获得+1/+1','effect');break;
-      case'buff22_selfDmg2':target.atk+=2;target.hp+=2;target.maxHp+=2;var bzEl=findCardEl(target);if(bzEl){floatDamage(bzEl,2,'heal','left');floatDamage(bzEl,2,'heal','right')}owner.hp-=2;var zhq=findHQEl(owner);if(zhq)floatDamage(zhq,2);GAME.log('\uD83C\uDFAF '+target.cn+' 获得+2/+2，己方总部受到2点伤害','effect');break;
-      case'dmg2bomber':target.hp-=2;GAME.showDmgEffect(target,2);GAME.log('\uD83C\uDFAF 对轰炸机'+target.cn+'造成2点伤害','effect');break;
-      case'dmg2fighter':target.hp-=2;GAME.showDmgEffect(target,2);GAME.log('\uD83C\uDFAF 对战斗机'+target.cn+'造成2点伤害','effect');break;
-      case'kill2c':target.hp=0;GAME.showDmgEffect(target,99);GAME.log('\uD83C\uDFAF 消灭'+target.cn,'effect');break;
-      case'destroyLowAtk':target.hp=0;GAME.showDmgEffect(target,99);GAME.log('\uD83C\uDFAF 丛林突袭\u2192消灭'+target.cn+'（攻击力<生命值）','effect');break;
+      case'buff22_selfDmg2':target.atk+=2;target.hp+=2;target.maxHp+=2;var bzEl=findCardEl(target);if(bzEl){floatDamage(bzEl,2,'heal','left');floatDamage(bzEl,2,'heal','right')}owner.hp-=2;_chainDmgFX(srcEl,[{isHq:true,owner:owner,dmg:2}]);GAME.log('\uD83C\uDFAF '+target.cn+' 获得+2/+2，己方总部受到2点伤害','effect');break;
+      case'dmg2bomber':_applyDmg(target,2);_chainDmgFX(srcEl,[{card:target,isHq:false,dmg:2}]);GAME.log('\uD83C\uDFAF 对轰炸机'+target.cn+'造成2点伤害','effect');break;
+      case'dmg2fighter':_applyDmg(target,2);_chainDmgFX(srcEl,[{card:target,isHq:false,dmg:2}]);GAME.log('\uD83C\uDFAF 对战斗机'+target.cn+'造成2点伤害','effect');break;
+      case'kill2c':target.hp=0;_chainDmgFX(srcEl,[{card:target,isHq:false,dmg:99}]);GAME.log('\uD83C\uDFAF 消灭'+target.cn,'effect');break;
+      case'destroyLowAtk':target.hp=0;_chainDmgFX(srcEl,[{card:target,isHq:false,dmg:99}]);GAME.log('\uD83C\uDFAF 丛林突袭\u2192消灭'+target.cn+'（攻击力<生命值）','effect');break;
       case'dmg2t4':
         var hasTank=owner.allUnits().some(function(u){return u.isT&&u.hp>0});
         var dmgVal=hasTank?4:2;
-        target.hp-=dmgVal;GAME.showDmgEffect(target,dmgVal);
+        _applyDmg(target,dmgVal);_chainDmgFX(srcEl,[{card:target,isHq:false,dmg:dmgVal}]);
         GAME.log('\uD83C\uDFAF 战术打击\u2192'+target.cn+' 受到'+dmgVal+'点伤害'+(hasTank?'（有坦克加成）':''),'effect');break;
-      case'dmg1tank':target.hp-=1;GAME.showDmgEffect(target,1);GAME.log('\uD83C\uDFAF 对坦克'+target.cn+'造成1点伤害','effect');break;
+      case'dmg1tank':_applyDmg(target,1);_chainDmgFX(srcEl,[{card:target,isHq:false,dmg:1}]);GAME.log('\uD83C\uDFAF 对坦克'+target.cn+'造成1点伤害','effect');break;
       case'removeArmor':target.armor=0;target.hasG=false;GAME.log('\uD83C\uDFAF 移除了'+target.cn+'的所有重甲和守护','effect');break;
       case'buffBomber':target.atk+=1;target.hp+=1;target.maxHp+=1;var bEl2=findCardEl(target);if(bEl2){floatDamage(bEl2,1,'heal','left');floatDamage(bEl2,1,'heal','right')}GAME.log('\uD83C\uDFAF '+target.cn+' 获得+1/+1','effect');break;
       case'pin1':target.pinned=true;target.canAct=false;target.apSpent=99;target.hasActedThisTurn=true;GAME.log('\uD83C\uDFAF '+target.cn+' \uD83D\uDCA2 被压制（本回合不可行动）','effect');break;
-      case'pinAtk2':target.pinned=true;target.canAct=false;target.apSpent=99;target.hasActedThisTurn=true;var atkLoss=Math.min(target.atk,2);target.atk-=atkLoss;GAME.showDmgEffect(target,atkLoss);GAME.log('\uD83C\uDFAF '+target.cn+' \uD83D\uDCA2 被压制且攻击力-'+atkLoss+'（本回合不可行动）','effect');break;
+      case'pinAtk2':target.pinned=true;target.canAct=false;target.apSpent=99;target.hasActedThisTurn=true;var atkLoss=Math.min(target.atk,2);target.atk-=atkLoss;_chainDmgFX(srcEl,[{card:target,isHq:false,dmg:atkLoss}]);GAME.log('\uD83C\uDFAF '+target.cn+' \uD83D\uDCA2 被压制且攻击力-'+atkLoss+'（本回合不可行动）','effect');break;
       case'bounceEnemyGround':
         target.owner.support=target.owner.support.filter(function(x){return x!==target});
         target.owner.fl=target.owner.fl.filter(function(x){return x!==target});
         target.zone='hand';target.justDeployed=false;target.pinned=false;target.canAct=true;target.apSpent=0;target.attacksThisTurn=0;target.hasActedThisTurn=false;
         target.owner.hand.push(target);
         GAME.log('\uD83C\uDFAF '+target.cn+' 返回敌方手牌','effect');break;
-      case'killAir':target.hp=0;GAME.showDmgEffect(target,99);GAME.log('\uD83C\uDFAF 消灭敌方空军'+target.cn,'effect');break;
+      case'killAir':target.hp=0;_chainDmgFX(srcEl,[{card:target,isHq:false,dmg:99}]);GAME.log('\uD83C\uDFAF 消灭敌方空军'+target.cn,'effect');break;
     }
     GAME.cleanup(opp,1500);GAME.cleanup(owner,1500);
   },
@@ -2514,41 +2881,63 @@ var GAME={
     else owner.fl.push(card);
     GAME.log(card.cn+' 加入战场（'+targetLine+'）— 不触发部署效果','effect');
     if(!card.canActOnDeploy){card.canAct=false;card.apSpent=99}
+    // 牛津：加入的守护单位获得增益
+    if(card.hasG){
+      var oxfords2=owner.allUnits().filter(function(u){return u.effCode==="oxfordBuff"&&u.hp>0});
+      oxfords2.forEach(function(ox2){
+        card.atk+=1;card.hp+=3;card.maxHp+=3;
+        GAME.log("\uD83D\uDCDC 牛津\u2192"+card.cn+" 获得+1/+3","effect");
+      });
+    }
     return true;
   },
 
   // ---------- 部署效果触发 ----------
   triggerDeploy:function(card,owner){
     var code=card.effCode;
-    if(!code)return;
     var opp=owner===GAME.player?GAME.enemy:GAME.player;
-    // 指向性效果：进入目标选择
-    if(GAME.isTargetedEffect(code)){
-      GAME.enterTargetSelect(code,owner,card);
-      return;
-    }
-    // 非指向性效果：直接结算
-    switch(code){
+    // 自身部署效果：有code时才执行
+    if(code){
+      // 指向性效果：进入目标选择
+      if(GAME.isTargetedEffect(code)){
+        GAME.enterTargetSelect(code,owner,card);
+        return;
+      }
+      // 非指向性效果：直接结算
+      switch(code){
       case'draw1':owner.draw(1);GAME.log('部署效果：抽1张牌','effect');break;
       case'dmg1all':
-        opp.allUnits().forEach(function(u,i){u.hp-=1;setTimeout(function(){GAME.showDmgEffect(u,1)},i*60)});GAME.log('部署效果：对敌方全体单位造成1点伤害','effect');break;
+        var d1allUnits=opp.allUnits();d1allUnits.forEach(function(u){_applyDmg(u,1)});
+        var d1allTargets=d1allUnits.map(function(u){return{card:u,isHq:false,dmg:1}});
+        var d1allCardEl=findCardEl(card);_chainDmgFX(d1allCardEl,d1allTargets);
+        GAME.log('部署效果：对敌方全体单位造成1点伤害','effect');break;
       case'dmg1fl':
-        opp.fl.forEach(function(u){u.hp-=1;GAME.showDmgEffect(u,1)});GAME.log('部署效果：对敌方前线造成1点伤害','effect');break;
+        var d1flUnits=opp.fl.slice();d1flUnits.forEach(function(u){_applyDmg(u,1)});
+        var d1flTargets=d1flUnits.map(function(u){return{card:u,isHq:false,dmg:1}});
+        var d1flCardEl=findCardEl(card);_chainDmgFX(d1flCardEl,d1flTargets);
+        GAME.log('部署效果：对敌方前线造成1点伤害','effect');break;
       case'pin1fl':
         opp.fl.forEach(function(u){u.pinned=true;u.canAct=false;u.apSpent=99;u.hasActedThisTurn=true});GAME.log('部署效果：敌方前线全体被压制','effect');break;
       case'dmg1sup':
-        opp.support.forEach(function(u){u.hp-=1;GAME.showDmgEffect(u,1)});GAME.log('部署效果：对敌方支援阵线造成1点伤害','effect');break;
+        var d1supUnits=opp.support.slice();d1supUnits.forEach(function(u){_applyDmg(u,1)});
+        var d1supTargets=d1supUnits.map(function(u){return{card:u,isHq:false,dmg:1}});
+        var d1supCardEl=findCardEl(card);_chainDmgFX(d1supCardEl,d1supTargets);
+        GAME.log('部署效果：对敌方支援阵线造成1点伤害','effect');break;
       case'dmg2hq':
-        opp.hp-=2;var dhq2=findHQEl(opp);if(dhq2)floatDamage(dhq2,2);GAME.log('部署效果：对敌方总部造成2点伤害','effect');break;
+        opp.hp-=2;
+        var d2hqEl=findCardEl(card);_chainDmgFX(d2hqEl,[{isHq:true,owner:opp,dmg:2}]);
+        GAME.log('部署效果：对敌方总部造成2点伤害','effect');break;
       case'dmg3hq':
-        opp.hp-=3;var dhq3=findHQEl(opp);if(dhq3)floatDamage(dhq3,3);GAME.log('部署效果：对敌方总部造成3点伤害','effect');break;
+        opp.hp-=3;
+        var d3hqEl=findCardEl(card);_chainDmgFX(d3hqEl,[{isHq:true,owner:opp,dmg:3}]);
+        GAME.log('部署效果：对敌方总部造成3点伤害','effect');break;
       case'armor1':
         card.armor+=1;GAME.log('部署效果：'+card.cn+' 获得+1重甲（当前'+card.armor+'）','effect');break;
       case'deployHeal2':
         owner.hp=owner.hp+2;owner.maxHp=owner.maxHp+2;var dh2hq=findHQEl(owner);if(dh2hq)floatDamage(dh2hq,2,'heal');GAME.log('部署效果：为总部回复2点生命','effect');break;
       case'dmg2airTank':
         var airTk=opp.allUnits().filter(function(u){return(u.isF||u.isO||u.isT)&&u.hp>0});
-        if(airTk.length){var atT=airTk[0];atT.hp-=2;GAME.showDmgEffect(atT,2);GAME.log('部署效果：对敌方空坦克'+atT.cn+'造成2点伤害','effect')}
+        if(airTk.length){var atT=airTk[0];_applyDmg(atT,2);var atTel=findCardEl(card);_chainDmgFX(atTel,[{card:atT,isHq:false,dmg:2}]);GAME.log('部署效果：对敌方空坦克'+atT.cn+'造成2点伤害','effect')}
         break;
       case'chargeDraw':
         owner.draw(1);GAME.log('部署效果：抽1张牌','effect');break;
@@ -2565,6 +2954,7 @@ var GAME={
         card.atk+=bitN2;card.hp+=bitN2;card.maxHp+=bitN2;var beBf=findCardEl(card);if(beBf){floatDamage(beBf,bitN2,'heal','left');floatDamage(beBf,bitN2,'heal','right')}
         GAME.log('部署效果：Bf109 自身获得+'+bitN2+'/+'+bitN2+((bitInfHas2&&bitTkHas2)?'（步兵+坦克）':''),'effect');break;
     }
+    }
     // 牛津：友方守护单位部署或加入时获得+1/+3
     if(card.hasG){
       var oxfords=owner.allUnits().filter(function(u){return u.effCode==='oxfordBuff'&&u.hp>0});
@@ -2580,6 +2970,7 @@ var GAME={
       wespes.forEach(function(ws){
         opp.hp-=1;
         var wsEl=findCardEl(ws);if(wsEl){wsEl.classList.add('card-flash');setTimeout(function(){wsEl.classList.remove('card-flash')},500)}
+        var wsPingEl=findCardEl(ws);_chainDmgFX(wsPingEl,[{isHq:true,owner:opp,dmg:1}]);
         GAME.log('\uD83D\uDC9B \u9EC4\u8702\u81EA\u884C\u706B\u70AE\u2192\u654C\u65B9\u603B\u90E8\u53D7\u52301\u70B9\u4F24\u5BB3','effect');
       });
     }
@@ -2685,15 +3076,15 @@ var GAME={
           el.classList.add('effect-target');el.style.cursor='crosshair';
           el.onclick=function(){GAME.onEffectTargetClick(c)};
         }
-        // 我方支援单位且可推线
-        if(GAME.phase==='play'&&isPlayer&&c.zone==='support'&&GAME.canPush(GAME.player)&&c.canStillMove){
+        // 我方支援单位且可推线（所有兵种均可推线，炮兵/轰炸机/战斗机亦允许，只是非必要）
+        if(GAME.phase==='play'&&isPlayer&&c.zone==='support'&&!c.isOrder&&GAME.canPush(GAME.player)&&c.canStillMove){
           if(GAME.isTouchDevice){
-            // 手机：点击推线
+            // 手机：点击推线（两步：先选单位→再点前线）
             el.classList.add('clickable');
             el.onclick=function(e){
               e.stopPropagation();
-              GAME.pendingPush=c;
-              GAME.pushToFL();
+              if(GAME.pendingPush===c){GAME.pendingPush=null;GAME.render();return;}
+              GAME.pendingPush=c;GAME.render();
             };
           }else{
             // 电脑：拖拽推线
@@ -2750,7 +3141,7 @@ var GAME={
       var existing=uiDiv.querySelector('img[alt="被守护"]');
       if(!existing){
         var img=document.createElement('img');
-        img.src='images/UI/被守护.png';img.alt='被守护';img.title='被守护';
+        img.src='images/UI/被守护.jpg';img.alt='被守护';img.title='被守护';
         var ref=uiDiv.querySelector('img[alt="重甲1"],img[alt="重甲2"],img[alt="重甲3"],img[alt="奋战"],img[alt="冲击"],img[alt="伏击"],img[alt="烟幕"],img[alt="压制"]');
         if(ref)uiDiv.insertBefore(img,ref);else uiDiv.appendChild(img);
       }
@@ -2808,8 +3199,14 @@ var GAME={
 
     // 前线：敌方单位 | 分隔 | 我方单位
     var fl=$('frontline');fl.innerHTML='';
+    fl.classList.toggle('push-target',!!GAME.pendingPush&&GAME.isTouchDevice);
+    if(GAME.pendingPush&&GAME.isTouchDevice){fl.onclick=function(){if(GAME.pendingPush)GAME.pushToFL();}}else{fl.onclick=null;}
     if(!pl.fl.length&&!en.fl.length){
-      fl.innerHTML='<span class="empty-text">前线（空）</span>';
+      if(GAME.pendingPush&&GAME.isTouchDevice){
+        fl.innerHTML='<span class="push-target-text">\uD83D\uDC46 \u70B9\u51FB\u6B64\u5904\u63A8\u7EBF\u81F3\u524D\u7EBF</span>';
+      }else{
+        fl.innerHTML='<span class="empty-text">前线（空）</span>';
+      }
     }else{
       if(en.fl.length){
         var enFlDiv=document.createElement('div');enFlDiv.className='fl-group enemy-fl';
@@ -2908,24 +3305,24 @@ var GAME={
     var icons=[];
     if(!c||c.isOrder)return icons;
     // 守护(G) — 优先级1
-    if(c.hasG)icons.push({src:'images/UI/守护.png',pri:1});
+    if(c.hasG)icons.push({src:'images/UI/守护.jpg',pri:1});
     // 闪击(B) — 优先级2
-    if(c.hasB)icons.push({src:'images/UI/闪击.png',pri:2});
+    if(c.hasB)icons.push({src:'images/UI/闪击.jpg',pri:2});
     // 被守护 — 优先级3（仅非守护单位；由 render 阶段 markGuarded 后单独补充）
     // 重甲(H) — 优先级4（按护甲等级显示对应图标）
     if(c.kw&&c.kw.indexOf('H')>=0&&c.armor>0){
-      var lv=Math.min(c.armor,3);icons.push({src:'images/UI/重甲'+lv+'.png',pri:4});
+      var lv=Math.min(c.armor,3);icons.push({src:'images/UI/重甲'+lv+'.jpg',pri:4});
     }
     // 奋战(F) — 优先级5
     if(c.hasFr)icons.push({src:'images/UI/奋战.jpg',pri:5});
     // 冲击(C) — 优先级6
-    if(c.kw&&c.kw.indexOf('C')>=0)icons.push({src:'images/UI/冲击.png',pri:6});
+    if(c.kw&&c.kw.indexOf('C')>=0)icons.push({src:'images/UI/冲击.jpg',pri:6});
     // 伏击(A) — 优先级7
-    if(c.hasA)icons.push({src:'images/UI/伏击.png',pri:7});
+    if(c.hasA)icons.push({src:'images/UI/伏击.jpg',pri:7});
     // 烟幕(S) — 优先级8（仅激活时显示）
-    if(c.smokescreenActive)icons.push({src:'images/UI/烟幕.png',pri:8});
+    if(c.smokescreenActive)icons.push({src:'images/UI/烟幕.jpg',pri:8});
     // 压制 — 优先级9
-    if(c.pinned)icons.push({src:'images/UI/压制.png',pri:9});
+    if(c.pinned)icons.push({src:'images/UI/压制.jpg',pri:9});
     icons.sort(function(a,b){return a.pri-b.pri;});
     return icons;
   },
@@ -3027,7 +3424,7 @@ var GAME={
         var uiDiv=document.createElement('div');uiDiv.className='ui-icons';
         icons.forEach(function(ic){
           var img=document.createElement('img');
-          img.src=ic.src;img.alt=ic.src.split('/').pop().replace('.png','');
+          img.src=ic.src;img.alt=ic.src.split('/').pop().replace(/\.(png|jpg)$/,'');
           img.title=img.alt;uiDiv.appendChild(img);
         });
         d.appendChild(uiDiv);
@@ -3179,10 +3576,12 @@ var GAME={
       // 选择攻击者：前线看能否攻击，支援看能否行动（推线或攻击）
       var canSelect=card.zone==='frontline'?card.canStillAtk:card.canStillAct;
       if(!canSelect)return toast('该单位已无法行动');
-      // 预判行动费用
-      if(GAME.player.cmd<card.effAcost)return toast('指挥点不足（需'+card.effAcost+'点行动费）');
       GAME.selected=card;GAME.pendingPush=null;
-      if(card.zone==='support'&&GAME.canPush(GAME.player)&&card.canStillMove){
+      // 支持所有兵种推线（炮兵/轰炸机/战斗机亦允许，只是非必要）
+      if(card.zone==="support"&&!card.isOrder&&GAME.canPush(GAME.player)&&card.canStillMove){
+        if(GAME.isTouchDevice){
+          GAME.pendingPush=card;GAME.pushToFL();return;
+        }
         GAME.pendingPush=card;
       }
       GAME.render();
@@ -3190,8 +3589,6 @@ var GAME={
       // 选择攻击目标
       if(!GAME.selected)return toast('请先选择你的攻击单位');
       if(GAME.selected.owner!==GAME.player)return;
-      // 预判攻击费用
-      if(GAME.player.cmd<GAME.selected.acost)return toast('指挥点不足（需'+GAME.selected.acost+'点攻击费）');
       var tgs=GAME.getTargets(GAME.selected);var found=null;
       for(var i=0;i<tgs.length;i++){if(tgs[i].card===card){found=tgs[i];break}}
       if(!found)return toast('无法攻击此目标（前线阻挡/射程不足/守护保护）');
@@ -3252,45 +3649,326 @@ var GAME={
     if(GAME.checkEnd())return;
   },
 
-  // ==================== AI 回合 ====================
+  // ==================== AI 辅助函数（增强版 v2） ====================
+
+  // 获取当前AI的综合风格配置（阵营+难度）
+  _getAIStyle:function(){
+    var style=AI_FACTION_STYLE[ENEMY_FC]||AI_FACTION_STYLE['D'];
+    var cfg=AI_CONFIG[AI_LEVEL];
+    if(AI_LEVEL===1){
+      style={cardPref:{},orderWeights:{},attackHQWeight:0.5,attackTypeWeights:{},pushAggression:0.3,pushPreferBlitz:false,targetLowestHp:false,avoidTrade:false,reserveBonus:0};
+    }
+    if(AI_LEVEL===3){
+      style.reserveBonus=(style.reserveBonus||0)+cfg.saveCredits;
+    }
+    return style;
+  },
+
+  // 综合局势评估：正数=AI优势，负数=玩家优势
+  _evalBoard:function(ai,opp){
+    var score=0;
+    score+=(ai.hp-opp.hp)*0.5;
+    var myPower=0,oppPower=0,myCount=0,oppCount=0;
+    ai.allUnits().forEach(function(c){if(c.hp>0){myPower+=c.effectiveAtk+c.hp;myCount++}});
+    opp.allUnits().forEach(function(c){if(c.hp>0){oppPower+=c.effectiveAtk+c.hp;oppCount++}});
+    score+=(myPower-oppPower)*1.0;
+    score+=(myCount-oppCount)*2;
+    score+=(ai.hand.length-opp.hand.length)*1.5;
+    score+=(ai.cmd-opp.cmd)*0.3;
+    var fc=GAME.flControl();
+    if(fc===ai)score+=5;
+    else if(fc===opp)score-=5;
+    // 隐形读牌：按难度概率偷瞄玩家手牌（困难低概率，地狱必发）
+    var shChance=AI_CONFIG[AI_LEVEL].seeHandChance||0;
+    if(Math.random()<shChance&&opp.hand.length>0){
+      var oppHandDmg=0,oppHandUnits=0;
+      opp.hand.forEach(function(c){
+        if(c.isOrder&&c.fx&&c.fx.indexOf('dmg')>=0)oppHandDmg+=3;
+        else if(!c.isOrder)oppHandUnits++;
+      });
+      if(oppHandDmg>=opp.hp)score-=15;
+      if(oppHandDmg>=ai.hp)score+=12;
+      if(opp.hand.length<=1)score+=8;
+      if(oppHandUnits>=3)score-=5;
+    }
+    return score;
+  },
+
+  // 威胁排序
+  _threatRank:function(unit){
+    var threat=0;
+    threat+=unit.effectiveAtk*2.0;
+    threat+=unit.hp*0.5;
+    if(unit.hasB)threat+=unit.effectiveAtk*1.5;
+    if(unit.hasFr)threat+=unit.effectiveAtk*1.0;
+    if(unit.hasG)threat+=4;
+    if(unit.isA||unit.isO)threat+=5;
+    if(unit.effCode==='drawOnDmg'||unit.effCode==='draw1')threat+=5;
+    return threat;
+  },
+
+  // 场攻计算（用于解场/打脸决策）
+  _calcFieldAtk:function(who){
+    var total=0,count=0;
+    who.allUnits().forEach(function(c){if(c.hp>0){total+=c.effectiveAtk;count++}});
+    return {total:total,count:count,avgAtk:count>0?total/count:0};
+  },
+
+  // 卡牌价值（阵营风格增强版）
+  _cardValue:function(card,ai,opp){
+    var cfg=AI_CONFIG[AI_LEVEL];var style=this._getAIStyle();var score=0;
+    var oppUnits=opp.allUnits().filter(function(x){return x.hp>0});
+    var myUnits=ai.allUnits().filter(function(x){return x.hp>0});
+    var board=GAME._evalBoard(ai,opp);
+    var pref=style.cardPref||{};
+
+    if(!card.isOrder){
+      // === 单位卡牌 ===
+      var costEff=(card.atk*1.5+card.hp*1.0)/Math.max(1,card.cost);
+      score+=card.atk*1.5+card.hp*1.0;
+      if(costEff>3)score+=3;
+      if(card.hasB){score+=4;if(pref.blitz)score+=pref.blitz;}
+      if(card.hasG){score+=3;if(pref.guard)score+=pref.guard;}
+      if(card.hasA)score+=2;
+      if(card.hasFr)score+=5;
+      if(card.hasH)score+=1;
+      if(card.armor>0)score+=card.armor*1.5;
+      // 阵营类型偏好
+      if(card.isT&&pref.tank)score+=pref.tank;
+      if(card.isI&&pref.infantry)score+=pref.infantry;
+      if(card.isA&&pref.artillery)score+=pref.artillery;
+      if(card.isF&&pref.fighter)score+=pref.fighter;
+      if(card.isO&&pref.bomber)score+=pref.bomber;
+      // 抽牌单位偏好
+      if((card.effCode==='draw1'||card.effCode==='drawOnDmg'||card.effCode==='furyDraw'||card.effCode==='chargeDraw'||card.effCode==='chargeDrawDR'||card.effCode==='dr_cmd1')&&pref.draw)score+=pref.draw;
+      if(board<0&&card.cost<=3)score+=3;
+      if(board>5&&card.cost>=5)score+=4;
+    }else{
+      // === 指令卡牌 ===
+      if(card.fx&&card.fx.indexOf('dmg')>=0){
+        score+=5;
+        if(oppUnits.length>=3)score+=5;
+        if(board<0)score+=8;
+        if(cfg.lethalCheck){
+          var lethal=GAME._calcLethal(ai,opp,card);
+          if(lethal)score+=30;
+        }
+      }
+      if(card.fx==='draw1'||card.fx==='draw2'){
+        if(ai.hand.length<=3)score+=8;
+        else if(ai.hand.length<=5)score+=4;
+      }
+      if(card.fx&&card.fx.indexOf('buff')>=0){
+        if(myUnits.length>=2)score+=6;
+      }
+      if(card.fx==='addCmd'||card.fx==='bondAddCmd')score+=8;
+      // 跳费/经济指令偏好
+      if((card.fx==='cmd1'||card.fx==='cmd2Draw1Next'||card.fx==='cmd1d2'||card.fx==='copyBigDraw1')&&pref.rampCmd)score+=pref.rampCmd;
+      // 阵营指令偏好
+      var ow=style.orderWeights||{};
+      if(card.fx&&ow[card.fx])score+=ow[card.fx];
+      if(card.condCode==='countermeasure')score+=4;
+    }
+    return score;
+  },
+
+  // 斩杀计算（可选额外牌）
+  _calcLethal:function(ai,opp,extraCard){
+    var total=0;
+    ai.allUnits().forEach(function(c){
+      if(c.hp>0&&c.canStillAtk)total+=c.effectiveAtk;
+    });
+    ai.hand.forEach(function(c){
+      if(c.isOrder&&c.cost<=ai.cmd){
+        if(c.fx==='dmg4hq')total+=4;
+        else if(c.fx==='dmgAll1')total+=1;
+        else if(c.fx==='dmgAll2')total+=2;
+        else if(c.fx&&c.fx.indexOf('dmg')>=0)total+=3;
+      }
+    });
+    if(extraCard){
+      if(extraCard.fx==='dmg4hq')total+=4;
+      else if(extraCard.fx&&extraCard.fx.indexOf('dmg')>=0)total+=3;
+    }
+    return total>=opp.hp;
+  },
+
+  // 攻击目标评分（阵营风格增强版）
+  _targetScore:function(attacker,target,ai,opp){
+    if(!target)return 100;
+    var score=0;
+    var atkDmg=Math.max(0,attacker.effectiveAtk-(target.armor||0));
+    var counterDmg=Math.max(0,target.effectiveAtk-(attacker.armor||0));
+    var willKill=atkDmg>=target.hp;
+    var willDie=counterDmg>=attacker.hp;
+    var board=GAME._evalBoard(ai,opp);
+    var style=this._getAIStyle();
+    var atw=style.attackTypeWeights||{};
+
+    if(willKill)score+=15;
+    if(willDie)score-=12;
+    // 阵营交换偏好：苏联以交换为主，不惩罚己方阵亡
+    if(style.avoidTrade&&willDie)score-=12;
+    var myLoss=counterDmg;
+    var theirLoss=Math.min(atkDmg,target.hp);
+    score+=(theirLoss-myLoss)*0.8;
+    score+=GAME._threatRank(target)*1.0;
+    // 过杀惩罚
+    if(willKill&&atkDmg>target.hp+3)score-=6;
+    // 阵营攻击类型偏好
+    if(target.hasG)score+=7+(atw.guard||0);
+    if(target.isA)score+=6+(atw.artillery||0);
+    if(target.isO)score+=6+(atw.bomber||0);
+    if(target.isF)score+=0+(atw.fighter||0);
+    if(target.isT)score+=0+(atw.tank||0);
+    if(target.isI)score+=0+(atw.infantry||0);
+    if(target.effCode==='drawOnDmg'||target.effCode==='draw1')score+=(atw.draw||0);
+    if(board<-5)score+=5;
+    // 苏联：优先攻击低血量
+    if(style.targetLowestHp&&target.hp<=2)score+=4;
+    return score;
+  },
+
+  // 智能推线（阵营风格增强版 v2）
+  _shouldPush:function(unit,ai,opp){
+    var cfg=AI_CONFIG[AI_LEVEL];
+    var style=this._getAIStyle();
+    if(!cfg.pushSmart)return true;
+    if(GAME.flTotal()>=5)return false;
+
+    // 支援阵线满了就推！不推就卡死了
+    if(ai.support.length>=4)return true;
+    // 打防守：己方前线空且敌军前线有攻击手 → 把支援阵线上最肉的单位推上前线挡刀
+    // （炮兵/轰炸机/战斗机等远程脆皮单位在必要时也可选择推线，以挡住敌军直取我方支援阵线/总部）
+    if(ai.fl.filter(function(c){return c.hp>0}).length===0&&
+       opp.fl.some(function(c){return c.hp>0&&c.effectiveAtk>0})&&unit.hp>0){
+      var blockCands=ai.support.filter(function(c){return c.hp>0});
+      if(blockCands.length){
+        var sturdiest=blockCands.reduce(function(a,b){return b.hp>a.hp?b:a});
+        if(unit===sturdiest)return true;
+      }
+    }
+    // AI指挥点充足（>=5）：推线开道，不要攒费
+    if(ai.cmd>=5&&ai.support.length>=3)return true;
+
+    // 英国/日本不再死守——支援≥3时仍推线
+    if(style.pushAggression<=0){
+      if(ai.support.length>=3)return true;
+      return false;
+    }
+
+    var supportCount=ai.support.filter(function(c){return c.hp>0}).length;
+    if(supportCount<=1&&ai.support.length<4)return false;
+
+    var frontEnemy=opp.fl.filter(function(c){return c.hp>0});
+    var avgEnemyAtk=0;
+    if(frontEnemy.length>0){
+      frontEnemy.forEach(function(c){avgEnemyAtk+=c.effectiveAtk});
+      avgEnemyAtk/=frontEnemy.length;
+    }
+    // 濒死单位避免送头（除非支援满了需要清位置）
+    if(avgEnemyAtk>=unit.hp&&!unit.hasG&&ai.support.length<4)return false;
+
+    // 德国：闪击单位优先推线
+    if(style.pushPreferBlitz&&unit.hasB&&ai.fl.length===0)return true;
+    // 低血量单位：支援满了也得推
+    if(unit.hp<=2&&!unit.hasB){
+      if(ai.support.length>=3)return true;
+      return false;
+    }
+    if(unit.hasB&&ai.fl.length===0)return true;
+    if(unit.isT&&unit.hp>=2)return true;
+    if(unit.hasG)return true;
+    if(ai.fl.length>=2)return false;
+
+    var oppSupport=opp.support.filter(function(c){return c.hp>0});
+    if(oppSupport.length>=2&&unit.effectiveAtk>=3)return true;
+
+    // 通用：支援接近满就推
+    if(ai.support.length>=3&&unit.hp>=2)return true;
+    // 有剩余指挥点就推，不攒费
+    if(ai.cmd>=3&&ai.support.length>=2)return true;
+
+    return false;
+  },
+
+  // ==================== AI 回合（智能版 v2） ====================
   enemyTurn:function(){
     if(GAME.gameOver)return;
     showTurnBanner('AI 回合','enemy');
-    var en=GAME.enemy;GAME.turn++;
+    var en=GAME.enemy,pl=GAME.player,cfg=AI_CONFIG[AI_LEVEL];
+    GAME.turn++;
     var skipFirstDraw=(GAME.turn===1&&!GAME.playerIsFirst);
     GAME._startTurn(en,skipFirstDraw);
-    GAME.log('\u2550\u2550\u2550 第'+GAME.turn+'回合 · AI回合 \u2550\u2550\u2550','system');
-    if(GAME.turn===1&&!GAME.playerIsFirst)GAME.log('⚡ AI先手首回合不抽牌','system');
+    // 沙盒：AI 关闭 → 敌方回合直接空过（不部署、不进攻），仅刷新状态后交还玩家
+    if(SANDBOX.active&&!SANDBOX.aiOn){
+      GAME.log('\u2696\uFE0F 沙盒：AI 已关闭，敌方回合空过','system');
+      GAME.phase='play';
+      GAME.playerTurn();
+      return;
+    }
+    var self=this;
+    var style=self._getAIStyle();
+    GAME.log('\u2550\u2550\u2550 第'+GAME.turn+'回合 \u00b7 AI回合 ['+style.desc+'] \u2550\u2550\u2550','system');
+    if(GAME.turn===1&&!GAME.playerIsFirst)GAME.log('\u26A1 AI先手首回合不抽牌','system');
     var firstMark=GAME.playerIsFirst?'\u2694\uFE0F先手':'\u27A1\uFE0F后手';
-    $('turnInfo').textContent='第'+GAME.turn+'回合 · AI回合 · '+firstMark;GAME.render();
+    $('turnInfo').textContent='第'+GAME.turn+'回合 \u00b7 AI回合 \u00b7 '+firstMark;GAME.render();
 
-    var orders=en.getPlayable().filter(function(c){return c.isOrder}).sort(function(a,b){return b.cost-a.cost});
-    var units=en.getPlayable().filter(function(c){return !c.isOrder}).sort(function(a,b){return b.cost-a.cost});
-    var oi=0,ui=0;
+    // 动态留费：优势时留更多（叠加阵营风格预留）
+    var boardScore=cfg.pushSmart?self._evalBoard(en,pl):0;
+    var reserve=(cfg.saveCredits||0)+(style.reserveBonus||0);
+    if(boardScore>8)reserve=Math.max(reserve,3);
+    else if(boardScore>3)reserve=Math.max(reserve,2);
+    else if(boardScore<-5)reserve=0;
 
+    // 支援阵线满了就不留费，推线开路
+    if(en.support.length>=4)reserve=0;
+    // 防空过：如果预留费导致无牌可出，动态降低预留
+    var allAffordableOrders=en.hand.filter(function(c){return c.isOrder&&c.cost<=en.cmd});
+    var allAffordableUnits=en.hand.filter(function(c){return !c.isOrder&&c.cost<=en.cmd&&en.support.length<4});
+    var canPlaySomething=(allAffordableOrders.length>0||allAffordableUnits.length>0);
+    if(!canPlaySomething&&reserve>0&&(en.hand.some(function(c){return c.cost<=en.cmd}))){reserve=0;GAME.log('AI 调整预留费为0避免空过','ai')}
+
+    // 1) 指令
+    var orders=en.hand.filter(function(c){
+      return c.isOrder&&c.cost<=en.cmd-reserve;
+    }).sort(function(a,b){return self._cardValue(b,en,pl)-self._cardValue(a,en,pl)});
+
+    var oi=0;
     function playOrder(){
-      if(oi>=orders.length)return playUnit();
+      if(oi>=orders.length)return playUnits();
       var c=orders[oi++];
-      if(en.hand.indexOf(c)<0||c.cost>en.cmd)return playOrder();
+      if(en.hand.indexOf(c)<0||c.cost>en.cmd){playOrder();return}
+      if(!cfg.useOrders&&!cfg.lethalCheck){playOrder();return}
+      if(!cfg.useOrders){var chk=checkOrderCondition(c,en);if(!chk.ok){playOrder();return}}
       var aiCond=checkOrderCondition(c,en);
-      if(!aiCond.ok){GAME.log('AI '+c.cn+' 条件不满足：'+aiCond.msg,'ai');return playOrder()}
+      if(!aiCond.ok){GAME.log('AI '+c.cn+' 条件不满足：'+aiCond.msg,'ai');playOrder();return}
       en.hand=en.hand.filter(function(x){return x!==c});en.cmd-=c.cost;
       GAME.log('AI使用指令 <b>'+c.cn+'</b>','ai');showOrderCardPlayed(c,false);GAME.execOrder(en,c);
-      GAME.render();if(GAME.checkEnd())return;setTimeout(playOrder,1200);
+      GAME.render();if(GAME.checkEnd())return;GAME.waitAnims().then(function(){playOrder()});
     }
-    function playUnit(){
-      if(ui>=units.length)return aiMove();
+
+    // 2) 单位
+    var units=en.hand.filter(function(c){
+      return !c.isOrder&&c.cost<=en.cmd-reserve&&en.support.length<4;
+    }).sort(function(a,b){return self._cardValue(b,en,pl)-self._cardValue(a,en,pl)});
+    var ui=0;
+
+    function playUnits(){
+      if(ui>=units.length)return smartMove();
       var c=units[ui++];
-      if(en.hand.indexOf(c)<0||c.cost>en.cmd)return playUnit();
-      // 支援阵线已满（上限4）时跳过部署本单位，避免超出上限
-      if(en.support.length>=4)return playUnit();
+      if(en.hand.indexOf(c)<0||c.cost>en.cmd||en.support.length>=4){playUnits();return}
       en.hand=en.hand.filter(function(x){return x!==c});en.cmd-=c.cost;
-      c.zone='support';c.owner=en;c.justDeployed=true;c.justPlayed=true;c.supSide=Math.random()<0.5?'L':'R';en.support.push(c);
+      c.zone='support';c.owner=en;c.justDeployed=true;c.justPlayed=true;
+      // 智能选侧：靠敌方前线近的一侧
+      if(c.isA||c.isO)c.supSide='R'; // 远程躲后面
+      else if(pl.fl.length>0)c.supSide='L'; // 敌方有前线→靠左
+      else c.supSide=Math.random()<0.5?'L':'R';
+      en.support.push(c);
       GAME.log('AI部署 '+UI[c.ut]+' <b>'+c.cn+'</b>','ai');showCardPlayed(c,false);
       var aiHeavy=c.ut!=='X'&&(c.atk+c.hp)>=10;
       var aiAnimDur=aiHeavy?800:650;
       setTimeout(function(){c.justPlayed=false},aiAnimDur);
-      // 反制指令检查
       var countered=GAME.checkCounterOrder(en,c);
       if(countered){
         GAME.log('\u26D4 '+c.cn+' 被反制！','effect');
@@ -3303,59 +3981,154 @@ var GAME={
         }
         if(!c.canActOnDeploy){c.canAct=false;c.apSpent=99}
       }
-      GAME.render();if(GAME.checkEnd())return;setTimeout(playUnit,1000);
+      GAME.render();if(GAME.checkEnd())return;setTimeout(playUnits,1000);
     }
 
-    function aiMove(){
-      var movers=en.support.filter(function(c){return c.canStillAct});var mi=0;
+    // 3) 推线
+    function smartMove(){
+      if(!cfg.pushSmart){smartAttack();return}
+      var movers=en.support.filter(function(c){return c.canStillAct&&self._shouldPush(c,en,pl)});
+      var mi=0;
       function stepMove(){
-        if(mi>=movers.length)return aiFight();
+        if(mi>=movers.length){
+          if(en.support.length<4&&en.cmd>0){
+            var moreU=en.hand.filter(function(c){return !c.isOrder&&c.cost<=en.cmd});
+            if(moreU.length>0){units=moreU.sort(function(a,b){return self._cardValue(b,en,pl)-self._cardValue(a,en,pl)});ui=0;playUnits();return}
+          }
+          return smartAttack()
+        }
         var m=movers[mi++];
-        if(en.fl.length>=2){stepMove();return}
-        if(GAME.canPush(en)){
-          if(en.support.indexOf(m)<0||!m.canStillMove||en.cmd<m.acost){stepMove();return}
-          // AI推线前记录旧DOM位置
-          var aiOldEl=findCardEl(m);
-          var aiOldRect=aiOldEl?aiOldEl.getBoundingClientRect():null;
-          en.cmd-=m.acost;
-          en.support=en.support.filter(function(x){return x!==m});
-          en.fl.push(m);m.zone='frontline';m.spendAP(1);
-          if(m.hasS)m.smokescreenActive=false;
-          GAME.log('AI '+m.cn+' \u27A1 推线至前线 <span style="color:#f9c74f;font-weight:700">\u26A1'+m.effAcost+'</span>','ai');
-          GAME.render();if(GAME.checkEnd())return;
-          // AI推线轨迹特效
-          setTimeout(function(){
-            var aiNewEl=findCardEl(m);
-            playPushTrailFromRect(aiOldRect,aiNewEl,m);
-          },50);
-          setTimeout(stepMove,1200);
-        }else{stepMove()}
+        if(en.fl.length>=2||!GAME.canPush(en)){stepMove();return}
+        if(en.support.indexOf(m)<0||!m.canStillMove||en.cmd<m.acost){stepMove();return}
+        var aiOldEl=findCardEl(m);
+        var aiOldRect=aiOldEl?aiOldEl.getBoundingClientRect():null;
+        en.cmd-=m.acost;
+        en.support=en.support.filter(function(x){return x!==m});
+        en.fl.push(m);m.zone='frontline';m.spendAP(1);
+        if(m.hasS)m.smokescreenActive=false;
+        GAME.log('AI '+m.cn+' \u27A1 推线至前线 <span style="color:#f9c74f;font-weight:700">\u26A1'+m.effAcost+'</span>','ai');
+        GAME.render();if(GAME.checkEnd())return;
+        setTimeout(function(){
+          var aiNewEl=findCardEl(m);
+          playPushTrailFromRect(aiOldRect,aiNewEl,m);
+        },50);
+        setTimeout(stepMove,1200);
       }
       stepMove();
     }
 
-    function aiFight(){
+    // 4) 攻击（阵营风格增强版 v3）
+    function smartAttack(){
       if(GAME.checkEnd())return;
-      var atkrs=en.allUnits().filter(function(c){return c.canStillAct});
-      if(!atkrs.length){aiEnd();return}var ai=0;
-      function stepFight(){
-        if(ai>=atkrs.length||GAME.checkEnd()){aiEnd();return}
-        var a=atkrs[ai++];if(!a.canStillAct){stepFight();return}
-        var tgs=GAME.getTargets(a);if(!tgs.length){stepFight();return}
-        var ut=tgs.filter(function(x){return x.card!==null}).sort(function(x,y){return x.card.hp-y.card.hp});
-        var ht=tgs.filter(function(x){return x.card===null});
-        var t=ut.length?ut[0]:(ht.length?ht[0]:null);if(!t){stepFight();return}
-        GAME.doAttack(a,t);GAME.render();if(GAME.checkEnd())return;setTimeout(stepFight,1000);
+      var atkrs=en.allUnits().filter(function(c){return c.canStillAtk});
+      if(!atkrs.length){aiEnd();return}
+
+      var cfg2=AI_CONFIG[AI_LEVEL];
+      var lethal=cfg2.lethalCheck?self._calcLethal(en,pl):false;
+      var isJapan=(en.fc==='J');
+      var atkHQWeight=style.attackHQWeight||0.5;
+
+      if(cfg2.smartAtk){
+        // ===== 中/困难：攻击规划 =====
+        var ai2=0;
+        function stepFight(){
+          if(ai2>=atkrs.length||GAME.checkEnd()){aiEnd();return}
+          var a=atkrs[ai2++];if(!a.canStillAtk){stepFight();return}
+          var tgs=GAME.getTargets(a);if(!tgs.length){stepFight();return}
+
+          // 日本：全员攻击总部（除非必须解守护才能打到）
+          if(isJapan&&atkHQWeight>=0.9){
+            var hqTarget=null;
+            for(var j=0;j<tgs.length;j++){if(tgs[j].card===null){hqTarget=tgs[j];break}}
+            if(hqTarget){
+              GAME.doAttack(a,hqTarget);GAME.render();
+              if(GAME.checkEnd())return;
+              atkrs=en.allUnits().filter(function(c){return c.canStillAtk});
+              setTimeout(stepFight,800);return;
+            }
+          }
+
+          // 斩杀检查
+          if(cfg2.lethalCheck&&self._calcLethal(en,pl)){
+            var hqTgt=null;
+            for(var k=0;k<tgs.length;k++){if(tgs[k].card===null){hqTgt=tgs[k];break}}
+            if(hqTgt){GAME.doAttack(a,hqTgt);GAME.render();if(GAME.checkEnd())return;setTimeout(stepFight,800);return}
+          }
+
+          // 场攻计算：用于判定解场/打脸策略
+          var myFA=self._calcFieldAtk(en);
+          var oppFA=self._calcFieldAtk(pl);
+          var aiHasLethal=myFA.total>=pl.hp; // AI下回合斩杀
+          var oppHasLethal=oppFA.total>=en.hp; // 敌方下回合斩杀
+          var aiFieldLead=myFA.total-oppFA.total; // 场攻差
+
+          // 构建候选目标列表（含阵营偏好）
+          var candidates=[];
+          tgs.forEach(function(t){
+            if(t.card===null){
+              var hqScore=50+(atkHQWeight*80); // 阵营打脸倾向加成
+              var board=self._evalBoard(en,pl);
+              if(board<-3)hqScore+=25;
+              if(pl.hp<=8)hqScore+=20;
+              if(a.effectiveAtk>=4)hqScore+=10;
+              // === 场攻决策 ===
+              if(aiHasLethal)hqScore+=200; // 能斩杀→全力打脸
+              if(oppHasLethal)hqScore-=60; // 敌方即将斩杀→优先解场
+              if(aiFieldLead>5)hqScore+=30; // 场攻碾压→放心打脸
+              if(aiFieldLead<-3)hqScore-=40; // 场攻落后→优先解场
+              candidates.push({t:t,score:hqScore});
+            }else{
+              var s=self._targetScore(a,t.card,en,pl);
+              candidates.push({t:t,score:s});
+            }
+          });
+
+          // 找最高分
+          var best=null,bestScore=-9999;
+          candidates.forEach(function(ct){
+            if(ct.score>bestScore){bestScore=ct.score;best=ct.t;}
+          });
+
+          if(best){
+            GAME.doAttack(a,best);GAME.render();
+            if(GAME.checkEnd())return;
+            atkrs=en.allUnits().filter(function(c){return c.canStillAtk});
+            setTimeout(stepFight,800);
+          }else{stepFight()}
+        }
+        stepFight();
+      }else{
+        // ===== 简单：概率打脸（含阵营倾向） =====
+        var ai2=0;
+        function stepFight(){
+          if(ai2>=atkrs.length||GAME.checkEnd()){aiEnd();return}
+          var a=atkrs[ai2++];if(!a.canStillAtk){stepFight();return}
+          var tgs=GAME.getTargets(a);if(!tgs.length){stepFight();return}
+          var myFA2=self._calcFieldAtk(en);
+          var oppFA2=self._calcFieldAtk(pl);
+          if(myFA2.total>=pl.hp){var effectiveAtkHQ=1.0} // 能斩杀→全打脸
+          else{var effectiveAtkHQ=isJapan?1.0:cfg2.atkHQ} // 日本简单难度也全力打脸
+          var ht=tgs.filter(function(t){return t.card===null});var ut=tgs.filter(function(t){return t.card!==null});
+          if(ht.length&&Math.random()<effectiveAtkHQ){
+            GAME.doAttack(a,ht[0]);GAME.render();if(GAME.checkEnd())return;setTimeout(stepFight,800)
+          }else if(ut.length){
+            GAME.doAttack(a,ut[0]);GAME.render();if(GAME.checkEnd())return;setTimeout(stepFight,800)
+          }else if(ht.length){
+            GAME.doAttack(a,ht[0]);GAME.render();if(GAME.checkEnd())return;setTimeout(stepFight,800)
+          }else{stepFight()}
+        }
+        stepFight();
       }
-      stepFight();
     }
 
     function aiEnd(){
-      GAME.cleanup(GAME.player);GAME.cleanup(GAME.enemy);
-      GAME.enemy.allUnits().forEach(function(c){c.tmpAtk=0;c.tmpAcost=0});
-      if(GAME.checkEnd())return;
-      GAME.log('AI回合结束','system');GAME.phase='play';
-      setTimeout(function(){GAME.playerTurn()},800);
+      GAME.waitAnims().then(function(){
+        GAME.cleanup(GAME.player);GAME.cleanup(GAME.enemy);
+        GAME.enemy.allUnits().forEach(function(c){c.tmpAtk=0;c.tmpAcost=0});
+        if(GAME.checkEnd())return;
+        GAME.log('AI回合结束','system');GAME.phase='play';
+        setTimeout(function(){GAME.playerTurn()},800);
+      });
     }
     try{playOrder()}catch(e){console.error(e);aiEnd()}
   },
@@ -3366,8 +4139,72 @@ var GAME={
     if(who.maxCmd<12)who.baseMaxCmd=Math.min(12,who.baseMaxCmd+1);
     who.maxCmd=Math.min(24,who.baseMaxCmd+who.cmdBonus);
     who.cmd=who.maxCmd;
-    if(!skipDraw)who.draw(1);
+    // 沙盒：无限指挥点
+    if(SANDBOX.active&&SANDBOX.unlimitedCmd&&(who===GAME.player||SANDBOX.aiOn)){who.cmd=999;who.maxCmd=999;who.baseMaxCmd=999;}
+    if(!skipDraw){
+      // AI定向抽牌：困难低概率偷瞄2张; 地狱必发、偷瞄N张选最优
+      var cfgPeek=AI_CONFIG[AI_LEVEL];
+      var peekCount=cfgPeek.peekCards||0;
+      var peekProg=(peekCount>=1)?(AI_LEVEL>=4?1:0.5):0;
+      if(who===GAME.enemy&&peekCount>=1&&who.deck.length>=2&&Math.random()<peekProg){
+        var peekN=Math.min(peekCount,who.deck.length);
+        // 神抽×看手牌配合：根据玩家暗藏的直伤/单位，定向抽能反制的牌
+        var oppHand=GAME.player;
+        var oppBurst=0,oppHeldUnits=0;
+        oppHand.hand.forEach(function(hc){if(hc.isOrder&&hc.fx&&hc.fx.indexOf('dmg')>=0)oppBurst+=3;else if(!hc.isOrder)oppHeldUnits++;});
+        // 解牌识别：仅含 dmg/kill/destroy 的指令才算解牌，过滤普通指令
+        function isRemoval(cc){return cc.isOrder&&cc.fx&&/dmg|kill|destroy/i.test(cc.fx)}
+        // 针对玩家国家：神抽偏好克制该国打法的牌型
+        var vsTune={
+          D:{guard:10,heavy:6},   // 德国闪击突击→抽守护/重甲抗压
+          S:{removal:9,aoe:4},    // 苏联人海铺场→抽解牌/范围清场
+          U:{reach:8,guard:4},    // 美国跳费堆大→抽直伤快攻抢血
+          B:{removal:8,reach:3},  // 英国守护城墙→抽解牌破墙
+          J:{guard:10,removal:4}  // 日本速攻玉碎→抽守护+控场
+        }[GAME.player.fc]||{};
+        var bestI=0,bestV=-9999;
+        for(var pi=0;pi<peekN;pi++){
+          var idx=who.deck.length-1-pi;
+          var cand=who.deck[idx];
+          var vv=GAME._cardValue(cand,GAME.enemy,GAME.player);
+          var lethalThreat=oppBurst>=who.hp;   // 敌方直伤足以灌死AI总部
+          var unitFlood=oppHeldUnits>=3;       // 敌方捏着多张单位
+          if(unitFlood){
+            if(isRemoval(cand))vv+=7;           // 敌方铺单位→优先神抽解牌
+            else if(cand.isUnit)vv-=3;          // 铺场单位性价比显著降低
+          }
+          if(lethalThreat){
+            if(cand.isUnit&&cand.hasG)vv+=9;    // 敌方蓄直伤→优先抽守护挡线
+            else if(isRemoval(cand))vv+=4;      // 其次抽解牌应对
+            else if(cand.isOrder&&cand.fx&&cand.fx.indexOf('dmg')>=0)vv+=3; // 直伤对轰压血
+            else if(cand.isUnit)vv-=2;          // 无关单位价值略降
+          }
+          // 针对玩家国家的神抽偏好（叠加层）
+          if(vsTune.guard&&cand.isUnit&&cand.hasG)vv+=vsTune.guard;
+          if(vsTune.heavy&&cand.isUnit&&cand.hasH)vv+=vsTune.heavy;
+          if(vsTune.removal&&isRemoval(cand))vv+=vsTune.removal;
+          if(vsTune.aoe&&cand.isUnit&&cand.isA)vv+=vsTune.aoe;
+          if(vsTune.reach&&((cand.isUnit&&cand.hasB)||(cand.isOrder&&cand.fx&&cand.fx.indexOf('dmg')>=0)))vv+=vsTune.reach;
+          if(vv>bestV){bestV=vv;bestI=pi}
+        }
+        for(var pi=0;pi<=bestI;pi++){
+          if(pi===bestI){who.hand.push(who.deck.pop())}
+          else{var skip=who.deck.pop();who.deck.splice(who.deck.length-pi,0,skip)}
+        }
+      }else if(who===GAME.enemy&&AI_LEVEL>=2&&who.deck.length>=2){
+        var c1=who.deck[who.deck.length-1],c2=who.deck[who.deck.length-2];
+        var v1=GAME._cardValue(c1,GAME.enemy,GAME.player);
+        var v2=GAME._cardValue(c2,GAME.enemy,GAME.player);
+        if(v2>v1){who.deck.pop();var keep=who.deck.pop();who.deck.push(c1);who.hand.push(keep)}
+        else{who.hand.push(who.deck.pop())}
+      }else{
+        who.draw(1);
+      }
+    }
     if(who.nextExtraDraw){who.draw(who.nextExtraDraw);GAME.log('\uD83C\uDFA0 战争债券\u2192额外抽'+who.nextExtraDraw+'张牌','effect');who.nextExtraDraw=0;}
+    if(who===GAME.enemy&&GAME.turn===1&&!GAME.playerIsFirst){who.cmd+=2;if(AI_LEVEL===4)GAME.log("\u26A1 地狱级作弊：AI先手额外+2指挥点","system")}
+    if(who===GAME.enemy){var cfg3=AI_CONFIG[AI_LEVEL];if(cfg3.cmdBonus&&GAME.turn>1){who.cmd+=cfg3.cmdBonus;if(AI_LEVEL===4)GAME.log("💰 地狱级作弊：指挥点+"+cfg3.cmdBonus,"system")};if(cfg3.extraDraw&&GAME.turn>0){who.draw(cfg3.extraDraw);if(AI_LEVEL===4)GAME.log("💰 地狱级作弊：额外抽"+cfg3.extraDraw+"张牌","system")}}
+
     // 当前玩家的单位刷新
     who.allUnits().forEach(function(c){c.resetTurn()});
     // 对手被压制的单位：已跳过对手整个回合，现在解除压制
@@ -3410,10 +4247,28 @@ var GAME={
       html+='</div>';
     });
     html+='</div>';
+    // 敌方阵营选择
+    html+='<div class="enemy-row"><span class="enemy-label">⚔ 敌方国家：</span><div class="enemy-fc-grid">';
+    fkeys.forEach(function(k){
+      html+='<div class="enemy-fc-btn'+(ENEMY_FC===k?' selected':'')+'" data-efc="'+k+'" onclick="GAME._selectEnemyFc(\''+k+'\')">'+FA_ICON[k]+'</div>';
+    });
+    html+='</div></div>';
+    // 难度选择
+    html+='<div class="diff-row">';
+    var aiStyle=AI_FACTION_STYLE[ENEMY_FC]||AI_FACTION_STYLE['D'];
+    var diffDescs=[
+      {l:1,icon:'\uD83D\uDFE2',name:'\u7B80\u5355',desc:'\u968F\u673A\u51FA\u724C\u00B7\u6F14\u4E60\u6A21\u5F0F'},{l:2,icon:'\uD83D\uDFE1',name:'\u666E\u901A',desc:aiStyle.desc||'\u6807\u51C6\u5BF9\u6218'},{l:3,icon:'\uD83D\uDD34',name:'\u56F0\u96BE',desc:(aiStyle.desc||'\u771F\u5B9E\u6218\u573A')},{l:4,icon:'\uD83D\uDFE3',name:'\u5730\u7344',desc:'\u663E\u6027\u52A0\u6210\u7206\u6807+\u9690\u5F62\u8BFB\u724C\u00B7\u795E\u62BD\u00B7\u4E0D\u5361\u624B'}];
+    diffDescs.forEach(function(d){
+      html+='<div class="diff-btn'+(AI_LEVEL===d.l?' selected':'')+'" data-lv="'+d.l+'" onclick="GAME._selectDiff('+d.l+')"><span class="diff-icon">'+d.icon+'</span><span class="diff-name">'+d.name+'</span><span class="diff-desc">'+d.desc+'</span></div>';
+    });
+    html+='<div class="diff-ai-note" style="font-size:.62rem;color:#888;margin-top:4px;text-align:center">&#x1f4a1; 切换敌方国家后难度描述自动更新</div>';
+    html+='</div>';
     html+='<div id="fc-detail" class="fc-detail"></div>';
     html+='<div class="fc-start-row"><button class="btn btn-green" id="fc-start-btn" disabled onclick="GAME._startWithFaction()">开始战斗</button>';
     html+='<button class="btn btn-ghost" onclick="GAME._randomFaction()">随机选择</button>';
-    html+='<button class="btn btn-ghost" style="color:#f9c74f;border-color:#f9c74f" onclick="TUT.start()">\uD83D\uDCDA 新手教程</button></div>';
+    html+='<button class="btn btn-ghost" style="color:#f9c74f;border-color:#f9c74f" onclick="TUT.start()">\uD83D\uDCDA 新手教程</button>';
+    html+='<button class="btn btn-ghost" style="color:#f9c74f;border-color:#f9c74f" onclick="GAME.showSandbox()">\uD83D\uDD2C \u6C99\u76D2\u6A21\u5F0F</button>';
+    html+='<a href="KARDS_\u5361\u724C\u5168\u89C8.html" target="_blank" class="btn btn-ghost" style="color:#4fc3f7;border-color:#4fc3f7;text-decoration:none;display:inline-flex;align-items:center">\uD83D\uDCCB \u5361\u724C\u5168\u89C8</a></div>';
     el.innerHTML=html;
     el.style.display='block';
     $('overlay').classList.remove('show');
@@ -3497,6 +4352,18 @@ var GAME={
     var fc=fkeys[Math.floor(Math.random()*fkeys.length)];
     GAME._selectFaction(fc);
   },
+  _selectEnemyFc:function(fc){
+    ENEMY_FC=fc;
+    var btns=document.querySelectorAll('.enemy-fc-btn');
+    btns.forEach(function(b){b.classList.toggle('selected',b.getAttribute('data-efc')===fc)});
+  },
+
+  _selectDiff:function(lv){
+    AI_LEVEL=lv;
+    var btns=document.querySelectorAll('.diff-btn');
+    btns.forEach(function(b){b.classList.toggle('selected',b.getAttribute('data-lv')==String(lv))});
+  },
+
 
   _startWithFaction:function(){
     if(!GAME._selectedFaction)return;
@@ -3509,15 +4376,14 @@ var GAME={
   },
 
   _initGame:function(playerFc){
+    SANDBOX.active=false; // 正常实战重置沙盒开关，避免沙盒无限指挥点/攻击泄漏到实战
     $('overlay').classList.remove('show');$('log').innerHTML='';$('prompt-area').textContent='出牌即生成';
-    var fkeys=['D','S','U','B','J'];
-    var efi=fkeys.indexOf(playerFc);
     GAME.player=new Player('你',playerFc);
-    GAME.enemy=new Player('AI对手',fkeys[(efi+1)%5]);
+    GAME.enemy=new Player('AI对手',ENEMY_FC);var aiCfg=AI_CONFIG[AI_LEVEL];if(aiCfg.hpBonus){GAME.enemy.hp+=aiCfg.hpBonus;if(AI_LEVEL===4)GAME.log('💰 地狱级作弊：生命+'+aiCfg.hpBonus,'system')}
     GAME.turn=0;GAME.phase='play';GAME.selected=null;GAME.pendingPush=null;GAME.pendingEffect=null;GAME.pendingDeploy=null;GAME.gameOver=false;
 
     var playerFirst=Math.random()<0.5;
-    GAME.playerIsFirst=playerFirst;
+    GAME.playerIsFirst=playerFirst;console.log('[先手/后手] _initGame playerIsFirst='+playerFirst);
     if(playerFirst){
       GAME.player.draw(4);GAME.enemy.draw(5);
       GAME.log('\u2694\uFE0F 随机分配：你是<span style="color:#4a9;font-weight:700">先手</span>（起手4张）\u27A1 AI是后手（起手5张）','system');
@@ -3544,6 +4410,152 @@ var GAME={
       nc.owner=GAME.player;GAME.player.hand.push(nc);
     }
 
+    // ===== AI 起手留牌策略（按国家风格参数化，避免通用攻略不适配个别国家）=====
+    // 各国留牌画像：
+    //   D 德军  — 闪击节奏：保≤3费 + 闪击/坦克，中速
+    //   S 苏军  — 人海牺牲：狂换高费，只留≤2费廉价单位
+    //   U 美军  — 工业跳费：恰恰相反，留高费目标、换掉拥挤的低费填充，找跳费/过牌
+    //   B 英军  — 守护消耗：保守护/过牌，后手留一张解牌
+    //   J 日军  — 速攻玉碎：狂留≤2费闪击，后手保留一张解牌
+    if(AI_LEVEL>=2){
+      var MF={
+        D:{maxKeep:3,preferBlitz:true, keepGuard:false,keepDraw:false,keepDmgLater:false,keepHigh:false},
+        S:{maxKeep:2,preferBlitz:false,keepGuard:false,keepDraw:false,keepDmgLater:false,keepHigh:false},
+        U:{maxKeep:99,preferBlitz:false,keepGuard:false,keepDraw:true, keepDmgLater:false,keepHigh:true},
+        B:{maxKeep:3,preferBlitz:false,keepGuard:true, keepDraw:true, keepDmgLater:true, keepHigh:false},
+        J:{maxKeep:2,preferBlitz:true, keepGuard:false,keepDraw:false,keepDmgLater:true, keepHigh:false}
+      }[GAME.enemy.fc]||{maxKeep:3,preferBlitz:false,keepGuard:false,keepDraw:false,keepDmgLater:false,keepHigh:false};
+      var aiFirst=!GAME.playerIsFirst;
+      var aiLoop=0;
+      while(aiLoop<40){
+        var aiHand=GAME.enemy.hand;
+        var aiCheap=aiHand.filter(function(c){return !c.isOrder&&c.cost<=2}).length;
+        var aiDraw=aiHand.some(function(c){return c.effCode==='draw1'||c.effCode==='drawOnDmg'||c.fx==='cmd2Draw1Next'||c.fx==='cmd1d2'});
+        var aiNeedsDraw=(MF.keepDraw&&!aiDraw);                                       // 美国/英国补跳费/过牌
+        var aiNeedDmgLater=(!aiFirst&&MF.keepDmgLater&&!aiHand.some(function(c){return c.isOrder&&c.fx&&c.fx.indexOf('dmg')>=0})); // 英/日后手握解牌
+        var aiDiscard=null;
+        if(MF.keepHigh){                                                               // 美国：跳费留高费
+          if(aiCheap>=3&&!aiNeedsDraw){                                                 // 低费填充过多 → 换掉一张多余的
+            aiDiscard=aiHand.filter(function(c){return !c.isOrder&&c.cost<=2})[2];
+          }else if(aiNeedsDraw&&aiCheap>=2){                                            // 缺跳费/过牌 → 换掉一张低费去搜
+            aiDiscard=aiHand.filter(function(c){return !c.isOrder&&c.cost<=2})[0];
+          }
+        }else{                                                                         // 其余国家：换掉费用最高的非关键单位
+          for(var aiI=0;aiI<aiHand.length;aiI++){
+            var aiC=aiHand[aiI];
+            if(aiC.isOrder)continue;
+            if(aiC.cost<=2&&aiCheap<=2)continue;                                        // 保住至少2张低费单位
+            if(MF.keepGuard&&aiC.hasG)continue;                                         // 英国保守护
+            if(MF.preferBlitz&&aiC.hasB)continue;                                       // 德/日保闪击
+            if(MF.keepDraw&&aiNeedsDraw&&(aiC.effCode==='draw1'||aiC.effCode==='drawOnDmg'))continue; // 英国先手留过牌
+            if(aiC.cost<=MF.maxKeep)continue;                                           // 未超过保留线不换
+            aiDiscard=aiC;break;
+          }
+          // 英/日后手需解牌：牺牲一张非伤害指令去搜解牌
+          if(!aiDiscard&&aiNeedDmgLater){
+            for(var aiJ=0;aiJ<aiHand.length;aiJ++){
+              var aiCC=aiHand[aiJ];
+              if(aiCC.isOrder&&!(aiCC.fx&&aiCC.fx.indexOf('dmg')>=0)){aiDiscard=aiCC;break;}
+            }
+          }
+        }
+        if(!aiDiscard)break;
+        GAME.enemy.hand=GAME.enemy.hand.filter(function(c){return c!==aiDiscard});
+        var aiPos3=Math.floor(Math.random()*(GAME.enemy.deck.length+1));
+        GAME.enemy.deck.splice(aiPos3,0,aiDiscard);
+        var aiIdx3=Math.floor(Math.random()*(GAME.enemy.deck.length));
+        GAME.enemy.hand.push(GAME.enemy.deck.splice(aiIdx3,1)[0]);aiLoop++;
+      }
+    }
+
+    // 全知难度兜底：国家感知留牌后，再确保开局至少能打出（具体兜底见下）
+    if(AI_LEVEL>=4){
+      // 全知兜底：确保开局至少能打出1-2回合（保1张≤2费单位即可）
+      // 不再强制"全部≤3费"，否则会把美军跳费留的高费掌费目标全换掉
+      var aiGuard2=0;
+      while(aiGuard2<30){
+        if(GAME.enemy.hand.some(function(c){return c.cost<=2&&!c.isOrder}))break;
+        var aiWorst2=GAME.enemy.hand.reduce(function(a,b){return (a.cost*10+(a.isOrder?0:1))>(b.cost*10+(b.isOrder?0:1))?a:b});
+        GAME.enemy.hand=GAME.enemy.hand.filter(function(c){return c!==aiWorst2});
+        var aiPos4=Math.floor(Math.random()*(GAME.enemy.deck.length+1));
+        GAME.enemy.deck.splice(aiPos4,0,aiWorst2);
+        var aiIdx4=Math.floor(Math.random()*(GAME.enemy.deck.length));
+        GAME.enemy.hand.push(GAME.enemy.deck.splice(aiIdx4,1)[0]);aiGuard2++;
+      }
+    }
+
+    // 开局调度手牌
+    GAME._mulliganCards=[];
+    GAME._showMulligan();
+  },
+
+  _showMulligan:function(){
+    GAME.phase='mulligan';
+    // 隐藏箭头提示
+    $('prompt-area').textContent='';
+    // 渲染手牌到调度面板
+    var html='<div class="mulligan-overlay"><div class="mulligan-panel">';
+    var fsMull=GAME.playerIsFirst?'⚔️ 先手':'➡️ 后手';
+    var fsMullClr=GAME.playerIsFirst?'#4a9':'#e44';
+    var fsMullCards=GAME.playerIsFirst?'4':'5';
+    html+='<h2>🔄 调度手牌 · <span style="font-size:.85rem;color:'+fsMullClr+'">'+fsMull+'（起手'+fsMullCards+'张）</span></h2>';
+    html+='<p class="mulligan-hint">点击卡牌选择要替换的牌，然后点击确认。可重复调度一次。</p>';
+    html+='<div class="mulligan-cards" id="mulligan-cards">';
+    GAME.player.hand.forEach(function(c,i){
+      var sel=GAME._mulliganCards.indexOf(i)>=0?' selected':'';
+      html+='<div class="mulligan-card'+sel+'" data-mi="'+i+'" onclick="GAME._toggleMulligan('+i+')">';
+      html+='<img src="'+(IMG_MAP[c.en]||'')+'" alt="'+c.cn+'" onerror="this.style.display=\'none\'">';
+      html+='<div class="mulligan-card-info"><b>'+c.cn+'</b> <span class="cost">'+c.cost+'费</span></div>';
+      if(c.isOrder){html+='<div class="mulligan-tag order">指令</div>'}
+      else{html+='<div class="mulligan-tag unit">'+['','步兵','坦克','炮兵','战斗机','轰炸机'][{'I':1,'T':2,'A':3,'F':4,'O':5}[c.ut]||0]+'</div>'}
+      html+='</div>';
+    });
+    html+='</div>';
+    html+='<div class="mulligan-btns">';
+    html+='<button class="btn btn-green" onclick="GAME._confirmMulligan()">✅ 确认调度 ('+GAME._mulliganCards.length+'张替换)</button>';
+    html+='<button class="btn btn-ghost" onclick="GAME._confirmMulligan(true)">全部保留</button>';
+    html+='</div>';
+    html+='</div></div>';
+    document.getElementById('arena').insertAdjacentHTML('beforeend',html);
+    GAME.render();
+  },
+
+  _toggleMulligan:function(idx){
+    var pos=GAME._mulliganCards.indexOf(idx);
+    if(pos>=0){GAME._mulliganCards.splice(pos,1)}
+    else{GAME._mulliganCards.push(idx)}
+    // 更新UI
+    var el=document.querySelector('.mulligan-card[data-mi="'+idx+'"]');
+    if(el)el.classList.toggle('selected');
+    var btn=document.querySelector('.mulligan-btns .btn-green');
+    if(btn)btn.textContent='✅ 确认调度 ('+GAME._mulliganCards.length+'张替换)';
+  },
+
+  _confirmMulligan:function(skip){
+    if(!skip&&GAME._mulliganCards.length>0){
+      // 把选中的牌放回卡组洗入
+      var replaced=GAME._mulliganCards.length;
+      var sorted=GAME._mulliganCards.slice().sort(function(a,b){return b-a});
+      sorted.forEach(function(i){
+        var c=GAME.player.hand[i];
+        GAME.player.hand.splice(i,1);
+        GAME.player.deck.push(c);
+      });
+      // 洗牌
+      for(var i=GAME.player.deck.length-1;i>0;i--){var j=Math.floor(Math.random()*(i+1));var t=GAME.player.deck[i];GAME.player.deck[i]=GAME.player.deck[j];GAME.player.deck[j]=t}
+      // 抽等量新牌
+      GAME.player.draw(replaced);
+      GAME.log('🔄 调度了 '+replaced+' 张手牌','system');
+    }
+    // 移除调度面板
+    var ov=document.querySelector('.mulligan-overlay');
+    if(ov)ov.remove();
+    // 开始游戏
+    GAME._startGameAfterMulligan();
+  },
+
+  _startGameAfterMulligan:function(){
+    console.log('[先手/后手] _startGameAfterMulligan playerIsFirst='+GAME.playerIsFirst);
     if(GAME.playerIsFirst){
       GAME.playerTurn();
     }else{
@@ -3556,6 +4568,43 @@ var GAME={
 
   newGame:function(){
     GAME.showFactionSelect();
+  },
+
+  // ==================== 沙盒模式 ====================
+  showSandbox:function(){
+    $('sandbox').classList.add('show');
+    SETNB.buildFilters();
+    SETNB.fillFiltersState();
+    SETNB.render();
+  },
+  closeSandbox:function(){
+    $('sandbox').classList.remove('show');
+    if(GAME.player&&GAME.phase==='end')GAME.newGame();
+  },
+  startSandboxGame:function(){
+    SANDBOX.active=true;
+    $('overlay').classList.remove('show');
+    $('sandbox').classList.remove('show');
+    $('faction-select').style.display='none';
+    document.querySelector('#arena').style.display='flex';
+    document.querySelector('#panel').style.display='flex';
+    $('log').innerHTML='';
+    GAME.player=new Player('沙盒玩家',SETNB.fc);
+    GAME.enemy=new Player('AI对手',ENEMY_FC);
+    GAME.turn=0;GAME.phase='play';GAME.selected=null;GAME.pendingPush=null;
+    GAME.pendingEffect=null;GAME.pendingDeploy=null;GAME.pendingOrder=null;
+    GAME.dragCard=null;GAME.gameOver=false;
+    GAME.playerIsFirst=true;
+    // 初始发牌
+    GAME.player.draw(6);GAME.enemy.draw(6);
+    // 沙盒加成应用
+    if(SANDBOX.unlimitedCmd){SETNB.cmdApply(GAME.player)}
+    if(SANDBOX.aiOn){SETNB.cmdApply(GAME.enemy)}
+    GAME.log('🔬 沙盒模式已开启 · 国家：'+FA[SETNB.fc],'system');
+    GAME.log((SANDBOX.unlimitedCmd?'🔁 无限指挥点：开启':'🔁 无限指挥点：关闭'),'system');
+    GAME.log((SANDBOX.unlimitedAtk?'🔁 无限攻击：开启':'🔁 无限攻击：关闭'),'system');
+    GAME.log((SANDBOX.aiOn?'🤖 AI对手：开启':'⏸ AI对手：关闭（敌方挂机）'),'system');
+    GAME.playerTurn();
   }
 };
 
@@ -3661,20 +4710,173 @@ var TUT={
   // 教程步骤定义
   _all:[
     {id:'welcome',title:'欢迎来到 KARDS！',text:'这是一款二战题材的卡牌对战游戏。<br><br><b>目标：利用你的卡组摧毁敌方总部</b>（20生命值）。<br><br>战场分<b>三条阵线</b>：<em>敌方支援阵线</em>（上）→ <em>前线 FL</em>（中）→ <em>友方支援阵线</em>（下）。<br><br>双方总部在各自的<b>支援阵线上</b>',hl:'#arena',pos:'center',autoNext:false,btn:'开始教程'},
-    {id:'hand1',title:'指挥点与指挥点槽',text:'总部左下角的 <b>⚡ 左边数字</b> 是你当前的<b>指挥点</b>，<b>右边数字</b>是你当前的<b>指挥点槽</b>。<br><br><b>指挥点</b>是消耗性资源，用于支付打出卡牌、移动或攻击的费用。它会在每回合开始时重置，数量等同于你当前的<b>指挥点槽</b>，且<b>未使用</b>的部分<b>不会保留</b>到下一回合。\n<br><br><b>指挥点槽</b>是成长性属性，代表你每回合可用的<b>指挥点上限</b>。它决定了你的资源规模，一般不会消耗，并<b>永久提升</b>你的每回合资源量。\n<br><br>现在拖动手牌中的 <em>动员兵</em>（1费 3/1 步兵）来<b>部署</b>他。',hl:'#handZone',pos:'top',autoNext:false,waitFor:'deployCard',waitCard:'动员兵'},
-    {id:'deploySide',title:'部署位置',text:'拖拽动员兵后，选择<b>左边或右边的支援阵线</b>放置它。<br><br>支援阵线最多放 <b>4</b> 个单位，前线最多 <b>5</b> 个。',hl:'#plSupportL,#plSupportR',pos:'top',autoNext:false,waitFor:'deployComplete'},
-    {id:'afterDeploy',title:'部署成功！',text:'动员兵已部署在上支援阵线。花费1指挥点<br><br><b>3/1</b> 表示 3攻击力/1生命值。<br>它拥有 <em>亡计</em> 效果：死亡时对随机敌方单位造成2点伤害。\n<br><br>左上角为<b>部署花费</b>，是单位从手牌打出单位到支援阵线所需支付的指挥点。，右上角为<b>行动花费</b>，是单位在战场上移动或攻击所需支付的指挥点。\n<br><br>一般情况，单位部署到支援阵线后无法立即行动，友方单位下一回合开始才可以<b>推进到前线</b>准备攻击。<br><br>现在点击 <b>"结束回合"</b> 按钮，让敌方行动。',hl:'#btnEndPlay',pos:'left',autoNext:false,waitFor:'endTurn',btn:false},
-    {id:'turn2',title:'部署坦克',text:'你的指挥点已恢复并增长了。为方便教学，为你提供额外的指挥点<br><br>现在<b>拖拽手牌中的 <em>T-34/76</em></b>（5费 4/4 闪击坦克）来部署它。<br><br>T-34/76 拥有 <em>闪击</em> 关键词——它部署后可以<b>立即行动</b>！',hl:'#handZone',pos:'top',autoNext:false,waitFor:'deployCard',waitCard:'T-34/76'},
-    {id:'deployT34',title:'部署 T-34/76',text:'将 T-34/76 部署到支援阵线。<br><br>因为拥有 <em>闪击</em> 关键词，部署后它将可以立即行动！<br><br>（普通单位部署后需要等到下回合才能行动）',hl:'#plSupportL,#plSupportR',pos:'top',autoNext:false,waitFor:'deployComplete'},
-    {id:'groundRule',title:'\uD83D\uDEE1 陆军单位规则',text:'<b>陆军单位</b>（步兵、坦克、炮兵）部署在支援阵线。<br><br>支援阵线的陆军单位<b>无法直接攻击敌方总部</b>——<br>必须先<b>推进到前线 FL</b>，才能攻击敌方总部和敌方支援阵线的单位。<br><br>接下来你将学习如何将单位推进到前线！',hl:'#arena',pos:'center',autoNext:false,btn:false},
-    {id:'pushToFL',title:'\u27A1 推进至前线',text:'T-34/76 已部署在<b>支援阵线</b>。<br><br>现在<b>拖拽 T-34/76 卡牌到前线区域</b>，将其推至前线。<br><br>\u26A1 推进消耗 <b>1 点指挥点</b> 。<br>因为其为 <em>坦克</em>，移动后仍可攻击！',hl:'#frontline',pos:'top',autoNext:false,waitFor:'pushComplete'},
-    {id:'attack',title:'\u2694 攻击敌方总部',text:'T-34/76 已在前线就位！<br><br>现在<b>点击前线的 T-34/76</b> 选中它，<br>然后 <b>点击敌方单位或总部</b>进行攻击！攻击消耗1点指挥点<br><br>\uD83C\uDFAF 单位每点攻击力造成 1 点伤害。',hl:'#enemyInfo',pos:'bottom',autoNext:false,waitFor:'attack'},
-    {id:'attackDone',title:'攻击成功！',text:'T-34/76 对敌方目标造成了 <b>4 点伤害</b>！<br><br>一般情况下，单位攻击后本回合无法再次攻击。<br><br>现在点击 <b>"结束回合"</b> 进入下一轮。',hl:'#btnEndPlay',pos:'left',autoNext:false,waitFor:'endTurn',btn:false},
-    {id:'turn3',title:'指令牌',text:'<br><br><b>指令牌</b>是KARDS中实现战术意图、控制战场节奏的关键卡牌。\n<b>指令牌</b>从手牌使用后立刻触发一次性效果，随后被弃置。左上角为指令牌的打出花费<br><b>拖动指令牌 <em>冬季攻势</em></b>（1费）来使用它。',hl:'#handZone',pos:'top',autoNext:false,waitFor:'deployCard',waitCard:'冬季攻势'},
-    {id:'orderResult',title:'冬季攻势效果',text:'指令牌立即生效——全场目标（双方总部+双方单位）各受到<b>1 点伤害</b>。<br><br>苏联的代价体系就是"以血换场"：不惜一切代价。<br><br>战斗继续——尝试用你的单位消灭敌方总部吧！',hl:'#arena',pos:'center',autoNext:false,btn:false},
-    {id:'done',title:'教程结束！',text:'你已经掌握了 KARDS 的基础操作：<br><br>1. <b>部署</b>——打出单位占领阵线<br>2. <b>推线</b>——将单位从支援阵线推进至前线<br>3. <b>攻击</b>——前线单位打击敌方总部/敌方单位<br>4. <b>指令</b>——打出即生效的指令卡<br>5. <b>结束回合</b>——让对手行动<br><br>现在继续这场对战，摧毁敌方总部来获胜吧！',hl:'#arena',pos:'center',autoNext:false,btn:'开始战斗'},
+    {id:'hand1',title:'指挥点与指挥点槽',text:'总部下方的 <b>⚡ 左边数字</b> 是当前<b>指挥点</b>，<b>右边数字</b>是<b>指挥点槽</b>。<br><br><b>指挥点</b>是消耗性资源，用于支付卡牌、移动、攻击的费用。每回合重置，未用完<b>不保留</b>。<br><br><b>指挥点槽</b>随回合自然增长，决定每回合的指挥点上限。<br><br>（部署动员兵的操作将在下方讲解结束后进行）',hl:'#playerInfo',pos:'bottom',autoNext:false,btn:'继续'},
+    {id:'hqUI1',title:'📊 总部下方的其他UI',text:'再认识总部<b>下方</b>区域的各个UI：<br><br>🃏 <b>手牌区</b>：你手中的卡牌都会显示在这里<br>🔢 <b>回合状态栏</b>：显示当前回合/阶段<br>📜 <b>战斗日志</b>：记录所有攻防与事件<br>⏩ <b>结束回合按钮</b>：操作完成后点它交给对手<br><br><span class="tut-action">点击 "继续" 了解总部状态栏。</span>',hl:'#handZone',pos:'bottom',autoNext:false,btn:'继续'},
+    {id:'hqUI2',title:'🏷️ 总部状态栏详解',text:'总部卡牌内部，除了<b>生命值❤</b>还有这些统计：<br><br>⚡ <b>指挥点</b>：当前可用/最大上限（消耗资源）<br>👁 <b>手牌数</b>：你手上还剩多少卡牌<br>🂮 <b>牌库</b>：牌库还剩多少张可抽（每回合抽1）<br>☠ <b>疲劳</b>：牌库抽空后每次抽牌受到的递增伤害<br><br><span class="tut-action">点击 "继续" 去部署动员兵。</span>',hl:'#playerInfo',pos:'bottom',autoNext:false,btn:'继续'},
+    {id:'deployGuide',title:'🃏 部署动员兵',text:'<span class="tut-action">现在拖动手牌中的 <em>动员兵</em>（1费 3/1 步兵）来<b>部署</b>他。</span><br><br>部署后它就会出现在你方<b>支援阵线</b>上。',hl:'#handZone',pos:'top',autoNext:false,waitFor:'deployCard',waitCard:'动员兵'},
+    {id:'deploySide',title:'部署位置',text:'<span class="tut-action">拖拽动员兵后，选择<b>左边或右边的支援阵线</b>放置它。</span><br><br>支援阵线最多放 <b>4</b> 个单位，前线最多 <b>5</b> 个。',hl:'#plSupportL,#plSupportR',pos:'top',autoNext:false,waitFor:'deployComplete'},
+    {id:'afterDeploy',title:'部署成功！🪖 步兵单位',text:'动员兵已部署，花费 1 指挥点。<br><br><b>3/1</b> = 3攻击力 / 1生命值。<br><em>亡计</em>：死亡时对随机敌方单位造成2点伤害。<br><br><b>步兵部署后本回合无法行动</b>：<br>单位部署当回合不能移动或攻击（闪击除外）。<br><br><span class="tut-action">现在点击 <b>"结束回合"</b>，下回合再行动。</span>',hl:'#btnEndPlay',pos:'left',autoNext:false,waitFor:'endTurn',btn:false},
+    {id:'cardUI1',title:'🃏 卡牌上的基本元素',text:'动员兵已部署成功！顺便认识<b>卡牌上</b>的UI：<br><br>🔝 <b>左上角</b>：<b>部署花费</b>——打出需消耗的指挥点，兵种图标<br>🔝 <b>右上角</b>：<b>行动花费——移动或攻击需消耗的指挥点</b><br>⬜ <b>中部</b>：名称 + 插画 + 兵种<br>⬇ <b>下方</b>：<b>攻击力 / 生命值，单位特殊效果</b>（如 3/1）<br><br><span class="tut-action">点击 "继续" 了解效果文字。</span>',hl:'#plSupportL,#plSupportR',pos:'top',autoNext:false,btn:'继续'},
+    {id:'cardUI2',title:'🏷️ 卡牌效果文字',text:'卡牌下方是<b>效果/关键字</b>描述区：<br><br>• <b>关键字</b>（闪击/守护/重甲/亡计…）用高亮标签标出<br>• 下方是效果说明文字（如动员兵的 <em>亡计</em>）<br>• 所有关键字在后续教程会逐一实战演示<br><br>现在基础UI已介绍完毕。<br><span class="tut-action">点击 "继续" 推进动员兵上前线。</span>',hl:'#plSupportL,#plSupportR',pos:'top',autoNext:false,btn:'继续'},
+    {id:'pushInfantry',title:'➡ 推进动员兵至前线',text:'新回合！动员兵可以行动了。<br><br><span class="tut-action">现在<b>将动员兵推进到前线 FL</b>！</span><br><span class="tut-action">点击动员兵卡牌，<b>拖拽到前线区域</b>。</span>（消耗 1 指挥点）<br><br>⚠ <b>🪖 步兵移动限制</b>：<br>非坦克单位<b>移动和攻击只能二选一</b>！<br>推线后本回合不能再攻击。<br><br>所以步兵推线前要想清楚——<br>是要移动占位，还是留在原地攻击？',hl:'#frontline',pos:'top',autoNext:false,waitFor:'pushComplete'},
+    {id:'endTurnAfterPush',title:'⏳ 结束回合',text:'动员兵已推进到前线！<br><br>⚠ 推线后本回合不能再攻击：<br>非坦克单位移动和攻击<b>只能二选一</b>。<br><br><span class="tut-action">点击 <b>"结束回合"</b>，下回合攻击敌方总部。</span>',hl:'#btnEndPlay',pos:'left',autoNext:false,waitFor:'endTurn',btn:false},
+    {id:'attackHQ',title:'⚔ 攻击敌方总部（无反击）',text:'动员兵已在前线就位！<br><br><span class="tut-action">现在<b>点击前线的动员兵</b>选中它，<br>然后<b>点击敌方总部</b>进行攻击。</span><br><br>🛡 <b>重要：攻击敌方总部不会受到反击伤害！</b><br>总部没有攻击力，攻击它很安全。<br><br>攻击消耗 1 指挥点，造成 <b>3 点伤害</b>。',hl:'#enemyInfo',pos:'bottom',autoNext:false,waitFor:'attack'},
+
+    {id:'endTurn2',title:'⏳ 再次结束回合',text:'已了解反击机制！<br><br><span class="tut-action">现在点击 <b>“结束回合”</b>，让敌军行动。<br>下一回合用动员兵攻击敌方单位试试！</span>',hl:'#btnEndPlay',pos:'left',autoNext:false,waitFor:'endTurn',btn:false},
+    {id:'attackEnemy',title:'⚔ 用动员兵攻击敌方单位',text:'新回合！动员兵已在前线。<br><br><span class="tut-action">点击<b>动员兵</b>选中它，<br>再点击<b>敌方单位</b>进行攻击！</span><br><br>⚠ 注意：<b>步兵（1血）攻击敌方单位</b>，<br>会受到反击伤害而阵亡！<br>这就是为什么步兵应优先攻击总部。',hl:'#frontline',pos:'top',autoNext:false,waitFor:'attack'},
+    {id:'counterExplain',title:'🛡 反击伤害 + 兵种对比',text:'<b>⚔ 反击伤害规则：</b><br>用单位攻击<b>敌方单位</b>时，<br>对方会用其<b>攻击力</b>反击你的单位！<br><br>例：3攻1血步兵 → 打敌方2攻单位 →<br>造成3伤，但<b>同时受2点反击</b>→ 1血阵亡！<br><br><b>📋 兵种反击一览：</b><br>🪖 <b>步兵</b>：正常受反击（高攻低血，慎攻单位）<br>🔧 <b>坦克</b>：正常受反击（血量高，可承受反击）<br>💣 <b>炮兵</b>：<em>不受反击</em>（远程打击）<br>✈ <b>轰炸机</b>：<em>不受反击</em>（可被战斗机反击）<br>✈ <b>战斗机</b>：正常受反击',hl:'#arena',pos:'center',autoNext:false,btn:'继续'},
+    {id:'turn2',title:'部署坦克 T-34/76',text:'敌方单位已在<b>支援阵线</b>守备。<br>你的指挥点已恢复并增长。<br><br><span class="tut-action">现在<b>拖拽手牌中的 <em>T-34/76</em></b>（5费 4/4 坦克）来部署它。</span><br><br>🔧 <b>坦克特点</b>：血量较高，可承受反击伤害。<br><em>闪击</em>——部署后可<b>立即行动</b>！',hl:'#handZone',pos:'top',autoNext:false,waitFor:'deployCard',waitCard:'T-34/76'},
+    {id:'deployT34',title:'部署 T-34/76',text:'<span class="tut-action">将 T-34/76 部署到支援阵线。</span><br><br>因拥有 <em>闪击</em>，部署后即可行动！<br>（普通单位需等下回合才能行动）',hl:'#plSupportL,#plSupportR',pos:'top',autoNext:false,waitFor:'deployComplete'},
+    {id:'pushT34',title:'➡ 推进 T-34 至前线',text:'T-34/76 已部署。<br><br><span class="tut-action">现在<b>将其推进到前线 FL</b>：</span><br><span class="tut-action">点击 T-34 卡牌，拖拽到前线区域。</span><br><br>⚡ 推进消耗 1 指挥点。<br>坦克移动后仍可攻击！',hl:'#frontline',pos:'top',autoNext:false,waitFor:'pushComplete'},
+    {id:'attackUnit',title:'⚔ 攻击敌方单位——观察反击！',text:'T-34/76 已在前线！敌方单位在<b>支援阵线</b>守备。<br><br><span class="tut-action">现在<b>点击 T-34/76</b> 选中它，<br>然后<b>点击敌方单位</b>进行攻击！</span><br><br>⚠ <b>注意观察战斗日志的“↩反击”！</b><br>T-34（4攻4血）打敌方2攻单位：<br>→ 造成 4 伤，受到 2 点反击 → 还剩 2 血<br><br>🔧 坦克血量高，可承受反击；<br>动员兵（1血）攻击单位则直接阵亡！',hl:'#frontline',pos:'top',autoNext:false,waitFor:'attack'},
+    {id:'endTurn3',title:'⏳ 再结束回合',text:'观察战斗日志：T-34 对敌方单位造成伤害，<br>同时受到了<b>反击伤害</b>（↩反击 -N HP）。<br><br><b>📋 反击机制总结：</b><br>• 攻击敌方单位 → 受反击（对方攻击力=反击伤害）<br>• 攻击敌方总部 → <em>无反击</em><br>• 💣炮兵 / ✈轰炸机 → <em>不受反击</em><br>• 高血量单位（坦克）→ 适合攻击敌方单位<br>• 低血量单位（步兵）→ 优先攻击总部<br><br><span class="tut-action">现在点击 <b>“结束回合”</b>。</span>',hl:'#btnEndPlay',pos:'left',autoNext:false,waitFor:'endTurn',btn:false},
+    {id:'turn3',title:'指令牌',text:'你的回合又开始了。<br><br><b>指令牌</b>从手牌使用后立刻触发一次性效果。<br>左上角为打出花费。<br><br><span class="tut-action"><b>拖动指令牌 <em>冬季攻势</em></b>（1费）来使用它。</span>',hl:'#handZone',pos:'top',autoNext:false,waitFor:'deployCard',waitCard:'冬季攻势'},
+    {id:'orderResult',title:'冬季攻势效果',blockEndTurn:true,text:'指令牌立即生效——全场目标（双方总部+双方单位）各受到<b>1 点伤害</b>。<br><br>苏联的代价体系就是“以血换场”：不惜一切代价。<br><br>战斗继续——尝试用你的单位消灭敌方总部吧！',hl:'#arena',pos:'center',autoNext:false,btn:false},
+    
+    // === 五大兵种攻击范围 ===
+    {id:'phase_range_setup',setupId:'phase_ranges',blockEndTurn:true,title:'🎯 五大兵种 · 攻击范围',text:'战场上已部署了五大兵种的单位。<br><br>不同兵种的<b>攻击范围（可攻击的目标）</b>各不相同。<br><br><span class="tut-action">接下来逐一选中每种单位，观察其攻击范围。</span>',hl:'#arena',pos:'center',autoNext:false,btn:'查看步兵/坦克'},
+    {id:'range_ground',title:'🪖/🔧 步兵/坦克攻击范围',text:'<span class="tut-action"><b>点击前线的步兵或坦克</b>选中它。</span><br><br>前线地面单位可以攻击：<br>✅ 敌方前线单位<br>✅ 敌方支援阵线单位<br>✅ 敌方总部<br><br>⚠ 受<b>守护</b>影响：有守护单位保护的目标无法直接攻击。',hl:'#frontline',pos:'top',autoNext:false,waitFor:'selectUnit',waitType:'ground'},
+    {id:'range_artillery',title:'💣 炮兵攻击范围',text:'<span class="tut-action"><b>点击支援阵线的炮兵</b>选中它。</span><br><br>炮兵可以攻击：<br>✅ 敌方所有阵线 + 总部<br>✅ <b>无视守护</b>（不受守护影响）<br>✅ <b>不受反击</b>（远程攻击安全输出）<br><br>⚡ 炮兵是远程打击之王！',hl:'#plSupportL,#plSupportR',pos:'top',autoNext:false,waitFor:'selectUnit',waitType:'A'},
+    {id:'range_fighter',title:'✈ 战斗机攻击范围',text:'<span class="tut-action"><b>点击战斗机</b>选中它。</span><br><br>战斗机可以攻击：<br>✅ 敌方所有阵线 + 总部<br>⚠ 受<b>守护</b>影响<br> <b>拦截轰炸机</b>：敌方轰炸机攻击时，若同战线有己方战斗机，轰炸机必须先攻击战斗机！',hl:'#arena',pos:'top',autoNext:false,waitFor:'selectUnit',waitType:'F'},
+    {id:'range_bomber',title:'💣✈ 轰炸机攻击范围',text:'<span class="tut-action"><b>点击轰炸机</b>选中它。</span><br><br>轰炸机可以攻击：<br>✅ 敌方所有阵线 + 总部<br>✅ <b>无视守护</b><br>✅ <b>不受反击</b>（除非目标为战斗机）<br>⚠ <b>被拦截规则</b>：若敌方同战线有战斗机，轰炸机<b>必须先攻击战斗机</b>！<br><br> 轰炸机是强力突防单位，但怕战斗机拦截！',hl:'#arena',pos:'top',autoNext:false,waitFor:'selectUnit',waitType:'O'},
+    {id:'range_summary',title:'📊 攻击范围总结',blockEndTurn:true,text:'<table style="font-size:.8rem;text-align:center;width:100%;border-collapse:collapse"><tr style="background:#333"><th>兵种</th><th>攻击范围</th><th>无视守护</th><th>受反击</th></tr><tr><td>🪖 步兵</td><td>前线/支援/总部</td><td>❌</td><td>✅</td></tr><tr><td>🔧 坦克</td><td>前线/支援/总部</td><td>❌</td><td>✅</td></tr><tr><td>💣 炮兵</td><td>全线</td><td>✅</td><td>❌</td></tr><tr><td>✈ 战斗机</td><td>全线</td><td>❌</td><td>✅</td></tr><tr><td>✈ 轰炸机</td><td>全线</td><td>✅</td><td>❌*</td></tr></table><br>*轰炸机被战斗机攻击时受反击。战斗机对轰炸机有拦截效果。',hl:'#arena',pos:'center',autoNext:false,btn:'下一章：守护'},
+    // === 守护机制 ===
+    {id:'phase_guard_setup',setupId:'phase_guard',blockEndTurn:true,title:'🛡 守护机制',text:'敌方已部署<b>守护单位</b>。<br><br><b>守护单位</b>：保护<b>相邻</b>的非守护友方单位。<br>攻击被守护的目标时，<b>必须先消灭守护单位</b>。<br><br><span class="tut-action">现在用你的单位攻击敌方：尝试攻击被守护的目标，<br>你会发现<b>只能选择守护单位</b>！</span>',hl:'#frontline',pos:'top',autoNext:false,btn:'开始'},
+    {id:'guard_attack',title:'🛡 攻击被守护目标',text:'<span class="tut-action"><b>选中你的步兵/坦克</b>，<br>然后点击敌方被守护的单位。</span><br><br>你会发现只能攻击到<b>守护单位本身</b>！<br>被守护的目标呈灰色不可选。',hl:'#frontline',pos:'top',autoNext:false,waitFor:'attack'},
+    {id:'guard_bypass',title:'💣 无视守护',text:'<b>炮兵和轰炸机</b>可以<b>无视守护</b>直接攻击任何目标！<br><br><span class="tut-action">现在用你的<b>炮兵或轰炸机</b>直接攻击<br>敌方<b>被守护的后排单位</b>试试！</span>',hl:'#plSupportL,#plSupportR',pos:'top',autoNext:false,waitFor:'attack'},
+    {id:'guard_summary',title:'📊 守护总结',blockEndTurn:true,text:'<b>守护机制要点：</b><br><br>1. 守护单位保护<b>相邻</b>的非守护单位<br>2. 被守护的目标<b>不可直接攻击</b><br>3. 必须先消灭守护单位<br>4. 💣 炮兵 / ✈ 轰炸机<b>无视守护</b><br>5. ✈ 战斗机<b>受守护影响</b><br><br>守护是布阵的核心策略！',hl:'#arena',pos:'center',autoNext:false,btn:'下一章：重甲'},
+    // === 重甲 ===
+    {id:'phase_armor_setup',setupId:'phase_armor',blockEndTurn:true,title:'🛡 重甲（Armor）',text:'IS-2 拥有 <b>重甲 2</b>。<br><br>重甲：数字表示<b>减免的伤害量</b>。<br>例：重甲2 → 每次受伤减少2点伤害。<br><br><span class="tut-action">用 IS-2 攻击敌方单位，观察<b>反击伤害被重甲减免</b>！</span>',hl:'#frontline',pos:'top',autoNext:false,btn:'攻击试试'},
+    {id:'kw_armor',title:'🛡 重甲实战',text:'<span class="tut-action"><b>选中 IS-2</b>，攻击敌方前线单位。</span><br><br>观察战斗日志：敌方反击伤害被<b>重甲2减免</b>！<br><br>⚠ 注意：炮兵/轰炸机和指令伤害<b>无视重甲</b>。<br>重甲只对<b>单位攻击的反击伤害</b>生效。<br><br>💡 重甲让高血量坦克成为不破铁壁。',hl:'#frontline',pos:'top',autoNext:false,waitFor:'attack'},
+    // === 奋战 ===
+    {id:'phase_fury_setup',setupId:'phase_fury',blockEndTurn:true,title:'⚔ 奋战（Fury）',text:'La-7 拥有 <b>奋战</b>关键词。<br><br>奋战：每回合可以<b>攻击两次</b>！<br>普通单位每回合只能攻击一次。<br><br><span class="tut-action">用 La-7 攻击敌方单位后再看——<br>它仍被高亮，还能再攻击一次！</span>',hl:'#frontline',pos:'top',autoNext:false,btn:'攻击试试'},
+    {id:'kw_fury',title:'⚔ 奋战实战',text:'<span class="tut-action"><b>选中 La-7</b>，攻击敌方前线单位。</span><br><br>攻击完成后，观察 La-7 仍可攻击！<br>再次攻击另一个目标。<br><br>💡 奋战=每回合双倍输出，强力终结技。',hl:'#frontline',pos:'top',autoNext:false,waitFor:'attack'},
+    // === 冲击 ===
+    {id:'phase_charge_setup',setupId:'phase_charge',blockEndTurn:true,title:'💥 冲击（Charge）',text:'IS-3 拥有 <b>冲击</b>关键词。<br><br>冲击：攻击<b>生命值高于自己</b>的目标时，<br>攻击力获得额外加成。<br><br><span class="tut-action">用 IS-3 攻击敌方高血量目标试试！</span>',hl:'#frontline',pos:'top',autoNext:false,btn:'攻击试试'},
+    {id:'kw_charge',title:'💥 冲击实战',text:'<span class="tut-action"><b>选中 IS-3</b>，攻击敌方高血量单位。</span><br><br>观察攻击力提升！<br><br>💡 冲击克制高血量单位，<br>是小打大的核心手段。',hl:'#frontline',pos:'top',autoNext:false,waitFor:'attack'},
+    // === 伏击 ===
+    {id:'phase_ambush_setup',setupId:'phase_ambush',blockEndTurn:true,title:'🎯 伏击（Ambush）',text:'敌方 88mmFlak 拥有 <b>伏击</b>关键词。<br><br>伏击：被攻击时，<b>先于攻击者造成伤害</b>！<br>每回合首次被攻击时触发。<br><br><span class="tut-action">用你的单位攻击敌方 88mmFlak，<br>观察<b>你反而先受到伤害</b>！</span>',hl:'#frontline',pos:'top',autoNext:false,btn:'攻击试试'},
+    {id:'kw_ambush',title:'🎯 伏击实战',text:'<span class="tut-action"><b>选中你的单位</b>，攻击敌方 88mmFlak。</span><br><br>观察：攻击前先受到<b>伏击伤害（↯伏击 -N HP）</b>！<br><br>💡 应对伏击：<br>• 用炮兵（不受反击，伏击也无效）远程打击<br>• 用高血量单位硬扛<br>• 用指令牌直接消灭',hl:'#frontline',pos:'top',autoNext:false,waitFor:'attack'},
+    // === 压制 ===
+    {id:'phase_suppress_setup',setupId:'phase_suppress',title:'🔒 压制（Suppression/Pin）',text:'你的手牌中有 <b>狙击小组</b>（部署：压制+降攻）。<br><br><b>压制</b>：使一个单位<b>本回合无法行动</b>。<br>被压制的单位会被灰色标记。<br><br><span class="tut-action"><b>拖拽狙击小组</b>部署它，<br>选择敌方前线单位进行压制！</span>',hl:'#handZone',pos:'top',autoNext:false,waitFor:'deployCard',waitCard:'狙击小组'},
+    {id:'kw_suppress',title:'🔒 压制实战',text:'<span class="tut-action">选择敌方单位进行压制。</span><br><br>部署后观察：<br>• 敌方单位出现 🔒 标记<br>• 该单位本回合<b>无法移动和攻击</b><br><br>💡 压制是防守利器：<br>压制敌方高攻单位，安全渡过一回合。<br>压制效果持续到<b>你的下回合开始</b>。',hl:'#plSupportL,#plSupportR',pos:'top',autoNext:false,waitFor:'deployComplete'},
+    // === 词条总结 ===
+    {id:'kw_summary',title:'📋 全部关键词总结',blockEndTurn:true,text:'<b>KARDS 关键词一览：</b><br><br>1. ⚡ <b>闪击</b>：部署当回合即可行动<br>2. 🛡 <b>守护</b>：保护相邻友方单位<br>3. 🛡 <b>重甲</b>：减免受到的伤害<br>4. ⚔ <b>奋战</b>：每回合可攻击两次<br>5. 💥 <b>冲击</b>：对高血量目标增伤<br>6. 🎯 <b>伏击</b>：被攻击时先造成伤害<br>7. 🔒 <b>压制</b>：使单位一回合无法行动<br>8. 💀 <b>亡计</b>：被摧毁时触发效果<br>9. 🌫 <b>烟幕</b>：部署后不可被攻击<br><br>掌握这些关键词，你就能驾驭战场！',hl:'#arena',pos:'center',autoNext:false,btn:'完成教程'},
+    {id:'done',title:'教程结束！',blockEndTurn:true,text:'你已经掌握了 KARDS 的核心机制：<br><br>1. <b>部署</b>——打出单位占领阵线<br>2. <b>推线</b>——将单位推进至前线<br>3. <b>攻击总部</b>——安全输出，无反击<br>4. <b>攻击单位</b>——需承受反击伤害<br>5. <b>兵种差异</b>——步兵炮灰 / 坦克肉盾 / 炮兵无反击<br>6. <b>指令牌</b>——打出即生效<br><br>现在继续这场对战，摧毁敌方总部来获胜吧！',hl:'#arena',pos:'center',autoNext:false,btn:'开始战斗'},
   ],
 
+  // 教程模块板面设置：每个模块独立配置单位布局
+  _setups:{
+    _clearBoard:function(){
+      GAME.player.support=[]; GAME.player.fl=[];
+      GAME.enemy.support=[]; GAME.enemy.fl=[];
+    },
+    // 阶段1：五大兵种攻击范围
+    phase_ranges:function(){
+      this._clearBoard();
+      GAME.player.cmd=10;GAME.player.maxCmd=10;
+      GAME.enemy.cmd=5;GAME.enemy.maxCmd=5;
+      var pc1=new Card(["动员兵","MobInf","S","I",3,1,1,1,0,"","",""]);
+      pc1.owner=GAME.player;pc1.zone='frontline';GAME.player.fl.push(pc1);
+      var pc2=new Card(["T-34/76","T3476","S","T",4,4,5,1,0,"B","\u95ea\u51fb\u3002",""]);
+      pc2.owner=GAME.player;pc2.zone='frontline';GAME.player.fl.push(pc2);
+      var pc3=new Card(["KV-2 \u91cd\u578b\u69b4\u5f39\u70ae","KV2","S","A",3,1,3,0,3,"","",""]);
+      pc3.owner=GAME.player;pc3.zone='support';pc3.supSide='R';GAME.player.support.push(pc3);
+      var pc4=new Card(["LaGG-3","LaGG3","S","F",3,3,3,0,2,"","",""]);
+      pc4.owner=GAME.player;pc4.zone='frontline';GAME.player.fl.push(pc4);
+      var pc5=new Card(["Pe-2","Pe2","S","O",2,2,3,0,2,"","\u90e8\u7f72\uff1a\u62bd\u4e00\u5f20\u724c\u3002","draw1"]);
+      pc5.owner=GAME.player;pc5.zone='support';pc5.supSide='L';GAME.player.support.push(pc5);
+      var ec1=new Card(["\u56fd\u6c11\u63b7\u5f39\u5175","Vg1","D","I",2,2,1,1,0,"","\u90e8\u7f72\uff1a\u62bd\u4e00\u5f20\u724c\u3002","draw1"]);
+      ec1.owner=GAME.enemy;ec1.zone='frontline';GAME.enemy.fl.push(ec1);
+      var ec2=new Card(["\u4e09\u53f7\u5766\u514b","Pz3","D","T",2,2,2,1,0,"B","\u95ea\u51fb\u3002",""]);
+      ec2.owner=GAME.enemy;ec2.zone='frontline';GAME.enemy.fl.push(ec2);
+      GAME.render();
+    },
+    // 阶段2：守护机制
+    phase_guard:function(){
+      this._clearBoard();
+      var pc1=new Card(["动员兵","MobInf","S","I",3,1,1,1,0,"","",""]);
+      pc1.owner=GAME.player;pc1.zone='frontline';GAME.player.fl.push(pc1);
+      var pc2=new Card(["T-34/76","T3476","S","T",4,4,5,1,0,"B","\u95ea\u51fb\u3002",""]);
+      pc2.owner=GAME.player;pc2.zone='frontline';GAME.player.fl.push(pc2);
+      var pc3=new Card(["KV-2 \u91cd\u578b\u69b4\u5f39\u70ae","KV2","S","A",3,1,3,0,3,"","",""]);
+      pc3.owner=GAME.player;pc3.zone='support';pc3.supSide='R';GAME.player.support.push(pc3);
+      var eg=new Card(["\u56fd\u6c11\u63b7\u5f39\u5175","VgG","D","I",2,2,1,1,0,"G","\u5b88\u62a4\u3002",""]);
+      eg.owner=GAME.enemy;eg.zone='frontline';GAME.enemy.fl.push(eg);
+      var ep=new Card(["\u88c5\u7532\u63b7\u5f39\u5175","PzGr","D","I",3,3,3,1,0,"","",""]);
+      ep.owner=GAME.enemy;ep.zone='frontline';GAME.enemy.fl.push(ep);
+      var es=new Card(["\u70ae\u5175\u89c2\u6d4b\u5458","ArtyObs","D","A",1,1,2,0,2,"","",""]);
+      es.owner=GAME.enemy;es.zone='support';es.supSide='L';GAME.enemy.support.push(es);
+      GAME.player.cmd=8;GAME.player.maxCmd=8;
+      GAME.enemy.cmd=0;GAME.enemy.maxCmd=0;
+      GAME.render();
+    },
+    // 阶段3：重甲
+    phase_armor:function(){
+      this._clearBoard();
+      var is2=new Card(["IS-2","IS2","S","T",5,5,6,1,2,"B H","\u95ea\u51fb\u3002\u91cd\u75322\u3002",""]);
+      is2.owner=GAME.player;is2.zone='frontline';GAME.player.fl.push(is2);
+      var pz4=new Card(["\u56db\u53f7\u5766\u514b","Pz4","D","T",3,4,3,1,0,"","",""]);
+      pz4.owner=GAME.enemy;pz4.zone='frontline';GAME.enemy.fl.push(pz4);
+      GAME.player.cmd=8;GAME.player.maxCmd=8;
+      GAME.enemy.cmd=0;GAME.enemy.maxCmd=0;
+      GAME.render();
+    },
+    // 阶段4：奋战
+    phase_fury:function(){
+      this._clearBoard();
+      var la7=new Card(["La-7","La7","S","F",4,4,5,0,2,"F","\u5f3c\u6218\u3002\u6bcf\u56de\u5408\u53ef\u653b\u51fb\u4e24\u6b21\u3002",""]);
+      la7.owner=GAME.player;la7.zone='frontline';GAME.player.fl.push(la7);
+      var bf109=new Card(["Bf 109","Bf109","D","F",3,4,4,0,2,"","",""]);
+      bf109.owner=GAME.enemy;bf109.zone='frontline';GAME.enemy.fl.push(bf109);
+      var he111=new Card(["He 111","He111","D","O",3,3,4,0,2,"","",""]);
+      he111.owner=GAME.enemy;he111.zone='frontline';GAME.enemy.fl.push(he111);
+      GAME.player.cmd=8;GAME.player.maxCmd=8;
+      GAME.enemy.cmd=0;GAME.enemy.maxCmd=0;
+      GAME.render();
+    },
+    // 阶段5：冲击
+    phase_charge:function(){
+      this._clearBoard();
+      var is3=new Card(["IS-3","IS3","S","T",7,7,8,1,0,"C","\u51b2\u51fb\u3002\u653b\u51fb\u751f\u547d\u503c\u9ad8\u4e8e\u81ea\u5df1\u7684\u76ee\u6807\u65f6+3\u653b\u3002",""]);
+      is3.owner=GAME.player;is3.zone='frontline';GAME.player.fl.push(is3);
+      var tiger=new Card(["\u864e\u5f0f\u5766\u514b","Tiger1","D","T",8,8,7,2,2,"B H","\u95ea\u51fb\u3002\u91cd\u75322\u3002",""]);
+      tiger.owner=GAME.enemy;tiger.zone='frontline';GAME.enemy.fl.push(tiger);
+      GAME.player.cmd=8;GAME.player.maxCmd=8;
+      GAME.enemy.cmd=0;GAME.enemy.maxCmd=0;
+      GAME.render();
+    },
+    // 阶段6：伏击
+    phase_ambush:function(){
+      this._clearBoard();
+      var t34=new Card(["T-34/85","T3485","S","T",5,5,5,1,0,"","",""]);
+      t34.owner=GAME.player;t34.zone='frontline';GAME.player.fl.push(t34);
+      var kv2=new Card(["KV-2 \u91cd\u578b\u69b4\u5f39\u70ae","KV2b","S","A",3,1,3,0,3,"","",""]);
+      kv2.owner=GAME.player;kv2.zone='support';kv2.supSide='L';GAME.player.support.push(kv2);
+      var flak88=new Card(["88\u6beb\u7c73\u9ad8\u70ae","88mmFlak","D","A",4,4,5,0,2,"A","\u4f0f\u51fb\u3002\u88ab\u653b\u51fb\u65f6\u5148\u5bf9\u653b\u51fb\u8005\u9020\u6210\u4f24\u5bb3\u3002",""]);
+      flak88.owner=GAME.enemy;flak88.zone='frontline';GAME.enemy.fl.push(flak88);
+      var gren=new Card(["\u56fd\u6c11\u63b7\u5f39\u5175","Vg2","D","I",2,2,1,1,0,"","\u90e8\u7f72\uff1a\u62bd\u4e00\u5f20\u724c\u3002","draw1"]);
+      gren.owner=GAME.enemy;gren.zone='frontline';GAME.enemy.fl.push(gren);
+      GAME.player.cmd=8;GAME.player.maxCmd=8;
+      GAME.enemy.cmd=0;GAME.enemy.maxCmd=0;
+      GAME.render();
+    },
+    // 阶段7：压制
+    phase_suppress:function(){
+      this._clearBoard();
+      var t34=new Card(["T-34/76","T3476c","S","T",4,4,5,1,0,"B","\u95ea\u51fb\u3002",""]);
+      t34.owner=GAME.player;t34.zone='frontline';GAME.player.fl.push(t34);
+      var tiger=new Card(["\u864e\u5f0f\u5766\u514b","Tiger2","D","T",8,8,7,2,2,"B H","\u95ea\u51fb\u3002\u91cd\u75322\u3002",""]);
+      tiger.owner=GAME.enemy;tiger.zone='frontline';GAME.enemy.fl.push(tiger);
+      var gren=new Card(["\u56fd\u6c11\u63b7\u5f39\u5175","Vg3","D","I",2,2,1,1,0,"","\u90e8\u7f72\uff1a\u62bd\u4e00\u5f20\u724c\u3002","draw1"]);
+      gren.owner=GAME.enemy;gren.zone='frontline';GAME.enemy.fl.push(gren);
+      GAME.player.cmd=6;GAME.player.maxCmd=6;
+      GAME.enemy.cmd=0;GAME.enemy.maxCmd=0;
+      GAME.render();
+      var sniper=new Card(['\u72d9\u51fb\u5c0f\u7ec4','Sniper Team','S','I',1,2,2,1,0,'','\u90e8\u7f72\uff1a\u538b\u5236\u4e00\u4e2a\u5355\u4f4d\uff0c\u5e76\u4f7f\u5176\u653b\u51fb\u529b-2\uff08\u4e0d\u4f4e\u4e8e0\uff09\u3002','pinAtk2',3]);
+      sniper.owner=GAME.player;GAME.player.hand.push(sniper);
+    },
+  },
   start:function(){
     var self=this;
     this.active=true;this.step=0;this._hooked={};this._maxStep=0;
@@ -3713,7 +4915,7 @@ var TUT={
       var c=new Card(cards[i]);c.owner=GAME.player;GAME.player.hand.push(c);
     }
 
-    // AI教程单位：多给几张，让冬季攻势有目标可打
+    // AI教程单位：为演示反击，AI需要可部署到前线的单位
     GAME.enemy.hand=[];GAME.enemy.deck=[];
     var aiCards=[
       ['国民掷弹兵','Volksgrenadier','D','I',2,2,1,1,0,'','部署：抽一张牌。','draw1'],
@@ -3729,10 +4931,10 @@ var TUT={
     GAME.log('\u2694\uFE0F 新手教程开始！你是<b>苏军</b>（先手）','system');
     GAME.log('\uD83D\uDCDA 跟随指引学习基础操作','system');
 
-    // 使用正常指挥点起点（第1回合=1），教程流程中按需补充
+    // 教程第1回合仅部署（1费），下回合推线+攻击
     GAME.player.baseMaxCmd=1;GAME.player.cmdBonus=0;
 
-    // 给AI足够指挥点部署教程单位（为冬季攻势准备敌方目标）
+    // AI需要足够指挥点部署单位并推到前线（演示反击）
     GAME.enemy.baseMaxCmd=3;GAME.enemy.maxCmd=3;GAME.enemy.cmd=3;
 
     // 启动玩家第一回合
@@ -3740,30 +4942,18 @@ var TUT={
     GAME.phase='play';
     $('turnInfo').textContent='第1回合 · 你的回合 · 教程';
   },
-
   _showStep:function(idx){
     var s=this._all[idx];this.step=idx;this.stepData=s;
+    // 执行对应模块的板面设置
+    if(s.setupId&&this._setups&&this._setups[s.setupId]){
+      this._setups[s.setupId].call(this._setups);
+    }
     $('tut-tooltip').classList.add('show');
     $('tut-title').innerHTML=s.title;
     $('tut-body').innerHTML=s.text;
     $('tut-step-indicator').textContent='步骤 '+(idx+1)+' / '+this._all.length;
 
-    // 将提示框定位在结束回合按钮正下方（不遮挡战场中央）
-    var endBtn=$('btnEndPlay');
-    if(endBtn){
-      var r=endBtn.getBoundingClientRect();
-      var tip=$('tut-tooltip');
-      var l=r.left;
-      if(r.width>0){
-        // 防止右侧溢出屏幕
-        if(l+420>window.innerWidth-12)l=window.innerWidth-432;
-        tip.style.left=l+'px';
-        tip.style.top=(r.bottom+8)+'px';
-        tip.style.right='auto';
-        tip.style.bottom='auto';
-      }
-    }
-
+    // 提示框靠右贴边显示（定位由 CSS 控制）
     var nextBtn=$('tut-next-btn');
     var closeBtn=$('tut-close-btn');
     var prevBtn=$('tut-prev-btn');
@@ -3772,9 +4962,29 @@ var TUT={
     var alreadyVisited=idx<=this._maxStep;
     if(idx>this._maxStep)this._maxStep=idx;
     if(s.waitFor && !alreadyVisited){
-      nextBtn.style.display='inline-block';nextBtn.textContent='继续';
-      nextBtn.onclick=function(){TUT.dismiss()};
+      nextBtn.style.display='inline-block';nextBtn.textContent='等待操作...';
+      nextBtn.onclick=function(){};
       closeBtn.style.display='block';
+      // selectUnit 类型：自动高亮匹配类型的单位
+      if(s.waitFor==='selectUnit'&&s.waitType){
+        GAME.render();
+        setTimeout(function(){
+          var allUnits=GAME.player.allUnits();
+          for(var i=0;i<allUnits.length;i+=1){
+            var u=allUnits[i];
+            var match=false;
+            if(s.waitType==='ground'){match=u.isGround;}
+            else if(s.waitType==='A'){match=u.isA;}
+            else if(s.waitType==='F'){match=u.isF;}
+            else if(s.waitType==='O'){match=u.isO;}
+            else{match=u.ut===s.waitType;}
+            if(match){
+              var el=findCardEl(u);
+              if(el){el.style.animation='tut-pulse 1s ease-in-out 3';}
+            }
+          }
+        },300);
+      }
     }else if(s.btn){
       nextBtn.style.display='inline-block';nextBtn.textContent=s.btn;
       nextBtn.onclick=function(){TUT.nextStep()};
@@ -3845,13 +5055,19 @@ var TUT={
   // 检查当前教程步骤是否允许某类操作，不允许则弹出提示并返回 false
   _blockIfNot:function(actionType,hint){
     var s=this.stepData;
-    if(!s||!s.waitFor)return false; // 无 waitFor = 自由操作步骤，放行
+    if(!s||!s.waitFor){
+      if(s&&s.blockEndTurn&&actionType==='endTurn'){
+        GAME.log('\u26A0\uFE0F '+hint,'system');
+        toast('\u26A0\uFE0F '+hint);
+        return true;
+      }
+      return false; // 自由操作步骤，放行
+    }
     if(s.waitFor===actionType)return false; // 匹配当前等待的操作，放行
     GAME.log('\u26A0\uFE0F '+hint,'system');
     toast('\u26A0\uFE0F '+hint);
     return true;
   },
-
   onCardClick:function(card){
     if(!this.active)return;
     var s=this.stepData;
@@ -3885,15 +5101,35 @@ var TUT={
     setTimeout(function(){self._showStep(self.step+1)},800);
   },
 
+
+  onUnitSelect:function(unit){
+    if(!this.active)return;
+    var s=this.stepData;
+    if(!s||s.waitFor!=='selectUnit')return;
+    if(!unit||unit.owner!==GAME.player)return;
+    // 检查类型匹配
+    if(s.waitType){
+      var match=false;
+      if(s.waitType==='ground'){match=unit.isGround;}
+      else if(s.waitType==='A'){match=unit.isA;}
+      else if(s.waitType==='F'){match=unit.isF;}
+      else if(s.waitType==='O'){match=unit.isO;}
+      else{match=unit.ut===s.waitType;}
+      if(!match)return;
+    }
+    var self=this;
+    setTimeout(function(){self._showStep(self.step+1)},400);
+  },
   onEndTurn:function(){
     if(!this.active)return;
     var s=this.stepData;
     if(!s||s.waitFor!=='endTurn')return;
-    // 让AI部署一个国民掷弹兵（教程用）
     var self=this;
-    var turn2Step=3,turn3Step=9; // 教程中结束回合后切换到下个玩家回合
+    var turn2Step=12,turn3Step=19; // 教程中结束回合后切换到下个玩家回合
     setTimeout(function(){
-      // AI：部署所有付得起的单位（为冬季攻势准备目标）
+      // 补充 AI 指挥点（教程跳过 AI 回合，需手动补充）
+      GAME.enemy.cmd=GAME.enemy.maxCmd;
+      // AI：部署所有付得起的单位
       while(GAME.enemy.hand.length>0){
         var c=GAME.enemy.hand[0];
         if(c.cost>GAME.enemy.cmd)break;
@@ -3903,22 +5139,38 @@ var TUT={
         if(GAME.enemy.support.length<4){GAME.enemy.support.push(c);}
         GAME.log('AI部署了 '+c.cn,'ai');
       }
+      // 步骤13(attackEnemy)前：敌方单位仅部署在支援线
+      // （前线单位在步骤11"敌方已部署单位到前线"时才推进，供步骤18的T-34攻击）
       GAME.render();
-      if(self.step===turn2Step){ // after "结束回合" → turn2 (step 4)
+      if(self.step===6){ // afterDeploy结束回合 → 第2回合, step 4 (pushInfantry)
         GAME.turn++;GAME.phase='play';
-        self._showStep(4);
+        self._showStep(7);
         GAME._startTurn(GAME.player,false);
-        // 教程第2回合需要足够指挥点打出T-34/76(5费)+推进(1费)
-        GAME.player.cmd=Math.max(GAME.player.cmd,7);
         GAME.selected=null;GAME.pendingPush=null;GAME.pendingEffect=null;GAME.pendingOrder=null;
-        GAME.log('\u2550\u2550\u2550 第2回合 · 你的回合 \u2550\u2550\u2550','system');
+        GAME.log('\u2550\u2550\u2550 第2回合 \u00b7 你的回合 \u2550\u2550\u2550','system');
         GAME.render();
-      }else if(self.step===turn3Step){ // after "结束回合" → turn3 (step 10)
+      }else if(self.step===10){ // endTurnAfterPush结束回合 → 第3回合, step 10 (attackHQ)
         GAME.turn++;GAME.phase='play';
-        self._showStep(10);
+        self._showStep(11);
         GAME._startTurn(GAME.player,false);
         GAME.selected=null;GAME.pendingPush=null;GAME.pendingEffect=null;GAME.pendingOrder=null;
-        GAME.log('\u2550\u2550\u2550 第3回合 · 你的回合 \u2550\u2550\u2550','system');
+        GAME.log('\u2550\u2550\u2550 第3回合 \u00b7 你的回合 \u2550\u2550\u2550','system');
+        GAME.render();
+      }else if(self.step===turn2Step){ // endTurn2结束回合 → 第4回合, step 12 (attackEnemy)
+        GAME.turn++;GAME.phase='play';
+        self._showStep(13);
+        GAME._startTurn(GAME.player,false);
+        // 该回合总消耗8：动员兵攻击(1)+T-34/76部署(5)+推线(1)+攻击单位(1)
+        GAME.player.cmd=Math.max(GAME.player.cmd,8);
+        GAME.selected=null;GAME.pendingPush=null;GAME.pendingEffect=null;GAME.pendingOrder=null;
+        GAME.log('\u2550\u2550\u2550 第4回合 \u00b7 你的回合 \u2550\u2550\u2550','system');
+        GAME.render();
+      }else if(self.step===turn3Step){ // endTurn3结束回合 → 第6回合, step 19 (turn3)
+        GAME.turn++;GAME.phase='play';
+        self._showStep(20);
+        GAME._startTurn(GAME.player,false);
+        GAME.selected=null;GAME.pendingPush=null;GAME.pendingEffect=null;GAME.pendingOrder=null;
+        GAME.log('\u2550\u2550\u2550 第6回合 \u00b7 你的回合 \u2550\u2550\u2550','system');
         // 确保手里有冬季攻势
         if(!GAME.player.hand.some(function(h){return h.cn==='冬季攻势'})){
           var wo=new Card(['冬季攻势','Winter Offensive','S','X',1,'dmg1allTargets','对全体目标造成1点伤害。','always','',2]);
@@ -3928,7 +5180,6 @@ var TUT={
       }
     },500);
   },
-
   onAttack:function(){
     if(!this.active)return;
     var s=this.stepData;
@@ -3946,7 +5197,7 @@ var TUT={
       // 阻止不在结束回合步骤时结束回合
       if(!TUT._blockIfNot('endTurn','请先完成当前教程步骤，再结束回合')){
         TUT.onEndTurn();
-        if(TUT.step===3||TUT.step===9)return; // 教程接管回合结束
+        if(TUT.step===6||TUT.step===10||TUT.step===12||TUT.step===19)return; // 教程接管回合结束
       }else{
         return; // 被阻止
       }
@@ -3971,8 +5222,36 @@ var TUT={
     if(TUT.active&&TUT._blockIfNot('attack','请先完成当前教程步骤，再发起攻击')){
       return;
     }
+    // 步骤12(attackHQ)：本步只能攻击敌方总部，禁止攻击敌方单位
+    if(TUT.active&&TUT.step===11&&targetInfo&&targetInfo.card){
+      GAME.log('本教程步骤只能攻击敌方总部，请点击总部图标进行攻击！','tut');
+      return;
+    }
+    // 步骤14(attackEnemy)：本步只能攻击敌方单位，禁止攻击敌方总部
+    if(TUT.active&&TUT.step===13&&targetInfo&&!targetInfo.card){
+      GAME.log('本教程步骤只能攻击敌方单位，请点击敌方单位进行攻击！','tut');
+      return;
+    }
+    // 步骤19(attackUnit)：本步只能攻击敌方单位，禁止攻击敌方总部
+    if(TUT.active&&TUT.step===18&&targetInfo&&!targetInfo.card){
+      GAME.log('本教程步骤只能攻击敌方单位，请点击敌方单位进行攻击！','tut');
+      return;
+    }
     _origDoAttack.apply(this,arguments);
     if(TUT.active){setTimeout(function(){TUT.onAttack()},600)}
+  };
+})();
+
+// 钩子注入：拦截 onUnitClick 以检测单位选中（selectUnit教程步骤）
+(function(){
+  var _origOnUnitClick=GAME.onUnitClick;
+  GAME.onUnitClick=function(card){
+    _origOnUnitClick.apply(this,arguments);
+    if(TUT.active){
+      if(card&&card.owner===GAME.player){
+        TUT.onUnitSelect(card);
+      }
+    }
   };
 })();
 
@@ -4018,9 +5297,11 @@ var TUT={
       if(!s||s.waitFor!=='deployCard')return;
       if(GAME._dragCard&&GAME._dragCard.isOrder)return;
       var nextIdx=TUT.step+1;
-      TUT.step=nextIdx;
-      TUT.stepData=TUT._all[nextIdx];
-      TUT._showStep(nextIdx);
+      var nextStep=TUT._all[nextIdx];
+      // 只更新提示面板文字，不调用 _showStep（避免 GAME.render() 打断拖拽）
+      $('tut-title').innerHTML=nextStep.title;
+      $('tut-body').innerHTML=nextStep.text;
+      $('tut-step-indicator').textContent='步骤 '+(nextIdx+1)+' / '+TUT._all.length;
     });
   }
 })();
@@ -4111,6 +5392,7 @@ var TUT={
 
 // ==================== 启动 ====================
 GAME.newGame();
+
 </script>
 
 <!-- 词条说明按钮 -->
@@ -4229,20 +5511,55 @@ document.addEventListener('click',function(e){
   popup.querySelector('#kwp-title').textContent=kwName;
   popup.querySelector('#kwp-body').innerHTML=desc;
   // 定位：与新手教程提示框位置一致（结束回合按钮下方）
-  var endBtn=$('btnEndPlay');
-  if(endBtn){
-    var r=endBtn.getBoundingClientRect();
+  var endBtn=$("btnEndPlay");
+  var mobBtn=$("btnEndTurnMob");
+  var targetBtn=(GAME.isTouchDevice&&mobBtn)?mobBtn:(endBtn);
+  if(targetBtn){
+    var r=targetBtn.getBoundingClientRect();
+    if(r.bottom===0&&endBtn){r=endBtn.getBoundingClientRect();}
+    if(r.bottom===0){r={left:window.innerWidth/2-180,bottom:window.innerHeight-100};}
     var l=r.left;if(l+360>window.innerWidth-12)l=window.innerWidth-372;
-    popup.style.left=l+'px';popup.style.top=(r.bottom+8)+'px';
-    popup.style.right='auto';popup.style.bottom='auto';popup.style.transform='none';
+    popup.style.left=l+"px";popup.style.top=(r.bottom+8)+"px";
+    popup.style.right="auto";popup.style.bottom="auto";popup.style.transform="none";
   }else{
-    popup.style.left='50%';popup.style.top='auto';popup.style.bottom='64px';popup.style.transform='translateX(-50%)';
-    popup.style.right='auto';
+    popup.style.left="50%";popup.style.top="auto";popup.style.bottom="64px";popup.style.transform="translateX(-50%)";
+    popup.style.right="auto";
   }
   popup.classList.add('show');
   e.stopPropagation();
 });
 </script>
 
+<div id="loading-screen"><div class="loading-spinner"></div><div class="loading-text">KARDS 加载中...</div><div class="loading-bar-wrap"><div class="loading-bar-fill" id="loading-bar-fill"></div></div><div class="loading-pct" id="loading-pct">0%</div></div>
+<script>
+(function(){
+  var ls=document.getElementById("loading-screen");
+  var bar=document.getElementById("loading-bar-fill");
+  var pct=document.getElementById("loading-pct");
+  if(!ls||!bar||!pct)return;
+  var preload=Object.values(IMG_MAP);
+  var loaded=0, total=preload.length;
+  var done=function(){
+    if(ls._done)return;ls._done=1;
+    bar.style.width="100%";pct.textContent="100%";
+    setTimeout(function(){ls.classList.add("fade-out");
+      setTimeout(function(){if(ls.parentNode)ls.parentNode.removeChild(ls)},500);
+    },400);
+  };
+  if(total===0){done();return;}
+  preload.forEach(function(src){
+    var img=new Image();
+    img.onload=img.onerror=function(){
+      loaded++;
+      var p=Math.round(loaded/total*100);
+      if(bar)bar.style.width=p+"%";
+      if(pct)pct.textContent=p+"%";
+      if(loaded>=total)done();
+    };
+    img.src=src;
+  });
+  setTimeout(function(){if(!ls._done)done()},8000);
+})();
+</script>
 </body>
 </html>
