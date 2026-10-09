@@ -1785,6 +1785,7 @@ function Card(d){
     this.condMsg=d[8]||'';
   }else{
     this.atk=d[4];this.hp=d[5];this.maxHp=d[5];
+    this.baseAtk=d[4];this.baseHp=d[5];
     this.cost=d[6];
     this.acost=d[7]!=null?d[7]:1;
     this.armor=d[8]||0;
@@ -1838,6 +1839,7 @@ Card.prototype={
   get hasS(){return this.kw.indexOf('S')>=0},
   get hasFr(){return this.kw.indexOf('F')>=0},
   get hasC(){return this.kw.indexOf('C')>=0},
+  resetToBase:function(){if(this.isUnit&&this.baseAtk!=null){this.atk=this.baseAtk;this.hp=this.baseHp;this.maxHp=this.baseHp;this.tmpAtk=0;this.tmpAcost=0;this.mobAtk=0;this.mobHp=0;this.mobilized=false;}},
   // ===== 统一行动点模型 =====
   // 基础行动点：坦克2（同回合可移动+攻击），其他兵种1（移动或攻击二选一）
   baseAP:function(){return this.isT?2:1},
@@ -2237,9 +2239,9 @@ var GAME={
         GAME.log('\uD83D\uDCA3 \u9632\u7A7A\u706B\u529B\u2192\u654C\u65B9\u7A7A\u519B2\u4F24','effect');break;
       case'retreatAll':
         var oppSupport=opp.support.slice();opp.support=[];
-        oppSupport.forEach(function(x){x.zone='hand';x.hp=x.maxHp;opp.hand.push(x);});
+        oppSupport.forEach(function(x){x.zone='hand';x.resetToBase();opp.hand.push(x);});
         var oppFl=opp.fl.slice();opp.fl=[];
-        oppFl.forEach(function(x){x.hp=x.maxHp;x.zone='support';if(opp.support.length<4){opp.support.push(x);}else{x.zone='hand';opp.hand.push(x);}});
+        oppFl.forEach(function(x){x.hp=x.maxHp;x.zone='support';if(opp.support.length<4){opp.support.push(x);}else{x.zone='hand';x.resetToBase();opp.hand.push(x);}});
         GAME.log('\u23F3 拖延战术\u2192敌方全体撤退','effect');break;
       case'radarAlert':
         if(who.support.length<4){var hg=new Card(['本土防卫军','Home Guard','B','I',1,3,1,1,0,'G','守护。亡计：为总部回复2点生命值。','dr_heal2',4]);hg.owner=who;hg.zone='support';hg.justDeployed=true;if(!hg.canActOnDeploy){hg.canAct=false;hg.apSpent=99}var enemyCount=opp.allUnits().filter(function(x){return x.hp>0}).length;if(enemyCount>0){hg.hp+=enemyCount;hg.maxHp+=enemyCount}who.support.push(hg);GAME.log('\uD83D\uDD0D 雷达警报\u2192加入本土防卫军'+(enemyCount>0?'+'+enemyCount+'血':''),'effect')}
@@ -2834,7 +2836,7 @@ var GAME={
       case'bounceEnemyGround':
         target.owner.support=target.owner.support.filter(function(x){return x!==target});
         target.owner.fl=target.owner.fl.filter(function(x){return x!==target});
-        target.zone='hand';target.justDeployed=false;target.pinned=false;target.canAct=true;target.apSpent=0;target.attacksThisTurn=0;target.hasActedThisTurn=false;
+        target.zone='hand';target.justDeployed=false;target.pinned=false;target.canAct=true;target.apSpent=0;target.attacksThisTurn=0;target.hasActedThisTurn=false;target.resetToBase();
         target.owner.hand.push(target);
         GAME.log('\uD83C\uDFAF '+target.cn+' 返回敌方手牌','effect');break;
       case'killAir':target.hp=0;_chainDmgFX(srcEl,[{card:target,isHq:false,dmg:99}]);GAME.log('\uD83C\uDFAF 消灭敌方空军'+target.cn,'effect');break;
@@ -3507,6 +3509,7 @@ var GAME={
       GAME.log('\u26D4 '+card.cn+' 被反制指令取消！部署效果不触发','effect');
       pl.support=pl.support.filter(function(x){return x!==card});
       card.zone='hand';card.justDeployed=false;card.owner=null;card.supSide=null;
+      card.resetToBase();
       pl.hand.push(card);
     }else{
       if(!card.joinedNotDeployed){
@@ -3973,7 +3976,7 @@ var GAME={
       if(countered){
         GAME.log('\u26D4 '+c.cn+' 被反制！','effect');
         en.support=en.support.filter(function(x){return x!==c});
-        c.zone='hand';c.justDeployed=false;c.owner=null;en.hand.push(c);
+        c.zone='hand';c.justDeployed=false;c.owner=null;c.resetToBase();en.hand.push(c);
       }else{
         if(!c.joinedNotDeployed){
           setTimeout(function(){playDeployFX(c,aiHeavy)},aiAnimDur);
