@@ -5561,7 +5561,6 @@ document.addEventListener('click',function(e){
   var done=function(){
     if(ls._done)return;ls._done=1;
     bar.style.width="100%";pct.textContent="100%";
-    setTimeout(warmCards,0);
     setTimeout(function(){ls.classList.add("fade-out");
       setTimeout(function(){if(ls.parentNode)ls.parentNode.removeChild(ls)},500);
     },400);
@@ -5579,6 +5578,7 @@ document.addEventListener('click',function(e){
     img.src=src;
   });
   setTimeout(function(){if(!ls._done)done()},2500);
+  setTimeout(warmCards,0);
 })();
 </script>
 </body>
