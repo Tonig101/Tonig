@@ -5537,7 +5537,7 @@ document.addEventListener('click',function(e){
   var bar=document.getElementById("loading-bar-fill");
   var pct=document.getElementById("loading-pct");
   if(!ls||!bar||!pct)return;
-  var preload=Object.values(IMG_MAP);
+  var preload=['images/UI/守护.png','images/UI/闪击.png','images/UI/重甲1.png','images/UI/重甲2.png','images/UI/重甲3.png','images/UI/伏击.png','images/UI/烟幕.png','images/UI/奋战.jpg','images/UI/冲击.png','images/UI/压制.png','images/UI/被守护.png'];
   var loaded=0, total=preload.length;
   var done=function(){
     if(ls._done)return;ls._done=1;
@@ -5558,7 +5558,7 @@ document.addEventListener('click',function(e){
     };
     img.src=src;
   });
-  setTimeout(function(){if(!ls._done)done()},8000);
+  setTimeout(function(){if(!ls._done)done()},2500);
 })();
 </script>
 </body>
