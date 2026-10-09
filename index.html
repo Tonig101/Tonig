@@ -5542,9 +5542,21 @@ document.addEventListener('click',function(e){
   if(!ls||!bar||!pct)return;
   var preload=['images/UI/守护.png','images/UI/闪击.png','images/UI/重甲1.png','images/UI/重甲2.png','images/UI/重甲3.png','images/UI/伏击.png','images/UI/烟幕.png','images/UI/奋战.jpg','images/UI/冲击.png','images/UI/压制.png','images/UI/被守护.png'];
   var loaded=0, total=preload.length;
+  var warmCards=function(){
+    var keys=[];try{keys=Object.keys(IMG_MAP)||[]}catch(e){}if(!keys.length)return;
+    var k=0;
+    function tick(){
+      if(k>=keys.length)return;
+      var n=0;
+      while(k<keys.length&&n<6){var s=IMG_MAP[keys[k++]];if(s){var im=new Image();im.src=s;}n++;}
+      setTimeout(tick,60);
+    }
+    setTimeout(tick,300);
+  };
   var done=function(){
     if(ls._done)return;ls._done=1;
     bar.style.width="100%";pct.textContent="100%";
+    setTimeout(warmCards,0);
     setTimeout(function(){ls.classList.add("fade-out");
       setTimeout(function(){if(ls.parentNode)ls.parentNode.removeChild(ls)},500);
     },400);
