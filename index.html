@@ -5543,12 +5543,18 @@ document.addEventListener('click',function(e){
   var preload=['images/UI/守护.png','images/UI/闪击.png','images/UI/重甲1.png','images/UI/重甲2.png','images/UI/重甲3.png','images/UI/伏击.png','images/UI/烟幕.png','images/UI/奋战.jpg','images/UI/冲击.png','images/UI/压制.png','images/UI/被守护.png'];
   var loaded=0, total=preload.length;
   var warmCards=function(){
-    var keys=[];try{keys=Object.keys(IMG_MAP)||[]}catch(e){}if(!keys.length)return;
+    var list=[],seen={};
+    try{
+      var html=document.documentElement.outerHTML;
+      var re=/images\/[^'"<>()\s]+/g,m;
+      while((m=re.exec(html))!==null){if(!seen[m[0]]){seen[m[0]]=1;list.push(m[0]);}}
+    }catch(e){}
+    if(!list.length)return;
     var k=0;
     function tick(){
-      if(k>=keys.length)return;
+      if(k>=list.length)return;
       var n=0;
-      while(k<keys.length&&n<6){var s=IMG_MAP[keys[k++]];if(s){var im=new Image();im.src=s;}n++;}
+      while(k<list.length&&n<6){var im=new Image();im.src=list[k++];n++;}
       setTimeout(tick,60);
     }
     setTimeout(tick,300);
