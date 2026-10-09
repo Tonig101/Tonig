@@ -1456,7 +1456,7 @@ function playAttackLine(fromEl,toEl){
 function _chainDmgFX(sourceEl, targets, staggerMs) {
   var p=new Promise(function(resolve) {
     if (!sourceEl || !targets || !targets.length) { resolve(); return; }
-    staggerMs = staggerMs || 900;
+    staggerMs = staggerMs || 500;
     var idx = 0;
     var remaining = targets.length;
     function oneDone() {
