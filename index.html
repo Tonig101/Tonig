@@ -723,8 +723,8 @@ body{background:var(--bg);color:var(--w);min-height:100vh;display:flex;justify-c
 #sandbox{position:fixed;top:0;left:0;right:0;height:58%;min-height:340px;background:rgba(10,12,20,.94);z-index:10000;display:none;flex-direction:column;box-shadow:0 12px 40px rgba(0,0,0,.55);border-bottom:2px solid var(--y)}
 #sandbox.show{display:flex}
 /* 更新日志弹窗 */
-.cl-modal{position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:12000;display:flex;justify-content:center;align-items:center;padding:16px}
-.cl-modal>div{background:#14161f;border:2px solid var(--y);border-radius:14px;width:min(560px,96vw);max-height:82vh;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,.6)}
+.cl-modal{position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:12000;display:flex;align-items:flex-start;justify-content:center;padding:6vh 16px 16px}
+.cl-modal>div{background:#14161f;border:2px solid var(--y);border-radius:14px;width:min(560px,96vw);height:min(600px,86vh);display:flex;flex-direction:column;overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,.6)}
 .cl-head{display:flex;justify-content:space-between;align-items:center;padding:14px 18px;border-bottom:1px solid #2a2d3a;background:#181b26}
 .cl-title{font-weight:900;color:var(--y);letter-spacing:2px}
 .cl-x{background:rgba(255,255,255,.06);border:1px solid #3a3f4f;color:#bbb;width:30px;height:30px;border-radius:8px;cursor:pointer;display:flex;align-items:center;justify-content:center;padding:0;transition:all .15s}
