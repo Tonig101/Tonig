@@ -720,9 +720,9 @@ body{background:var(--bg);color:var(--w);min-height:100vh;display:flex;justify-c
 .mulligan-tag.unit{background:rgba(100,200,150,.2);color:#8cbaa0}
 .mulligan-btns{display:flex;gap:12px;justify-content:center}
 /* ===== 沙盒模式 ===== */
-#sandbox{position:fixed;inset:0;background:rgba(0,0,0,.72);z-index:10000;display:none;justify-content:center;align-items:center}
+#sandbox{position:fixed;top:0;left:0;right:0;height:58%;min-height:340px;background:rgba(10,12,20,.94);z-index:10000;display:none;flex-direction:column;box-shadow:0 12px 40px rgba(0,0,0,.55);border-bottom:2px solid var(--y)}
 #sandbox.show{display:flex}
-.sb-panel{background:#14161f;border:2px solid var(--y);border-radius:14px;max-width:880px;width:94vw;max-height:92vh;display:flex;flex-direction:column;overflow:hidden}
+.sb-panel{background:#14161f;border:2px solid var(--y);border-top:0 none;border-radius:0 0 14px 14px;max-width:100%;width:100%;max-height:100%;display:flex;flex-direction:column;overflow:hidden}
 .sb-head{display:flex;justify-content:space-between;align-items:center;padding:12px 18px;border-bottom:1px solid #2a2d3a;background:#181b26}
 .sb-head h2{margin:0;font-size:1.05rem;color:var(--y);letter-spacing:2px}
 .sb-head b{color:#888;font-size:.68rem;font-weight:600}
@@ -766,6 +766,7 @@ body{background:var(--bg);color:var(--w);min-height:100vh;display:flex;justify-c
     <span style="font-weight:900;font-size:.95rem;letter-spacing:2px;color:#bbb">KARDS</span>
     <span style="font-size:.68rem;color:#444">二战卡牌对战 · 三条阵线</span>
     <button class="btn btn-ghost" onclick="GAME.newGame()" style="font-size:.68rem">&#128260; 新游戏</button>
+    <button class="btn btn-ghost" id="sb-toggle" onclick="GAME.toggleSandbox()" style="display:none;font-size:.68rem;color:#f9c74f;border-color:#f9c74f">&#128300; 沙盒</button>
   </div>
 
   <!-- 敌方 -->
@@ -842,31 +843,30 @@ body{background:var(--bg);color:var(--w);min-height:100vh;display:flex;justify-c
   <div class="sb-panel">
     <div class="sb-head">
       <h2>&#128300; 沙盒模式</h2>
-      <b>自由构筑 · 模拟对战</b>
-      <button class="btn btn-ghost" onclick="GAME.closeSandbox()" style="font-size:.7rem">关闭</button>
+      <b>模拟对战 · 下方出牌区不被遮挡</b>
+      <button class="btn btn-ghost" onclick="GAME.closeSandbox()" style="font-size:.7rem">收起面板</button>
     </div>
     <div class="sb-body">
       <div class="sb-config">
         <div class="sb-fc-pick">我方国家：
-          <select id="sb-fc" onchange="SETNB.fc=this.value">
+          <select id="sb-fc" onchange="SETNB.changeFc(this.value)">
             <option value="D">&#x2716; 德军</option><option value="S">&#x262D; 苏军</option>
             <option value="U">&#x2605; 美军</option><option value="B">&#x2694; 英军</option><option value="J">&#x2600; 日军</option>
           </select>
         </div>
         <label class="sb-toggle"><input type="checkbox" id="sb-ai" checked onchange="SETNB.changeAi(this.checked)"> AI 对手（关=敌方挂机）</label>
-        <label class="sb-toggle"><input type="checkbox" id="sb-cmd" checked onchange="SETNB.changeCmd(this.checked)"> 无限指挥点</label>
-        <label class="sb-toggle"><input type="checkbox" id="sb-atk" onchange="SETNB.changeAtk(this.checked)"> 无限攻击次数</label>
+        <label class="sb-toggle"><input type="checkbox" id="sb-cmd" checked onchange="SETNB.changeCmd(this.checked)"> 无限指挥点（仅我方）</label>
+        <label class="sb-toggle"><input type="checkbox" id="sb-atk" onchange="SETNB.changeAtk(this.checked)"> 无限攻击次数（仅我方）</label>
+        <label class="sb-toggle"><input type="checkbox" id="sb-hp" onchange="SETNB.changeHp(this.checked)"> 我方总部无限血</label>
         <div class="sb-act">
-          <button class="btn btn-green" onclick="GAME.startSandboxGame()">&#9989; 开始沙盒对战</button>
           <button class="btn btn-ghost" onclick="SETNB.fillHand()">&#129533; 副满手牌</button>
           <button class="btn btn-ghost" onclick="SETNB.clearHand()">&#128465; 清空手牌</button>
-          <button class="btn btn-ghost" onclick="SETNB.cmdApply()" title="将无限指挥点状态立即应用到当前指挥点">&#9889; 应用指挥点</button>
         </div>
       </div>
       <div class="sb-filters" id="sb-filters"></div>
       <div class="sb-count" id="sb-count"></div>
       <div class="sb-grid" id="sb-grid"></div>
-      <div class="sb-tip">从卡库中点击任意卡牌即可<b style="color:#f9c74f">加入我方手牌</b>（最多9张）。无限指挥点/无限攻击即时生效；AI关闭时敌方回合直接空过，便于测试连招与结算。</div>
+      <div class="sb-tip">从卡库中点击任意牌<b style="color:#f9c74f">加入我方手牌</b>（最多9张）。无限指挥点/无限攻击/总部无限血<b style="color:#f9c74f">只作用于我方</b>；我方总部血量归零不结束对局。AI关闭时敌方回合直接空过，便于测试连招。</div>
     </div>
   </div>
 </div>
@@ -1979,19 +1979,20 @@ Player.prototype.getPlayable=function(){
 Player.prototype.allUnits=function(){return this.support.concat(this.fl)};
 
 // ==================== 沙盒模式 ====================
-var SANDBOX={active:false,unlimitedCmd:true,aiOn:true,unlimitedAtk:false};
+var SANDBOX={active:false,unlimitedCmd:true,aiOn:true,unlimitedAtk:false,unlimitedHp:false};
 var SETNB={
   fc:'D', fcF:'全部', typeF:'全部', costF:'全部',
   changeCmd:function(v){SANDBOX.unlimitedCmd=v;SETNB.cmdApply()},
-  changeAtk:function(v){SANDBOX.unlimitedAtk=v;GAME.log((v?'🔁 已开启无限攻击次数（我方单位可连续攻击）':'⏹ 已关闭无限攻击次数'),'system')},
+  changeAtk:function(v){SANDBOX.unlimitedAtk=v;GAME.log((v?'🔁 已开启无限攻击次数（仅我方单位可连续攻击）':'⏹ 已关闭无限攻击次数'),'system')},
+  changeHp:function(v){SANDBOX.unlimitedHp=v;GAME.log((v?'♥ 已开启我方总部无限血（血量常满）':'⏹ 已关闭我方总部无限血'),'system');GAME.render()},
   changeAi:function(v){SANDBOX.aiOn=v;GAME.log((v?'🤖 AI对手：开启':'⏸ AI对手：关闭（敌方回合将直接空过）'),'system')},
-  // 将无限指挥点开关立即应用到当前指挥点
+  changeFc:function(v){SETNB.fc=v;if(GAME.player&&SANDBOX.active){GAME.player.fc=v;GAME.render();}},
+  // 将无限指挥点开关立即应用到当前指挥点（仅我方）
   cmdApply:function(plc){
     var pl=plc||GAME.player;
     if(!pl)return;
     if(SANDBOX.unlimitedCmd){pl.cmd=999;pl.maxCmd=999;pl.baseMaxCmd=999;}
     else if(pl.cmd>=900){pl.baseMaxCmd=5;pl.maxCmd=5;pl.cmd=5;}
-    if(SANDBOX.aiOn&&pl===GAME.enemy&&SANDBOX.unlimitedCmd===false){pl.cmd=999;pl.maxCmd=999;}
     GAME.render();
   },
   // 渲染卡库列表（根据筛选条件）
@@ -2980,6 +2981,7 @@ var GAME={
 
   // ---------- 检查胜负 ----------
   checkEnd:function(){
+    if(SANDBOX.active)return false; // 沙盒：总部血量归零不结束对局
     if(GAME.player.hp<=0){GAME.endGame(false);return true}
     if(GAME.enemy.hp<=0){GAME.endGame(true);return true}
     return false;
@@ -3029,6 +3031,7 @@ var GAME={
   render:function(){
     var pl=GAME.player,en=GAME.enemy;
     if(!pl||!en)return;
+    if(SANDBOX.active&&SANDBOX.unlimitedHp){pl.hp=pl.maxHp||20;}
 
     $('plName').textContent=pl.name;
     var plFB=$('plFaction');plFB.textContent=FA_ICON[pl.fc]+' '+FA[pl.fc];
@@ -4142,7 +4145,7 @@ var GAME={
     who.maxCmd=Math.min(24,who.baseMaxCmd+who.cmdBonus);
     who.cmd=who.maxCmd;
     // 沙盒：无限指挥点
-    if(SANDBOX.active&&SANDBOX.unlimitedCmd&&(who===GAME.player||SANDBOX.aiOn)){who.cmd=999;who.maxCmd=999;who.baseMaxCmd=999;}
+    if(SANDBOX.active&&SANDBOX.unlimitedCmd&&who===GAME.player){who.cmd=999;who.maxCmd=999;who.baseMaxCmd=999;}
     if(!skipDraw){
       // AI定向抽牌：困难低概率偷瞄2张; 地狱必发、偷瞄N张选最优
       var cfgPeek=AI_CONFIG[AI_LEVEL];
@@ -4233,6 +4236,8 @@ var GAME={
     // 回到选阵营界面：打扫上次对战留下的战场贴图
     GAME.gameOver=true;GAME.phase='end';
     GAME.cleanupBattlefield();
+    $('sandbox').classList.remove('show');
+    var st=$('sb-toggle');if(st)st.style.display='none';
     // 隐藏底层内容，防止手机端被截断显示
     document.querySelector('#arena').style.display='none';
     document.querySelector('#panel').style.display='none';
@@ -4379,6 +4384,8 @@ var GAME={
 
   _initGame:function(playerFc){
     SANDBOX.active=false; // 正常实战重置沙盒开关，避免沙盒无限指挥点/攻击泄漏到实战
+    $('sandbox').classList.remove('show');
+    var st=$('sb-toggle');if(st)st.style.display='none';
     $('overlay').classList.remove('show');$('log').innerHTML='';$('prompt-area').textContent='出牌即生成';
     GAME.player=new Player('你',playerFc);
     GAME.enemy=new Player('AI对手',ENEMY_FC);var aiCfg=AI_CONFIG[AI_LEVEL];if(aiCfg.hpBonus){GAME.enemy.hp+=aiCfg.hpBonus;if(AI_LEVEL===4)GAME.log('💰 地狱级作弊：生命+'+aiCfg.hpBonus,'system')}
@@ -4574,14 +4581,23 @@ var GAME={
 
   // ==================== 沙盒模式 ====================
   showSandbox:function(){
+    // 点击沙盒按钮：立刻进入沙盒对战，并弹出顶部控制面板（不遮挡下方出牌区）
+    GAME.startSandboxGame();
+    GAME.openSandboxPanel();
+  },
+  openSandboxPanel:function(){
     $('sandbox').classList.add('show');
     SETNB.buildFilters();
     SETNB.fillFiltersState();
     SETNB.render();
+    var t=$('sb-toggle');if(t)t.style.display='';
+  },
+  toggleSandbox:function(){
+    if($('sandbox').classList.contains('show')){$('sandbox').classList.remove('show')}
+    else{GAME.openSandboxPanel()}
   },
   closeSandbox:function(){
     $('sandbox').classList.remove('show');
-    if(GAME.player&&GAME.phase==='end')GAME.newGame();
   },
   startSandboxGame:function(){
     SANDBOX.active=true;
@@ -4599,12 +4615,13 @@ var GAME={
     GAME.playerIsFirst=true;
     // 初始发牌
     GAME.player.draw(6);GAME.enemy.draw(6);
-    // 沙盒加成应用
+    // 沙盒加成应用（仅我方：无限指挥点/无限攻击/总部无限血）
     if(SANDBOX.unlimitedCmd){SETNB.cmdApply(GAME.player)}
-    if(SANDBOX.aiOn){SETNB.cmdApply(GAME.enemy)}
+    var t=$('sb-toggle');if(t)t.style.display='';
     GAME.log('🔬 沙盒模式已开启 · 国家：'+FA[SETNB.fc],'system');
-    GAME.log((SANDBOX.unlimitedCmd?'🔁 无限指挥点：开启':'🔁 无限指挥点：关闭'),'system');
-    GAME.log((SANDBOX.unlimitedAtk?'🔁 无限攻击：开启':'🔁 无限攻击：关闭'),'system');
+    GAME.log((SANDBOX.unlimitedCmd?'🔁 无限指挥点：开启（仅我方）':'🔁 无限指挥点：关闭'),'system');
+    GAME.log((SANDBOX.unlimitedAtk?'🔁 无限攻击：开启（仅我方）':'🔁 无限攻击：关闭'),'system');
+    GAME.log((SANDBOX.unlimitedHp?'♥ 总部无限血：开启（仅我方）':'♥ 总部无限血：关闭'),'system');
     GAME.log((SANDBOX.aiOn?'🤖 AI对手：开启':'⏸ AI对手：关闭（敌方挂机）'),'system');
     GAME.playerTurn();
   }
