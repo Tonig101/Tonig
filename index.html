@@ -3950,7 +3950,9 @@ var GAME={
       if(!aiCond.ok){GAME.log('AI '+c.cn+' 条件不满足：'+aiCond.msg,'ai');playOrder();return}
       en.hand=en.hand.filter(function(x){return x!==c});en.cmd-=c.cost;
       GAME.log('AI使用指令 <b>'+c.cn+'</b>','ai');showOrderCardPlayed(c,false);GAME.execOrder(en,c);
-      GAME.render();if(GAME.checkEnd())return;GAME.waitAnims().then(function(){playOrder()});
+      GAME.render();if(GAME.checkEnd())return;
+      // AI指令效果结算后停顿，便于玩家看清效果再继续
+      GAME.waitAnims().then(function(){delay(950).then(function(){playOrder()})});
     }
 
     // 2) 单位
