@@ -727,8 +727,8 @@ body{background:var(--bg);color:var(--w);min-height:100vh;display:flex;justify-c
 .cl-modal>div{background:#14161f;border:2px solid var(--y);border-radius:14px;width:min(560px,96vw);max-height:82vh;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,.6)}
 .cl-head{display:flex;justify-content:space-between;align-items:center;padding:14px 18px;border-bottom:1px solid #2a2d3a;background:#181b26}
 .cl-title{font-weight:900;color:var(--y);letter-spacing:2px}
-.cl-x{background:none;border:none;color:#888;font-size:1.2rem;cursor:pointer;padding:2px 8px;line-height:1}
-.cl-x:hover{color:#fff}
+.cl-x{background:rgba(255,255,255,.06);border:1px solid #3a3f4f;color:#bbb;width:30px;height:30px;border-radius:8px;cursor:pointer;display:flex;align-items:center;justify-content:center;padding:0;transition:all .15s}
+.cl-x:hover{background:#e74c3c;border-color:#e74c3c;color:#fff}
 .cl-body{flex:1;overflow-y:auto;padding:16px 18px}
 .cl-item{margin-bottom:18px}
 .cl-item:last-child{margin-bottom:0}
@@ -4322,7 +4322,7 @@ var GAME={
         '五大阵营选择与 AI 多档难度（简单/普通/困难/地狱）'
       ]}
     ];
-    var h='<div class="cl-head"><span class="cl-title">📄 更新日志</span><button class="cl-x" onclick="GAME.closeChangelog()">&#10005;</button></div>';
+    var h='<div class="cl-head"><span class="cl-title">📄 更新日志</span><button class="cl-x" onclick="GAME.closeChangelog()" aria-label="关闭"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><line x1="5" y1="5" x2="19" y2="19"/><line x1="19" y1="5" x2="5" y2="19"/></svg></button></div>';
     h+='<div class="cl-body">';
     log.forEach(function(it){
       h+='<div class="cl-item"><div class="cl-v">'+it.v+'<span class="cl-date">'+it.date+'</span></div><ul>';
