@@ -1,13 +1,14 @@
-def str_ord(s):
-    if s.isupper():
-        m = 'uppercase'
-    elif s.islower():
-        m = 'lowercase'
-    elif s.isdigit():
-        m = 'digital'
-    else:
-        m = 'other'
-    return ord(s), hex(ord(s)).upper()[2:]+'H', m
+def f(min,max):
+    a = 0
+    b = 1
+    num_list = []
+    while a <= max:
+        if a >= min:
+            num_list.append(a)
+        a, b = b, a + b
+    return num_list
 
-num = input()
-print(f'{str_ord(num)[0]} {str_ord(num)[1]} {str_ord(num)[2]}')
+min,max = map(int,input().split())
+print(*f(min,max),sep=' ')
+
+
