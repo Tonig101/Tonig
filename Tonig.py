@@ -1,18 +1,19 @@
-﻿class A:
-    def who(self):
-        return "A"
+﻿import dataclasses
 
-class B(A):
-    def who(self):
-        return "B"
 
-class C(A):
-    def who(self):
-        return "C"
+@dataclasses.dataclass()
+class Phone:
+    name: str
+    size: int = 64
 
-class D(B, C):
-    pass
+    def on(self):
+        print(f"{self.name} is on")
 
-print(D().who())   # B
-print(D.__mro__)   # (D, B, C, A, object)
-# 多继承时，会先调用第一个父类的方法，如果第一个父类的方法没有返回值，会继续调用第二个父类的方法，以此类推。
+    def off(self):
+        print(f"{self.name} is off")
+
+    def take_photo(self):
+        print(f"{self.name} takes photo")
+
+
+phone1 = Phone("Apple")
