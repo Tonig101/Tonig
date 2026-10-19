@@ -869,6 +869,18 @@ body{background:var(--bg);color:var(--w);min-height:100vh;display:flex;justify-c
             <option value="U">&#x2605; 美军</option><option value="B">&#x2694; 英军</option><option value="J">&#x2600; 日军</option>
           </select>
         </div>
+        <div class="sb-fc-pick">AI国家：
+          <select id="sb-efc" onchange="SETNB.changeEnemyFc(this.value)">
+            <option value="D">&#x2716; 德军</option><option value="S">&#x262D; 苏军</option>
+            <option value="U">&#x2605; 美军</option><option value="B">&#x2694; 英军</option><option value="J">&#x2600; 日军</option>
+          </select>
+        </div>
+        <div class="sb-fc-pick">AI难度：
+          <select id="sb-diff" onchange="SETNB.changeAIDiff(this.value)">
+            <option value="1">&#x1F7E2; 简单</option><option value="2">&#x1F7E1; 中等</option>
+            <option value="3">&#x1F7E0; 困难</option><option value="4">&#x1F534; 地狱</option>
+          </select>
+        </div>
         <label class="sb-toggle"><input type="checkbox" id="sb-ai" checked onchange="SETNB.changeAi(this.checked)"> AI 对手（关=敌方挂机）</label>
         <label class="sb-toggle"><input type="checkbox" id="sb-cmd" checked onchange="SETNB.changeCmd(this.checked)"> 无限指挥点（仅我方）</label>
         <label class="sb-toggle"><input type="checkbox" id="sb-atk" onchange="SETNB.changeAtk(this.checked)"> 无限攻击次数（仅我方）</label>
@@ -876,12 +888,16 @@ body{background:var(--bg);color:var(--w);min-height:100vh;display:flex;justify-c
         <div class="sb-act">
           <button class="btn btn-ghost" onclick="SETNB.fillHand()">&#129533; 副满手牌</button>
           <button class="btn btn-ghost" onclick="SETNB.clearHand()">&#128465; 清空手牌</button>
+          <label class="sb-toggle"><input type="checkbox" id="sb-spawn" onchange="SETNB.toggleSpawnMode(this.checked)"> 卡库部署到敌方场上</label>
+        </div>
+        <div class="sb-act" style="margin-top:4px">
+          <button class="btn btn-ghost" onclick="SETNB.clearEnemyField()" style="color:#e44;border-color:#e44">&#128465; 清空敌方场上全部单位</button>
         </div>
       </div>
       <div class="sb-filters" id="sb-filters"></div>
       <div class="sb-count" id="sb-count"></div>
       <div class="sb-grid" id="sb-grid"></div>
-      <div class="sb-tip">从卡库中点击任意牌<b style="color:#f9c74f">加入我方手牌</b>（最多9张）。无限指挥点/无限攻击/总部无限血<b style="color:#f9c74f">只作用于我方</b>；我方总部血量归零不结束对局。AI关闭时敌方回合直接空过，便于测试连招。</div>
+      <div class="sb-tip">从卡库中点击任意牌<b style="color:#f9c74f">加入我方手牌</b>（最多9张）。勾选「卡库部署到敌方场上」后可<b style="color:#e44">直接在敌方支援阵线生成单位</b>。AI国家/难度修改后<b style="color:#f9c74f">重开沙盒生效</b>，不影响正常模式对局。无限指挥点/无限攻击/总部无限血<b style="color:#f9c74f">只作用于我方</b>。</div>
     </div>
   </div>
 </div>
@@ -2002,6 +2018,45 @@ var SETNB={
   changeHp:function(v){SANDBOX.unlimitedHp=v;GAME.log((v?'♥ 已开启我方总部无限血（血量常满）':'⏹ 已关闭我方总部无限血'),'system');GAME.render()},
   changeAi:function(v){SANDBOX.aiOn=v;GAME.log((v?'🤖 AI对手：开启':'⏸ AI对手：关闭（敌方回合将直接空过）'),'system')},
   changeFc:function(v){SETNB.fc=v;if(GAME.player&&SANDBOX.active){GAME.player.fc=v;GAME.render();}},
+  spawnEnemyMode:false,
+  changeEnemyFc:function(v){
+    ENEMY_FC=v;
+    GAME.log('🔬 沙盒：AI国家 → '+FA[v]+'（下次重开沙盒生效）','system');
+  },
+  changeAIDiff:function(v){
+    AI_LEVEL=parseInt(v);
+    var dn={1:'简单',2:'中等',3:'困难',4:'地狱'};
+    GAME.log('🔬 沙盒：AI难度 → '+dn[AI_LEVEL]+'（下次重开沙盒生效）','system');
+  },
+  toggleSpawnMode:function(v){
+    SETNB.spawnEnemyMode=v;
+    SETNB.render();
+  },
+  spawnEnemy:function(d){
+    if(!GAME.enemy||!SANDBOX.active)return toast('请先开启沙盒对战');
+    if(GAME.enemy.support.length>=4)return toast('敌方支援阵线已满（最多4）');
+    var c=new Card(d);
+    c.owner=GAME.enemy;c.zone='support';
+    c.joinedNotDeployed=true;c.justDeployed=false;
+    var leftC=GAME.enemy.support.filter(function(u){return u.supSide==='L'}).length;
+    var rightC=GAME.enemy.support.length-leftC;
+    c.supSide=leftC<=rightC?'L':'R';
+    GAME.enemy.support.push(c);
+    GAME.log('🔬 沙盒：敌方部署 <b>'+c.cn+'</b> ('+c.effectiveAtk+'/'+c.hp+')','system');
+    GAME.render();
+  },
+  clearEnemyField:function(){
+    if(!GAME.enemy||!SANDBOX.active)return toast('请先开启沙盒对战');
+    GAME.enemy.support=[];GAME.enemy.fl=[];
+    GAME.log('🔬 沙盒：已清空敌方全部单位','system');
+    GAME.render();
+  },
+  _saveSettings:function(){
+    this.__ai=AI_LEVEL;this.__efc=ENEMY_FC;
+  },
+  _restoreSettings:function(){
+    if(this.__ai!=null){AI_LEVEL=this.__ai;ENEMY_FC=this.__efc;this.__ai=null;this.__efc=null;}
+  },
   // 将无限指挥点开关立即应用到当前指挥点（仅我方）
   cmdApply:function(plc){
     var pl=plc||GAME.player;
@@ -2028,7 +2083,7 @@ var SETNB={
     var seen={};var uniq=[];
     list.forEach(function(d){if(!seen[d[0]]){seen[d[0]]=1;uniq.push(d)}});
     var grid=$('sb-grid');grid.innerHTML='';
-    $('sb-count').textContent='匹配 '+uniq.length+' 张 · 点击加入手牌';
+    $('sb-count').textContent='匹配 '+uniq.length+' 张 · '+(SETNB.spawnEnemyMode?'点击部署到敌方场上':'点击加入手牌');
     if(!uniq.length){grid.innerHTML='<span style="color:#888;font-size:.72rem;grid-column:1/-1;text-align:center;padding:20px">没有匹配的卡牌</span>';return}
     var imgFn=function(src){return src?('<img src="'+src+'" onerror="this.style.display=\'none\'">'):'无图'};
     uniq.forEach(function(d){
@@ -2049,8 +2104,12 @@ var SETNB={
         +'<div class="sb-cn">'+d[1]+'</div>'
         +'<div class="sb-meta">'+meta+'</div>'
         +(isOrder?('<div class="sb-eff">'+d[6]+'</div>'):(d[10]?'<div class="sb-eff">'+d[10]+'</div>':''));
-      tile.title='点击加入手牌';
-      tile.onclick=function(){SETNB.addToHand(d)};
+      tile.title=SETNB.spawnEnemyMode?'部署到敌方场上':'点击加入手牌';
+      if(SETNB.spawnEnemyMode){
+        tile.onclick=function(){SETNB.spawnEnemy(d)};
+      }else{
+        tile.onclick=function(){SETNB.addToHand(d)};
+      }
       grid.appendChild(tile);
     });
   },
@@ -2451,6 +2510,7 @@ var GAME={
 
     // 攻击者消耗1个行动点（坦克2AP可攻击后仍可移动，其他1AP攻击后锁死）
     attacker.spendAP(1);
+    var _atkNum=attacker.attacksThisTurn;
     attacker.attacksThisTurn++;
     // 沙盒：无限攻击次数（我方单位攻击后不消耗行动点/次数，可连续攻击）
     if(SANDBOX.active&&SANDBOX.unlimitedAtk&&atkOwner===GAME.player){
@@ -2552,7 +2612,7 @@ var GAME={
       if(weak.length){var w=weak[0];w.hp=w.hp+2;w.maxHp=w.maxHp+2;v.healWeakest={card:w}}
     }
     // 三号坦克
-    if(!v.ambushKill&&attacker.effCode==='growOnHit'&&attacker.hp>0&&attacker.attacksThisTurn===1){
+    if(!v.ambushKill&&attacker.effCode==='growOnHit'&&attacker.hp>0&&_atkNum===0){
       attacker.atk+=1;attacker.hp+=1;attacker.maxHp+=1;v.growOnHit=true;
     }
     // 丘吉尔IV
@@ -2844,7 +2904,7 @@ var GAME={
         _applyDmg(target,dmgVal);_chainDmgFX(srcEl,[{card:target,isHq:false,dmg:dmgVal}]);
         GAME.log('\uD83C\uDFAF 战术打击\u2192'+target.cn+' 受到'+dmgVal+'点伤害'+(hasTank?'（有坦克加成）':''),'effect');break;
       case'dmg1tank':_applyDmg(target,1);_chainDmgFX(srcEl,[{card:target,isHq:false,dmg:1}]);GAME.log('\uD83C\uDFAF 对坦克'+target.cn+'造成1点伤害','effect');break;
-      case'removeArmor':target.armor=0;target.hasG=false;GAME.log('\uD83C\uDFAF 移除了'+target.cn+'的所有重甲和守护','effect');break;
+      case'removeArmor':target.armor=0;target.kw=target.kw.replace('G','').replace('H','');GAME.log('🎯 移除了'+target.cn+'的所有重甲和守护','effect');break;
       case'buffBomber':target.atk+=1;target.hp+=1;target.maxHp+=1;var bEl2=findCardEl(target);if(bEl2){floatDamage(bEl2,1,'heal','left');floatDamage(bEl2,1,'heal','right')}GAME.log('\uD83C\uDFAF '+target.cn+' 获得+1/+1','effect');break;
       case'pin1':target.pinned=true;target.canAct=false;target.apSpent=99;target.hasActedThisTurn=true;GAME.log('\uD83C\uDFAF '+target.cn+' \uD83D\uDCA2 被压制（本回合不可行动）','effect');break;
       case'pinAtk2':target.pinned=true;target.canAct=false;target.apSpent=99;target.hasActedThisTurn=true;var atkLoss=Math.min(target.atk,2);target.atk-=atkLoss;_chainDmgFX(srcEl,[{card:target,isHq:false,dmg:atkLoss}]);GAME.log('\uD83C\uDFAF '+target.cn+' \uD83D\uDCA2 被压制且攻击力-'+atkLoss+'（本回合不可行动）','effect');break;
@@ -4250,6 +4310,8 @@ var GAME={
 
   // ==================== 新游戏 ====================
   showFactionSelect:function(){
+    // 恢复沙盒期间可能被修改的AI设置，确保正常模式不受影响
+    SETNB._restoreSettings();
     // 回到选阵营界面：打扫上次对战留下的战场贴图
     GAME.gameOver=true;GAME.phase='end';
     GAME.cleanupBattlefield();
@@ -4638,6 +4700,8 @@ var GAME={
 
   // ==================== 沙盒模式 ====================
   showSandbox:function(){
+    // 保存正常模式下的AI设置，沙盒期间修改不影响正常模式
+    SETNB._saveSettings();
     // 点击沙盒按钮：立刻进入沙盒对战，并弹出顶部控制面板（不遮挡下方出牌区）
     GAME.startSandboxGame();
     GAME.openSandboxPanel();
@@ -4648,6 +4712,10 @@ var GAME={
     SETNB.fillFiltersState();
     SETNB.render();
     var t=$('sb-toggle');if(t)t.style.display='';
+    // 同步沙盒面板的AI国家/难度/部署模式
+    var efSel=document.getElementById('sb-efc');if(efSel)efSel.value=ENEMY_FC;
+    var diffSel=document.getElementById('sb-diff');if(diffSel)diffSel.value=String(AI_LEVEL);
+    var spawnChk=document.getElementById('sb-spawn');if(spawnChk)spawnChk.checked=SETNB.spawnEnemyMode;
   },
   toggleSandbox:function(){
     if($('sandbox').classList.contains('show')){$('sandbox').classList.remove('show')}
