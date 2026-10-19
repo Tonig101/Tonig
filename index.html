@@ -782,6 +782,7 @@ body{background:var(--bg);color:var(--w);min-height:100vh;display:flex;justify-c
     <span style="font-size:.68rem;color:#444">二战卡牌对战 · 三条阵线</span>
     <button class="btn btn-ghost" onclick="GAME.newGame()" style="font-size:.68rem">&#128260; 新游戏</button>
     <button class="btn btn-ghost" id="sb-toggle" onclick="GAME.toggleSandbox()" style="display:none;font-size:.68rem;color:#f9c74f;border-color:#f9c74f">&#128300; 沙盒</button>
+    <button class="btn btn-ghost" id="sfx-toggle" onclick="SFX.toggle()?this.textContent='\uD83D\uDD07':this.textContent='\uD83D\uDD0A'" style="font-size:.68rem" title="音效开关">&#x1F50A;</button>
   </div>
 
   <!-- 敌方 -->
@@ -1990,6 +1991,7 @@ Player.prototype.draw=function(n){
     }
     this.hand.push(this.deck.pop());
   }
+  if(n>0)SFX.play('draw');
   // 动态减费：敌方抽牌时，检查己方手牌中的 dynamicCost 卡牌
   var opp=this===GAME.player?GAME.enemy:GAME.player;
   opp.hand.forEach(function(c){
@@ -2008,6 +2010,116 @@ Player.prototype.getPlayable=function(){
   });
 };
 Player.prototype.allUnits=function(){return this.support.concat(this.fl)};
+
+// ==================== 音效系统（Web Audio API） ====================
+var SFX={
+  ctx:null,
+  muted:false,
+  masterGain:null,
+  volume:1.0,
+  _ensureCtx:function(){
+    if(!this.ctx){
+      this.ctx=new(window.AudioContext||window.webkitAudioContext)();
+      var d=this.ctx.destination;
+      this.masterGain=this.ctx.createGain();
+      this.masterGain.gain.value=this.volume;
+      this.masterGain.connect(d);
+    }
+    if(this.ctx.state==='suspended')this.ctx.resume();
+    return this.ctx;
+  },
+  setVolume:function(v){
+    this.volume=Math.max(0,Math.min(1,v));
+    if(this.masterGain)this.masterGain.gain.value=this.volume;
+  },
+  play:function(type){if(this.muted)return;try{this['_'+type](this._ensureCtx())}catch(e){}},
+  toggle:function(){this.muted=!this.muted;return this.muted;},
+  _click:function(ctx){
+    var o=ctx.createOscillator(),g=ctx.createGain();
+    o.type='sine';o.frequency.value=800;
+    g.gain.setValueAtTime(0.06,ctx.currentTime);g.gain.exponentialRampToValueAtTime(0.001,ctx.currentTime+0.03);
+    o.connect(g);g.connect(ctx.destination);o.start();o.stop(ctx.currentTime+0.03);
+  },
+  _draw:function(ctx){
+    var buf=ctx.createBuffer(1,ctx.sampleRate*0.1,ctx.sampleRate),d=buf.getChannelData(0);
+    for(var i=0;i<d.length;i++)d[i]=(Math.random()*2-1)*0.18*Math.pow(1-i/d.length,3);
+    var s=ctx.createBufferSource();s.buffer=buf;
+    var f=ctx.createBiquadFilter();f.type='bandpass';f.frequency.value=2500;f.Q.value=1;
+    var g=ctx.createGain();g.gain.setValueAtTime(0.22,ctx.currentTime);g.gain.exponentialRampToValueAtTime(0.001,ctx.currentTime+0.1);
+    s.connect(f);f.connect(g);g.connect(ctx.destination);s.start();s.stop(ctx.currentTime+0.1);
+  },
+  _deploy:function(ctx){
+    var o=ctx.createOscillator(),g=ctx.createGain();
+    o.type='triangle';o.frequency.setValueAtTime(220,ctx.currentTime);o.frequency.exponentialRampToValueAtTime(80,ctx.currentTime+0.1);
+    g.gain.setValueAtTime(0.1,ctx.currentTime);g.gain.exponentialRampToValueAtTime(0.001,ctx.currentTime+0.13);
+    o.connect(g);g.connect(ctx.destination);o.start();o.stop(ctx.currentTime+0.13);
+  },
+  _order:function(ctx){
+    var o=ctx.createOscillator(),g=ctx.createGain();
+    o.type='sine';o.frequency.setValueAtTime(500,ctx.currentTime);o.frequency.exponentialRampToValueAtTime(1400,ctx.currentTime+0.08);
+    o.frequency.setValueAtTime(1000,ctx.currentTime+0.08);o.frequency.exponentialRampToValueAtTime(1800,ctx.currentTime+0.16);
+    g.gain.setValueAtTime(0.06,ctx.currentTime);g.gain.exponentialRampToValueAtTime(0.001,ctx.currentTime+0.2);
+    o.connect(g);g.connect(ctx.destination);o.start();o.stop(ctx.currentTime+0.2);
+  },
+  _attack:function(ctx){
+    var buf=ctx.createBuffer(1,ctx.sampleRate*0.12,ctx.sampleRate),d=buf.getChannelData(0);
+    for(var i=0;i<d.length;i++)d[i]=(Math.random()*2-1)*0.25*Math.pow(1-i/d.length,2);
+    var s=ctx.createBufferSource();s.buffer=buf;
+    var f=ctx.createBiquadFilter();f.type='lowpass';f.frequency.value=800;
+    var g=ctx.createGain();g.gain.setValueAtTime(0.3,ctx.currentTime);g.gain.exponentialRampToValueAtTime(0.001,ctx.currentTime+0.12);
+    s.connect(f);f.connect(g);g.connect(ctx.destination);s.start();s.stop(ctx.currentTime+0.12);
+    var o=ctx.createOscillator(),g2=ctx.createGain();
+    o.type='sine';o.frequency.value=90;g2.gain.setValueAtTime(0.25,ctx.currentTime);g2.gain.exponentialRampToValueAtTime(0.001,ctx.currentTime+0.09);
+    o.connect(g2);g2.connect(ctx.destination);o.start();o.stop(ctx.currentTime+0.09);
+  },
+  _destroy:function(ctx){
+    var buf=ctx.createBuffer(1,ctx.sampleRate*0.35,ctx.sampleRate),d=buf.getChannelData(0);
+    for(var i=0;i<d.length;i++)d[i]=(Math.random()*2-1)*0.25*Math.pow(1-i/d.length,1.5);
+    var s=ctx.createBufferSource();s.buffer=buf;
+    var f=ctx.createBiquadFilter();f.type='lowpass';f.frequency.setValueAtTime(600,ctx.currentTime);f.frequency.exponentialRampToValueAtTime(50,ctx.currentTime+0.32);
+    var g=ctx.createGain();g.gain.setValueAtTime(0.3,ctx.currentTime);g.gain.exponentialRampToValueAtTime(0.001,ctx.currentTime+0.35);
+    s.connect(f);f.connect(g);g.connect(ctx.destination);s.start();s.stop(ctx.currentTime+0.35);
+  },
+  _hqDmg:function(ctx){
+    var o=ctx.createOscillator(),g=ctx.createGain();
+    o.type='square';o.frequency.setValueAtTime(300,ctx.currentTime);o.frequency.setValueAtTime(180,ctx.currentTime+0.1);
+    g.gain.setValueAtTime(0.06,ctx.currentTime);g.gain.exponentialRampToValueAtTime(0.001,ctx.currentTime+0.22);
+    o.connect(g);g.connect(ctx.destination);o.start();o.stop(ctx.currentTime+0.22);
+  },
+  _turn:function(ctx){
+    var t=ctx.currentTime;
+    [523,659,784].forEach(function(f,i){
+      var o=ctx.createOscillator(),g=ctx.createGain();
+      o.type='sine';o.frequency.value=f;
+      g.gain.setValueAtTime(0,t+i*0.07);g.gain.linearRampToValueAtTime(0.05,t+i*0.07+0.02);g.gain.exponentialRampToValueAtTime(0.001,t+i*0.07+0.13);
+      o.connect(g);g.connect(ctx.destination);o.start(t+i*0.07);o.stop(t+i*0.07+0.13);
+    });
+  },
+  _victory:function(ctx){
+    var t=ctx.currentTime;
+    [523,659,784,1047,784].forEach(function(f,i){
+      var o=ctx.createOscillator(),g=ctx.createGain();
+      o.type='sine';o.frequency.value=f;
+      g.gain.setValueAtTime(0,t+i*0.1);g.gain.linearRampToValueAtTime(0.06,t+i*0.1+0.02);g.gain.exponentialRampToValueAtTime(0.001,t+i*0.1+0.28);
+      o.connect(g);g.connect(ctx.destination);o.start(t+i*0.1);o.stop(t+i*0.1+0.28);
+    });
+  },
+  _defeat:function(ctx){
+    var t=ctx.currentTime;
+    [400,350,300,200].forEach(function(f,i){
+      var o=ctx.createOscillator(),g=ctx.createGain();
+      o.type='triangle';o.frequency.value=f;
+      g.gain.setValueAtTime(0,t+i*0.14);g.gain.linearRampToValueAtTime(0.05,t+i*0.14+0.02);g.gain.exponentialRampToValueAtTime(0.001,t+i*0.14+0.35);
+      o.connect(g);g.connect(ctx.destination);o.start(t+i*0.14);o.stop(t+i*0.14+0.35);
+    });
+  },
+  _push:function(ctx){
+    var o=ctx.createOscillator(),g=ctx.createGain();
+    o.type='sine';o.frequency.setValueAtTime(300,ctx.currentTime);o.frequency.exponentialRampToValueAtTime(600,ctx.currentTime+0.09);
+    g.gain.setValueAtTime(0.15,ctx.currentTime);g.gain.exponentialRampToValueAtTime(0.001,ctx.currentTime+0.12);
+    o.connect(g);g.connect(ctx.destination);o.start();o.stop(ctx.currentTime+0.12);
+  },
+};
 
 // ==================== 沙盒模式 ====================
 var SANDBOX={active:false,unlimitedCmd:true,aiOn:true,unlimitedAtk:false,unlimitedHp:false};
@@ -2194,6 +2306,7 @@ var GAME={
   // ---------- 指令执行 ----------
   execOrder:function(who,order){
     orderFlash();
+    SFX.play('order');
     var opp=who===GAME.player?GAME.enemy:GAME.player;
     // 指向性指令：进入目标选择
     if(GAME.isTargetedEffect(order.fx)){
@@ -2517,6 +2630,7 @@ var GAME={
       attacker.attacksThisTurn=0;attacker.apSpent=0;attacker.hasActedThisTurn=false;
       atkOwner.cmd+=attacker.effAcost;
     }
+    SFX.play('attack');
     if(attacker.hasS)attacker.smokescreenActive=false;
     var chargeActive=attacker.hasC;
 
@@ -2547,6 +2661,7 @@ var GAME={
       // —— 攻击总部 ——
       v.hqDmg=attacker.effectiveAtk+atkBonus;
       defender.hp-=v.hqDmg;
+      SFX.play('hqDmg');
     }else{
       // —— 单位互殴 ——
       v.atkDmg=Math.max(0,attacker.effectiveAtk+atkBonus-target.armor);
@@ -2754,6 +2869,7 @@ var GAME={
     // 日志+亡计立即执行，死亡动画延迟
     dead.forEach(function(c){
       GAME.log(c.cn+' \uD83D\uDC80 被摧毁','system');
+      SFX.play('destroy');
       GAME.triggerDeathrattle(c,c.owner);
       var cEl=findCardEl(c);
       if(cEl){
@@ -3064,6 +3180,7 @@ var GAME={
 
   endGame:function(won){
     GAME.gameOver=true;GAME.phase='end';
+    SFX.play(won?'victory':'defeat');
     // 打扫战场：清空所有卡牌贴图，释放卡面图片引用
     GAME.cleanupBattlefield();
     var dlg=$('dialog');
@@ -3576,6 +3693,7 @@ var GAME={
     var pl=GAME.player;
     card.supSide=side;card.zone='support';card.owner=pl;card.justDeployed=true;card.justPlayed=true;pl.support.push(card);
     GAME.log('部署 '+UI[card.ut]+' <b>'+card.cn+'</b> ('+card.effectiveAtk+'/'+card.hp+(card.armor?' \uD83D\uDEE1'+card.armor:'')+') \u2192支援阵线'+(side==='L'?'左侧':'右侧'),'play');
+    SFX.play('deploy');
     showCardPlayed(card,true);
     GAME.setPrompt(card);
     var isHeavy=card.ut!=='X'&&(card.atk+card.hp)>=10;
@@ -3710,6 +3828,7 @@ var GAME={
     c.spendAP(1);
     if(c.hasS)c.smokescreenActive=false;
     GAME.log(c.cn+' \u27A1 推线至前线 <span style="color:#f9c74f;font-weight:700">\u26A1'+c.acost+'</span>','combat');
+    SFX.play('push');
     GAME.selected=null;GAME.pendingPush=null;GAME.render();
 
     // 推线轨迹特效（使用render前保存的旧坐标 + render后的新坐标）
@@ -4217,6 +4336,7 @@ var GAME={
 
   // ==================== 回合流转 ====================
   _startTurn:function(who,skipDraw){
+    SFX.play('turn');
     var opp=who===GAME.player?GAME.enemy:GAME.player;
     if(who.maxCmd<12)who.baseMaxCmd=Math.min(12,who.baseMaxCmd+1);
     who.maxCmd=Math.min(24,who.baseMaxCmd+who.cmdBonus);
