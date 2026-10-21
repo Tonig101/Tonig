@@ -2,7 +2,7 @@ import dataclasses,functools
 
 
 @dataclasses.dataclass
-class Father(object):
+class Father:
     name: str
     gender: str = '男'
 
