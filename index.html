@@ -336,6 +336,9 @@ body{background:var(--bg);color:var(--w);min-height:100vh;display:flex;justify-c
 @keyframes cardDrop{0%{transform:translateY(-120px) scale(1.5);opacity:0}60%{transform:translateY(0) scale(1.02);opacity:1}100%{transform:translateY(0) scale(1);opacity:1}}
 .card.card-drop{animation:cardDrop .5s cubic-bezier(.22,.61,.36,1) forwards}
 
+@keyframes joinFromRight{0%{transform:translateX(80px);opacity:0}100%{transform:translateX(0);opacity:1}}
+.card.join-slide{animation:joinFromRight .4s cubic-bezier(.22,.61,.36,1) forwards}
+
 /* ===== 重型单位部署动画：抬升→变大→悬停蓄力→重重摔下→余震 ===== */
 @keyframes heavyDeploy{
   0%{transform:translateY(0) scale(1);opacity:1;filter:brightness(1)}
@@ -2538,16 +2541,16 @@ var GAME={
         }
         who.draw(1);GAME.log('\uD83D\uDCCB 工业动员\u2192抽1张牌','effect');break;
       case'summonPara':
-        for(var k=0;k<2;k++){if(who.support.length<4){var pc=new Card(['空降兵','Paratrooper',who.fc,'I',2,2,2,1,0,'B','','']);pc.owner=who;pc.zone='support';pc.justDeployed=true;who.support.push(pc)}}
+        for(var k=0;k<2;k++){if(who.support.length<4){var pc=new Card(['空降兵','Paratrooper',who.fc,'I',2,2,2,1,0,'B','','']);pc.owner=who;pc.zone='support';pc.justDeployed=true;pc.joinedNotDeployed=true;pc.justPlayed=true;who.support.push(pc)}}
         GAME.log('\uD83D\uDEEB 空降师→加入2个闪击空降兵（2/2）','effect');break;
       case'summonScout':
-        for(var k=0;k<2;k++){if(who.support.length<4){var sc=new Card(['侦察兵','Scout','J','I',1,2,1,1,0,'','受到伤害时，抽一张牌。','drawOnDmg',4]);sc.owner=who;sc.zone='support';sc.justDeployed=true;if(!sc.canActOnDeploy){sc.canAct=false;sc.apSpent=99}who.support.push(sc)}}
+        for(var k=0;k<2;k++){if(who.support.length<4){var sc=new Card(['侦察兵','Scout','J','I',1,2,1,1,0,'','受到伤害时，抽一张牌。','drawOnDmg',4]);sc.owner=who;sc.zone='support';sc.justDeployed=true;sc.joinedNotDeployed=true;sc.justPlayed=true;if(!sc.canActOnDeploy){sc.canAct=false;sc.apSpent=99}who.support.push(sc)}}
         GAME.log('\uD83D\uDD0D 侦察队→加入2个侦察兵（1/2）','effect');break;
       case'humanWave':
         var hwCount=0;var mobList=[];
         while(who.support.length<4){
           var mob=new Card(['动员兵','Mobilized Infantry','S','I',3,1,1,1,0,'','亡计：对随机一个敌方单位造成2点伤害。','dr_dmg2',4]);
-          mob.owner=who;mob.zone='support';mob.justDeployed=true;
+          mob.owner=who;mob.zone='support';mob.justDeployed=true;mob.joinedNotDeployed=true;mob.justPlayed=true;
           if(mob.kw.indexOf('B')<0)mob.kw+='B';
           mob.hasB=true;mob.origKw=mob.kw;
           who.support.push(mob);mobList.push(mob);hwCount++;
@@ -2578,7 +2581,7 @@ var GAME={
         oppFl.forEach(function(x){x.hp=x.maxHp;x.zone='support';if(opp.support.length<4){opp.support.push(x);}else{x.zone='hand';x.resetToBase();opp.hand.push(x);}});
         GAME.log('\u23F3 拖延战术\u2192敌方全体撤退','effect');break;
       case'radarAlert':
-        if(who.support.length<4){var hg=new Card(['本土防卫军','Home Guard','B','I',1,3,1,1,0,'G','守护。亡计：为总部回复2点生命值。','dr_heal2',4]);hg.owner=who;hg.zone='support';hg.justDeployed=true;if(!hg.canActOnDeploy){hg.canAct=false;hg.apSpent=99}var enemyCount=opp.allUnits().filter(function(x){return x.hp>0}).length;if(enemyCount>0){hg.hp+=enemyCount;hg.maxHp+=enemyCount}who.support.push(hg);GAME.log('\uD83D\uDD0D 雷达警报\u2192加入本土防卫军'+(enemyCount>0?'+'+enemyCount+'血':''),'effect')}
+        if(who.support.length<4){var hg=new Card(['本土防卫军','Home Guard','B','I',1,3,1,1,0,'G','守护。亡计：为总部回复2点生命值。','dr_heal2',4]);hg.owner=who;hg.zone='support';hg.justDeployed=true;hg.joinedNotDeployed=true;hg.justPlayed=true;if(!hg.canActOnDeploy){hg.canAct=false;hg.apSpent=99}var enemyCount=opp.allUnits().filter(function(x){return x.hp>0}).length;if(enemyCount>0){hg.hp+=enemyCount;hg.maxHp+=enemyCount}who.support.push(hg);GAME.log('\uD83D\uDD0D 雷达警报\u2192加入本土防卫军'+(enemyCount>0?'+'+enemyCount+'血':''),'effect')}
         break;
       case'revealHand':
         var revN=Math.min(3,opp.hand.length);var revIdx=[];for(var ri=0;ri<revN;ri++){var rj=Math.floor(Math.random()*opp.hand.length);if(revIdx.indexOf(rj)<0)revIdx.push(rj)}
@@ -3063,7 +3066,7 @@ var GAME={
       case'dr_heal2':
         owner.hp=owner.hp+2;owner.maxHp=owner.maxHp+2;var hhq=findHQEl(owner);if(hhq)floatDamage(hhq,2,'heal');GAME.log('\u2620 亡计：'+card.cn+' 为总部回复2生命','effect');break;
       case'dr_summon2_2':
-        if(owner.support.length<4){var s22=new Card(['近卫第8步兵师','8th Guards Infantry',owner.fc,'I',3,4,2,1,0,'G','','']);s22.owner=owner;s22.zone='support';s22.justDeployed=true;s22.supSide=s22.supSide||'R';if(!s22.canActOnDeploy){s22.canAct=false;s22.apSpent=99}owner.support.push(s22);GAME.log('\u2620 亡计：'+card.cn+' 在支援阵线加入近卫第8步兵师3/4','effect')}
+        if(owner.support.length<4){var s22=new Card(['近卫第8步兵师','8th Guards Infantry',owner.fc,'I',3,4,2,1,0,'G','','']);s22.owner=owner;s22.zone='support';s22.justDeployed=true;s22.joinedNotDeployed=true;s22.justPlayed=true;s22.supSide=s22.supSide||'R';if(!s22.canActOnDeploy){s22.canAct=false;s22.apSpent=99}owner.support.push(s22);GAME.log('\u2620 亡计：'+card.cn+' 在支援阵线加入近卫第8步兵师3/4','effect')}
         break;
       case'dr_summonUS4':
         var usPool=CP.filter(function(c){return c.length>=6&&c[2]==='U'&&c[3]!=='X'&&(c[6]||0)<=4&&c[0]!=='M4谢尔曼'});
@@ -3216,10 +3219,11 @@ var GAME={
     if(!targetLine)targetLine='support';
     if(targetLine==='support'&&owner.support.length>=4)return false;
     if(targetLine==='frontline'&&(GAME.flTotal()>=5||(owner===GAME.player?GAME.enemy:owner).fl.length>0))return false;
-    card.zone=targetLine;card.owner=owner;card.joinedNotDeployed=true;card.justDeployed=true;
+    card.zone=targetLine;card.owner=owner;card.joinedNotDeployed=true;card.justDeployed=true;card.justPlayed=true;
     if(targetLine==='support'){card.supSide=card.supSide||(Math.random()<0.5?'L':'R');owner.support.push(card)}
     else owner.fl.push(card);
     GAME.log(card.cn+' 加入战场（'+targetLine+'）— 不触发部署效果','effect');
+    setTimeout(function(){card.justPlayed=false},500);
     if(!card.canActOnDeploy){card.canAct=false;card.apSpent=99}
     // 牛津：加入的守护单位获得增益
     if(card.hasG){
@@ -3315,6 +3319,12 @@ var GAME={
       });
     }
     GAME.cleanup(opp,1500);
+    // 清理加入战场单位的动画标记
+    setTimeout(function(){
+      owner.allUnits().forEach(function(u){
+        if(u.justPlayed && u.joinedNotDeployed) u.justPlayed = false;
+      });
+    }, 600);
   },
 
   // ---------- 检查胜负 ----------
@@ -3371,6 +3381,7 @@ var GAME={
     var pl=GAME.player,en=GAME.enemy;
     if(!pl||!en)return;
     if(SANDBOX.active&&SANDBOX.unlimitedHp){pl.hp=pl.maxHp||20;}
+    GAME._joinSeq=0;
 
     // 拖拽单位时：只渲染插槽，不重建手牌DOM（避免打断浏览器拖拽）
     var _pl=pl,drUnit=GAME._dragCard&&!GAME._dragCard.isOrder;
@@ -3482,7 +3493,13 @@ var GAME={
         var isPlayer=c.owner===GAME.player;
         var hl=(GAME.phase==='play'&&isPlayer&&(c.zone==='frontline'?c.canStillAtk:c.canStillAct));
         var el=GAME._mkCardEl(c,hl);
-        if(c.justPlayed)el.classList.add((c.ut!=='X'&&(c.atk+c.hp)>=10)?'heavy-deploy':'just-played');
+        if(c.justPlayed){
+          if(c.joinedNotDeployed){
+            GAME._joinSeq++;el.classList.add('join-slide');el.style.animationDelay=((GAME._joinSeq-1)*0.08)+'s';
+          }else{
+            el.classList.add((c.ut!=='X'&&(c.atk+c.hp)>=10)?'heavy-deploy':'just-played');
+          }
+        }
         if(c.hasG&&!c.dying)el.classList.add('guard-active');
         if(validTargets&&validTargets.has(c)){el.classList.add('can-target');el.style.cursor='crosshair'}
         if(GAME.phase==='selectTarget'&&GAME.pendingEffect&&GAME.pendingEffect.targets.indexOf(c)>=0){
@@ -3508,6 +3525,7 @@ var GAME={
               GAME.render();
             });
             el.addEventListener('dragend',function(e){
+              if(!GAME._dragPush){el.classList.remove('dragging');return;}
               GAME._dragPush=null;el.classList.remove('dragging');
               GAME.render();
             });
@@ -3661,7 +3679,10 @@ var GAME={
         var enFlDiv=document.createElement('div');enFlDiv.className='fl-group enemy-fl';
         en.fl.forEach(function(c){
           var hl=false;var el=GAME._mkCardEl(c,hl);
-          if(c.justPlayed)el.classList.add((c.ut!=='X'&&(c.atk+c.hp)>=10)?'heavy-deploy':'just-played');
+          if(c.justPlayed){
+            if(c.joinedNotDeployed){GAME._joinSeq++;el.classList.add('join-slide');el.style.animationDelay=((GAME._joinSeq-1)*0.08)+'s';}
+            else{el.classList.add((c.ut!=='X'&&(c.atk+c.hp)>=10)?'heavy-deploy':'just-played');}
+          }
           if(validTargets&&validTargets.has(c)){el.classList.add('can-target');el.style.cursor='crosshair'}
           if(GAME.phase==='selectTarget'&&GAME.pendingEffect&&GAME.pendingEffect.targets.indexOf(c)>=0){
             el.classList.add('effect-target');el.style.cursor='crosshair';el.onclick=function(){GAME.onEffectTargetClick(c)};
@@ -3679,7 +3700,10 @@ var GAME={
           plFlDiv.appendChild(mkPushSlotTouch(0));
           pl.fl.forEach(function(c,i){
             var el=GAME._mkCardEl(c,false);
-            if(c.justPlayed)el.classList.add((c.ut!=='X'&&(c.atk+c.hp)>=10)?'heavy-deploy':'just-played');
+            if(c.justPlayed){
+              if(c.joinedNotDeployed){GAME._joinSeq++;el.classList.add('join-slide');el.style.animationDelay=((GAME._joinSeq-1)*0.08)+'s';}
+              else{el.classList.add((c.ut!=='X'&&(c.atk+c.hp)>=10)?'heavy-deploy':'just-played');}
+            }
             plFlDiv.appendChild(el);
             plFlDiv.appendChild(mkPushSlotTouch(i+1));
           });
@@ -3687,7 +3711,10 @@ var GAME={
           pl.fl.forEach(function(c){
             var hl=(GAME.phase==='play'&&c.canStillAct);
             var el=GAME._mkCardEl(c,hl);
-            if(c.justPlayed)el.classList.add((c.ut!=='X'&&(c.atk+c.hp)>=10)?'heavy-deploy':'just-played');
+            if(c.justPlayed){
+              if(c.joinedNotDeployed){GAME._joinSeq++;el.classList.add('join-slide');el.style.animationDelay=((GAME._joinSeq-1)*0.08)+'s';}
+              else{el.classList.add((c.ut!=='X'&&(c.atk+c.hp)>=10)?'heavy-deploy':'just-played');}
+            }
             if(validTargets&&validTargets.has(c)){el.classList.add('can-target');el.style.cursor='crosshair'}
             if(GAME.phase==='selectTarget'&&GAME.pendingEffect&&GAME.pendingEffect.targets.indexOf(c)>=0){
               el.classList.add('effect-target');el.style.cursor='crosshair';el.onclick=function(){GAME.onEffectTargetClick(c)};
@@ -4152,7 +4179,8 @@ var GAME={
     if(c.hasS)c.smokescreenActive=false;
     GAME.log(c.cn+' \u27A1 推线至前线 <span style="color:#f9c74f;font-weight:700">\u26A1'+c.acost+'</span>','combat');
     SFX.play('push',c.ut);
-    GAME.selected=null;GAME.pendingPush=null;GAME.render();
+    GAME.selected=null;GAME.pendingPush=null;
+    GAME.render();
 
     // 推线轨迹特效（使用render前保存的旧坐标 + render后的新坐标）
     setTimeout(function(){
@@ -4175,6 +4203,7 @@ var GAME={
     var c=GAME.pendingPush;
     if(!c||GAME.phase!=='play')return;
     if(c.zone!=='support')return toast('只有支援阵线的单位可以推线');
+    if(GAME.player.support.indexOf(c)<0)return;
     if(!GAME.canPush(GAME.player))return toast('无法推线');
     if(!c.canStillMove)return toast('已无法移动');
     if(GAME.player.cmd<c.acost)return toast('指挥点不足（需'+c.acost+'点）');
@@ -4188,7 +4217,8 @@ var GAME={
     if(c.hasS)c.smokescreenActive=false;
     GAME.log(c.cn+' \u27A1 推线至前线 第'+(pos+1)+'位 <span style="color:#f9c74f;font-weight:700">\u26A1'+c.acost+'</span>','combat');
     SFX.play('push',c.ut);
-    GAME.selected=null;GAME.pendingPush=null;GAME.render();
+    GAME.selected=null;GAME.pendingPush=null;
+    GAME.render();
     setTimeout(function(){
       var newEl=findCardEl(c);
       playPushTrailFromRect(oldRect,newEl,c)
