@@ -47,6 +47,12 @@ body{background:var(--bg);color:var(--w);min-height:100vh;display:flex;justify-c
 .sup-left{justify-content:flex-end;border-right:3px solid rgba(204,68,68,.35)}
 .sup-right{justify-content:flex-start;border-left:3px solid rgba(68,170,136,.35)}
 .sup-left.side-target,.sup-right.side-target{cursor:pointer;border-color:#f9c74f!important;box-shadow:inset 0 0 20px rgba(249,199,79,.25)}
+.insert-slot{width:28px;min-height:96px;border:2px dashed rgba(249,199,79,.35);border-radius:6px;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all .15s;flex-shrink:0;background:rgba(249,199,79,.04)}
+.insert-slot:hover{background:rgba(249,199,79,.18);border-color:#f9c74f;box-shadow:0 0 14px rgba(249,199,79,.25)}
+.insert-slot::after{content:'+';color:rgba(249,199,79,.5);font-size:1.3rem;font-weight:700;transition:color .15s}
+.insert-slot:hover::after{color:#f9c74f}
+.insert-slot.drag-over{background:rgba(249,199,79,.28);border-color:#f9c74f;box-shadow:0 0 20px rgba(249,199,79,.4);transform:scale(1.08)}
+.insert-slot.drag-over::after{color:#f9c74f;font-size:1.6rem}
 #enSupportL,#enSupportR,#plSupportL,#plSupportR{flex-shrink:0}
 .zone-units.frontline{background:#14120d;border:2px dashed #543;min-height:86px;justify-content:center;flex-wrap:wrap;gap:4px}
 .fl-group{display:flex;gap:7px;align-items:flex-start}
@@ -2422,7 +2428,7 @@ var GAME={
   pendingPush:null,
   pendingEffect:null,
   pendingOrder:null,
-  _dragCard:null, _dragPush:null,
+  _dragCard:null, _dragPush:null, _dragStarted:false,
   gameOver:false,
   _pendingAnims:[],
   isTouchDevice:(function(){if(!('ontouchstart'in window)&&!(navigator.maxTouchPoints>0))return false;if(window.matchMedia&&window.matchMedia('(pointer:coarse)').matches)return true;return false;})(),
@@ -3368,6 +3374,44 @@ var GAME={
     if(!pl||!en)return;
     if(SANDBOX.active&&SANDBOX.unlimitedHp){pl.hp=pl.maxHp||20;}
 
+    // 拖拽单位时：只渲染插槽，不重建手牌DOM（避免打断浏览器拖拽）
+    var _pl=pl,drUnit=GAME._dragCard&&!GAME._dragCard.isOrder;
+    if(drUnit){
+      var plSL=$('plSupportL'),plSR=$('plSupportR');
+      plSL.classList.toggle('side-target',false);plSR.classList.toggle('side-target',false);
+      plSL.innerHTML='';plSR.innerHTML='';
+      var plSupL=_pl.support.filter(function(c){return c.supSide==='L'});
+      var plSupR=_pl.support.filter(function(c){return c.supSide!=='L'});
+      var mkSlot=function(side,pos){
+        var s=document.createElement('div');s.className='insert-slot';
+        s.title='\uD83D\uDCCD 部署到此处（'+(side==='L'?'左侧第'+(pos+1)+'位':'右侧第'+(pos+1)+'位')+'）';
+        s.onclick=function(){GAME.deployToSlot(side,pos)};
+        s.addEventListener('dragover',function(e){
+          if(!GAME._dragCard||GAME._dragCard.isOrder||GAME.gameOver)return;
+          e.preventDefault();e.dataTransfer.dropEffect='move';
+          s.classList.add('drag-over');
+        });
+        s.addEventListener('dragleave',function(){s.classList.remove('drag-over')});
+        s.addEventListener('drop',function(e){
+          e.preventDefault();e.stopPropagation();
+          s.classList.remove('drag-over');
+          GAME.dropToSlot(side,pos);
+        });
+        return s;
+      };
+      plSL.appendChild(mkSlot('L',0));
+      plSupL.forEach(function(c,i){
+        var el=GAME._mkCardEl(c,false);el.classList.add('occupied');el.draggable=false;plSL.appendChild(el);
+        plSL.appendChild(mkSlot('L',i+1));
+      });
+      plSupR.forEach(function(c,i){
+        plSR.appendChild(mkSlot('R',i));
+        var el=GAME._mkCardEl(c,false);el.classList.add('occupied');el.draggable=false;plSR.appendChild(el);
+      });
+      plSR.appendChild(mkSlot('R',plSupR.length));
+      return;
+    }
+
     $('plName').textContent=pl.name;
     var plFB=$('plFaction');plFB.textContent=FA_ICON[pl.fc]+' '+FA[pl.fc];
     plFB.style.background=FA_COLOR[pl.fc];plFB.style.color='#fff';
@@ -3449,19 +3493,47 @@ var GAME={
     var plSL=$('plSupportL'),plSR=$('plSupportR');
     var enSL=$('enSupportL'),enSR=$('enSupportR');
 
-    // 选边模式高亮
-    var choosingSide=!!GAME.pendingDeploy;
-    plSL.classList.toggle('side-target',choosingSide);
-    plSR.classList.toggle('side-target',choosingSide);
+    // 选边模式 → 插孔部署：点击或拖拽单位时展示插入槽
+    var dragUnit=GAME._dragCard&&!GAME._dragCard.isOrder;
+    var choosingSide=!!GAME.pendingDeploy||dragUnit;
+    plSL.classList.toggle('side-target',false);
+    plSR.classList.toggle('side-target',false);
     if(choosingSide){
-      plSL.onclick=function(){GAME.deployToSide('L')};
-      plSR.onclick=function(){GAME.deployToSide('R')};
+      plSL.innerHTML='';plSR.innerHTML='';
+      var mkSlot=function(side,pos){
+        var s=document.createElement('div');s.className='insert-slot';
+        s.title='\uD83D\uDCCD 部署到此处（'+(side==='L'?'左侧第'+(pos+1)+'位':'右侧第'+(pos+1)+'位')+'）';
+        s.onclick=function(){GAME.deployToSlot(side,pos)};
+        // 拖拽落点
+        s.addEventListener('dragover',function(e){
+          if(!GAME._dragCard||GAME._dragCard.isOrder||GAME.gameOver)return;
+          e.preventDefault();e.dataTransfer.dropEffect='move';
+          s.classList.add('drag-over');
+        });
+        s.addEventListener('dragleave',function(){s.classList.remove('drag-over')});
+        s.addEventListener('drop',function(e){
+          e.preventDefault();e.stopPropagation();
+          s.classList.remove('drag-over');
+          GAME.dropToSlot(side,pos);
+        });
+        return s;
+      };
+      plSL.appendChild(mkSlot('L',0));
+      plSupL.forEach(function(c,i){
+        var el=GAME._mkCardEl(c,false);el.classList.add('occupied');el.draggable=false;plSL.appendChild(el);
+        plSL.appendChild(mkSlot('L',i+1));
+      });
+      plSupR.forEach(function(c,i){
+        plSR.appendChild(mkSlot('R',i));
+        var el=GAME._mkCardEl(c,false);el.classList.add('occupied');el.draggable=false;plSR.appendChild(el);
+      });
+      plSR.appendChild(mkSlot('R',plSupR.length));
+      
     }else{
       plSL.onclick=null;plSR.onclick=null;
+      renderZone(plSL,plSupL,false);
+      renderZone(plSR,plSupR,false);
     }
-
-    renderZone(plSL,plSupL,false);
-    renderZone(plSR,plSupR,false);
     renderZone(enSL,enSupL,false);
     renderZone(enSR,enSupR,false);
 
@@ -3608,15 +3680,25 @@ var GAME={
           el.draggable=true;
           el.addEventListener('dragstart',function(e){
             e.dataTransfer.setData('text/plain',c.en);e.dataTransfer.effectAllowed='move';
-            GAME._dragCard=c;el.classList.add('dragging');
+            GAME._dragCard=c;GAME._dragStarted=true;el.classList.add('dragging');
+            if(!c.isOrder)GAME.render();
           });
           el.addEventListener('dragend',function(){
+            var wasUnitDrag=GAME._dragCard&&!GAME._dragCard.isOrder;
             GAME._dragCard=null;el.classList.remove('dragging');
+            setTimeout(function(){GAME._dragStarted=false},0);
+            if(wasUnitDrag)GAME.render();
+          });
+          el.addEventListener('click',function(e){
+            if(GAME._dragStarted){GAME._dragStarted=false;return}
+            if(GAME.pendingDeploy)return toast('请先选择部署位置');
+            if(!ok)return toast('无法打出此牌');
+            GAME.tryPlay(c);
           });
         }
         hz.appendChild(el);
       });
-      $('handLabel').textContent=GAME.isTouchDevice?'点击手牌出牌 | 点击己方单位攻击':'拖拽卡牌出牌 | 点击己方单位攻击';
+      $('handLabel').textContent=GAME.isTouchDevice?'点击手牌出牌 | 点击己方单位攻击':'点击出牌（选槽位）/ 拖拽快速部署';
       // HQ 可攻击高亮
       var eir=$('enemyInfo');
       if(GAME.selected&&validTargets&&validTargets.has(null)){eir.classList.add('hq-target')}
@@ -3829,13 +3911,36 @@ var GAME={
     GAME._dragCard=null;
   },
 
-  // 选择支援阵线左侧/右侧完成部署
-  deployToSide:function(side){
+  // 拖拽到插槽：扣费并从手牌移除，再按位置部署
+  dropToSlot:function(side,pos){
+    var card=GAME._dragCard;
+    if(!card||GAME.gameOver)return;
+    GAME._dragCard=null;
+    if(card.isOrder||GAME.phase!=='play')return;
+    var pl=GAME.player;
+    if(card.cost>pl.cmd){toast('指挥点不足');GAME.render();return}
+    if(!pl.hand.some(function(h){return h===card})){GAME.render();return}
+    // 扣费、移除手牌
+    pl.hand=pl.hand.filter(function(x){return x!==card});
+    pl.cmd-=card.cost;
+    GAME.pendingDeploy=card;
+    GAME.deployToSlot(side,pos);
+    GAME._dragCard=null;
+  },
+
+  // 选择支援阵线指定槽位完成部署（pos 为该侧内的序号，0=最外 / 末尾=最靠HQ）
+  deployToSlot:function(side,pos){
     if(!GAME.pendingDeploy)return;
     var card=GAME.pendingDeploy;GAME.pendingDeploy=null;
     var pl=GAME.player;
-    card.supSide=side;card.zone='support';card.owner=pl;card.justDeployed=true;card.justPlayed=true;pl.support.push(card);
-    GAME.log('部署 '+UI[card.ut]+' <b>'+card.cn+'</b> ('+card.effectiveAtk+'/'+card.hp+(card.armor?' \uD83D\uDEE1'+card.armor:'')+') \u2192支援阵线'+(side==='L'?'左侧':'右侧'),'play');
+    card.supSide=side;card.zone='support';card.owner=pl;card.justDeployed=true;card.justPlayed=true;
+    // 将 support 数组分为左右两组，在指定侧指定位置插入后重排
+    var left=pl.support.filter(function(c){return c.supSide==='L'});
+    var right=pl.support.filter(function(c){return c.supSide!=='L'});
+    if(side==='L'){left.splice(pos,0,card)}else{right.splice(pos,0,card)}
+    pl.support.length=0;pl.support.push.apply(pl.support,left.concat(right));
+    var sideLabel=side==='L'?'左侧':'右侧';if(pos===0)sideLabel=side==='L'?'最左侧':'HQ右侧';else if((side==='L'?pos===left.length-1:pos===right.length-1)){sideLabel=side==='L'?'HQ左侧':'最右侧'}
+    GAME.log('部署 '+UI[card.ut]+' <b>'+card.cn+'</b> ('+card.effectiveAtk+'/'+card.hp+(card.armor?' \uD83D\uDEE1'+card.armor:'')+') \u2192支援阵线'+sideLabel+' 第'+(pos+1)+'位','play');
     var isHeavy=card.ut!=='X'&&(card.atk+card.hp)>=10;
     SFX.play(isHeavy?'deployHeavy':'deploy');
     showCardPlayed(card,true);
@@ -3859,6 +3964,13 @@ var GAME={
     $('btnCancel').style.display='none';
     $('handLabel').textContent='';
     GAME.render();if(GAME.checkEnd())return;
+  },
+
+  // 兼容旧接口：快速部署到左侧或右侧末尾
+  deployToSide:function(side){
+    var pl=GAME.player;
+    var count=pl.support.filter(function(c){return c.supSide===side}).length;
+    GAME.deployToSlot(side,count);
   },
 
   endPlayerTurn:function(){
@@ -5088,13 +5200,9 @@ $('enemyInfo').addEventListener('click',function(e){
     }
     var card=GAME._dragCard;GAME._dragCard=null;
     if(!card||GAME.gameOver)return;
-    // 单位：拖到我方支援阵线（左/右）部署；拖到其他位置则无效并提示
+    // 单位：需拖到插槽部署；拖到区域空白处取消
     if(!card.isOrder){
-      if(zoneId==='plSupportL'||zoneId==='plSupportR'){
-        GAME.dropPlay(card,zoneId==='plSupportL'?'L':'R');
-      }else{
-        toast('单位需拖到下方我方支援阵线部署');
-      }
+      GAME.render();
       return;
     }
     // 指令：拖到任意战场区域执行
@@ -5115,6 +5223,7 @@ if(arenaEl){
     var card=GAME._dragCard;GAME._dragCard=null;
     if(!card||GAME.gameOver)return;
     if(card.isOrder){GAME.dropPlay(card,null)}
+    else{GAME.render()}
   });
 }
 
@@ -5132,9 +5241,11 @@ if(handZoneEl){
   handZoneEl.addEventListener('drop',function(e){
     e.preventDefault();e.stopPropagation();
     handZoneEl.classList.remove('drag-over');
+    var wasUnitDrag=GAME._dragCard&&!GAME._dragCard.isOrder;
     GAME._dragPush=null;
     GAME._dragCard=null;
     GAME.log('\u21A9 取消拖拽','system');
+    if(wasUnitDrag)GAME.render();
   });
 }
 
@@ -5640,8 +5751,13 @@ var TUT={
   };
 })();
 
-// 钩子注入：拦截 deployToSide 以检测部署完成（覆盖点击选边和拖拽两种部署方式）
+// 钩子注入：拦截 deployToSlot / deployToSide 以检测部署完成
 (function(){
+  var _origDeployToSlot=GAME.deployToSlot;
+  GAME.deployToSlot=function(side,pos){
+    _origDeployToSlot.apply(this,arguments);
+    if(TUT.active){TUT.onDeployComplete()}
+  };
   var _origDeployToSide=GAME.deployToSide;
   GAME.deployToSide=function(side){
     _origDeployToSide.apply(this,arguments);
