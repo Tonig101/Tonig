@@ -336,8 +336,8 @@ body{background:var(--bg);color:var(--w);min-height:100vh;display:flex;justify-c
 @keyframes cardDrop{0%{transform:translateY(-120px) scale(1.5);opacity:0}60%{transform:translateY(0) scale(1.02);opacity:1}100%{transform:translateY(0) scale(1);opacity:1}}
 .card.card-drop{animation:cardDrop .5s cubic-bezier(.22,.61,.36,1) forwards}
 
-@keyframes joinFromRight{0%{transform:translateX(80px);opacity:0}100%{transform:translateX(0);opacity:1}}
-.card.join-slide{animation:joinFromRight .4s cubic-bezier(.22,.61,.36,1) forwards}
+@keyframes joinFromRight{0%{transform:translateX(130px) scale(.8);opacity:.1;box-shadow:0 0 18px rgba(100,220,100,.55)}100%{transform:translateX(0) scale(1);opacity:1;box-shadow:0 0 0px rgba(100,220,100,0)}}
+.card.join-slide{animation:joinFromRight .55s cubic-bezier(.22,.61,.36,1) forwards}
 
 /* ===== 重型单位部署动画：抬升→变大→悬停蓄力→重重摔下→余震 ===== */
 @keyframes heavyDeploy{
@@ -2541,16 +2541,16 @@ var GAME={
         }
         who.draw(1);GAME.log('\uD83D\uDCCB 工业动员\u2192抽1张牌','effect');break;
       case'summonPara':
-        for(var k=0;k<2;k++){if(who.support.length<4){var pc=new Card(['空降兵','Paratrooper',who.fc,'I',2,2,2,1,0,'B','','']);pc.owner=who;pc.zone='support';pc.justDeployed=true;pc.joinedNotDeployed=true;pc.justPlayed=true;who.support.push(pc)}}
+        for(var k=0;k<2;k++){if(who.support.length<4){var pc=new Card(['空降兵','Paratrooper',who.fc,'I',2,2,2,1,0,'B','','']);pc.owner=who;pc.zone='support';pc.supSide='R';pc.justDeployed=true;pc.joinedNotDeployed=true;pc.justPlayed=true;who.support.push(pc)}}
         GAME.log('\uD83D\uDEEB 空降师→加入2个闪击空降兵（2/2）','effect');break;
       case'summonScout':
-        for(var k=0;k<2;k++){if(who.support.length<4){var sc=new Card(['侦察兵','Scout','J','I',1,2,1,1,0,'','受到伤害时，抽一张牌。','drawOnDmg',4]);sc.owner=who;sc.zone='support';sc.justDeployed=true;sc.joinedNotDeployed=true;sc.justPlayed=true;if(!sc.canActOnDeploy){sc.canAct=false;sc.apSpent=99}who.support.push(sc)}}
+        for(var k=0;k<2;k++){if(who.support.length<4){var sc=new Card(['侦察兵','Scout','J','I',1,2,1,1,0,'','受到伤害时，抽一张牌。','drawOnDmg',4]);sc.owner=who;sc.zone='support';sc.supSide='R';sc.justDeployed=true;sc.joinedNotDeployed=true;sc.justPlayed=true;if(!sc.canActOnDeploy){sc.canAct=false;sc.apSpent=99}who.support.push(sc)}}
         GAME.log('\uD83D\uDD0D 侦察队→加入2个侦察兵（1/2）','effect');break;
       case'humanWave':
         var hwCount=0;var mobList=[];
         while(who.support.length<4){
           var mob=new Card(['动员兵','Mobilized Infantry','S','I',3,1,1,1,0,'','亡计：对随机一个敌方单位造成2点伤害。','dr_dmg2',4]);
-          mob.owner=who;mob.zone='support';mob.justDeployed=true;mob.joinedNotDeployed=true;mob.justPlayed=true;
+          mob.owner=who;mob.zone='support';mob.supSide='R';mob.justDeployed=true;mob.joinedNotDeployed=true;mob.justPlayed=true;
           if(mob.kw.indexOf('B')<0)mob.kw+='B';
           mob.hasB=true;mob.origKw=mob.kw;
           who.support.push(mob);mobList.push(mob);hwCount++;
@@ -2581,7 +2581,7 @@ var GAME={
         oppFl.forEach(function(x){x.hp=x.maxHp;x.zone='support';if(opp.support.length<4){opp.support.push(x);}else{x.zone='hand';x.resetToBase();opp.hand.push(x);}});
         GAME.log('\u23F3 拖延战术\u2192敌方全体撤退','effect');break;
       case'radarAlert':
-        if(who.support.length<4){var hg=new Card(['本土防卫军','Home Guard','B','I',1,3,1,1,0,'G','守护。亡计：为总部回复2点生命值。','dr_heal2',4]);hg.owner=who;hg.zone='support';hg.justDeployed=true;hg.joinedNotDeployed=true;hg.justPlayed=true;if(!hg.canActOnDeploy){hg.canAct=false;hg.apSpent=99}var enemyCount=opp.allUnits().filter(function(x){return x.hp>0}).length;if(enemyCount>0){hg.hp+=enemyCount;hg.maxHp+=enemyCount}who.support.push(hg);GAME.log('\uD83D\uDD0D 雷达警报\u2192加入本土防卫军'+(enemyCount>0?'+'+enemyCount+'血':''),'effect')}
+        if(who.support.length<4){var hg=new Card(['本土防卫军','Home Guard','B','I',1,3,1,1,0,'G','守护。亡计：为总部回复2点生命值。','dr_heal2',4]);hg.owner=who;hg.zone='support';hg.supSide='R';hg.justDeployed=true;hg.joinedNotDeployed=true;hg.justPlayed=true;if(!hg.canActOnDeploy){hg.canAct=false;hg.apSpent=99}var enemyCount=opp.allUnits().filter(function(x){return x.hp>0}).length;if(enemyCount>0){hg.hp+=enemyCount;hg.maxHp+=enemyCount}who.support.push(hg);GAME.log('\uD83D\uDD0D 雷达警报\u2192加入本土防卫军'+(enemyCount>0?'+'+enemyCount+'血':''),'effect')}
         break;
       case'revealHand':
         var revN=Math.min(3,opp.hand.length);var revIdx=[];for(var ri=0;ri<revN;ri++){var rj=Math.floor(Math.random()*opp.hand.length);if(revIdx.indexOf(rj)<0)revIdx.push(rj)}
@@ -2605,6 +2605,9 @@ var GAME={
       case'draw2':
         who.draw(2);GAME.log('📋 扩张→抽2张牌','effect');break;
     }
+    who.allUnits().forEach(function(u){
+      if(u.joinedNotDeployed&&u.justPlayed){(function(t){setTimeout(function(){t.justPlayed=false;t.joinedNotDeployed=false},550)})(u)}
+    });
     GAME.cleanup(opp,1500);
     GAME.cleanup(who,1500);
   },
@@ -3066,7 +3069,7 @@ var GAME={
       case'dr_heal2':
         owner.hp=owner.hp+2;owner.maxHp=owner.maxHp+2;var hhq=findHQEl(owner);if(hhq)floatDamage(hhq,2,'heal');GAME.log('\u2620 亡计：'+card.cn+' 为总部回复2生命','effect');break;
       case'dr_summon2_2':
-        if(owner.support.length<4){var s22=new Card(['近卫第8步兵师','8th Guards Infantry',owner.fc,'I',3,4,2,1,0,'G','','']);s22.owner=owner;s22.zone='support';s22.justDeployed=true;s22.joinedNotDeployed=true;s22.justPlayed=true;s22.supSide=s22.supSide||'R';if(!s22.canActOnDeploy){s22.canAct=false;s22.apSpent=99}owner.support.push(s22);GAME.log('\u2620 亡计：'+card.cn+' 在支援阵线加入近卫第8步兵师3/4','effect')}
+        if(owner.support.length<4){var s22=new Card(['近卫第8步兵师','8th Guards Infantry',owner.fc,'I',3,4,2,1,0,'G','','']);s22.owner=owner;s22.zone='support';s22.supSide=s22.supSide||'R';s22.justDeployed=true;s22.joinedNotDeployed=true;s22.justPlayed=true;if(!s22.canActOnDeploy){s22.canAct=false;s22.apSpent=99}owner.support.push(s22);GAME.log('\u2620 亡计：'+card.cn+' 在支援阵线加入近卫第8步兵师3/4','effect')}
         break;
       case'dr_summonUS4':
         var usPool=CP.filter(function(c){return c.length>=6&&c[2]==='U'&&c[3]!=='X'&&(c[6]||0)<=4&&c[0]!=='M4谢尔曼'});
@@ -3533,6 +3536,7 @@ var GAME={
         }
         container.appendChild(el);
       });
+      void container.offsetHeight;
     }
     // 支援阵线：按 supSide 分左右
     var plSupL=pl.support.filter(function(c){return c.supSide==='L'});
