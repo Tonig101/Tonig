@@ -3410,6 +3410,38 @@ var GAME={
       return;
     }
 
+    // 拖拽推线时：只渲染前线插槽，不动支援阵线DOM（避免打断浏览器拖拽）
+    var drPush=GAME._dragPush;
+    if(drPush && !drUnit){
+      var enFL=GAME.enemy.fl;
+      var fl=$('frontline');fl.innerHTML='';
+      fl.classList.add('push-active');
+      var mkPushSlot=function(pos){
+        var s=document.createElement('div');s.className='insert-slot push-slot';
+        s.title='\u27A1 推线至前线第'+(pos+1)+'位';
+        s.addEventListener('dragover',function(e){e.preventDefault();e.dataTransfer.dropEffect='move';s.classList.add('drag-over')});
+        s.addEventListener('dragleave',function(){s.classList.remove('drag-over')});
+        s.addEventListener('drop',function(e){e.preventDefault();e.stopPropagation();s.classList.remove('drag-over');GAME.dropPushToSlot(pos)});
+        return s;
+      };
+      if(enFL.length){
+        var enFlDiv=document.createElement('div');enFlDiv.className='fl-group enemy-fl';
+        enFL.forEach(function(c){enFlDiv.appendChild(GAME._mkCardEl(c,false))});
+        fl.appendChild(enFlDiv);
+      }
+      if(_pl.fl.length&&enFL.length){
+        var sep=document.createElement('div');sep.className='fl-separator';sep.textContent='\u2694';fl.appendChild(sep);
+      }
+      var plFlDiv=document.createElement('div');plFlDiv.className='fl-group player-fl';
+      plFlDiv.appendChild(mkPushSlot(0));
+      _pl.fl.forEach(function(c,i){
+        plFlDiv.appendChild(GAME._mkCardEl(c,false));
+        plFlDiv.appendChild(mkPushSlot(i+1));
+      });
+      fl.appendChild(plFlDiv);
+      return;
+    }
+
     $('plName').textContent=pl.name;
     var plFB=$('plFaction');plFB.textContent=FA_ICON[pl.fc]+' '+FA[pl.fc];
     plFB.style.background=FA_COLOR[pl.fc];plFB.style.color='#fff';
@@ -3473,9 +3505,11 @@ var GAME={
             el.addEventListener('dragstart',function(e){
               e.dataTransfer.setData('text/plain','push:'+c.en);e.dataTransfer.effectAllowed='move';
               GAME._dragPush=c;GAME._dragCard=null;el.classList.add('dragging');
+              GAME.render();
             });
             el.addEventListener('dragend',function(e){
               GAME._dragPush=null;el.classList.remove('dragging');
+              GAME.render();
             });
           }
         }
@@ -3606,13 +3640,19 @@ var GAME={
     markGuarded(enSR,enSupR,$('enemyInfo'),checkHQGuarded(enSupL,enSupR));
     // 前线守护在渲染完后标记
 
-    // 前线：敌方单位 | 分隔 | 我方单位
+    // 前线：敌方单位 | 分隔 | 我方单位（推线时显示插槽）
     var fl=$('frontline');fl.innerHTML='';
-    fl.classList.toggle('push-target',!!GAME.pendingPush&&GAME.isTouchDevice);
-    if(GAME.pendingPush&&GAME.isTouchDevice){fl.onclick=function(){if(GAME.pendingPush)GAME.pushToFL();}}else{fl.onclick=null;}
+    var isPushing=!!GAME.pendingPush&&GAME.isTouchDevice;
+    fl.classList.toggle('push-target',isPushing);
+    fl.onclick=null;
     if(!pl.fl.length&&!en.fl.length){
-      if(GAME.pendingPush&&GAME.isTouchDevice){
-        fl.innerHTML='<span class="push-target-text">\uD83D\uDC46 \u70B9\u51FB\u6B64\u5904\u63A8\u7EBF\u81F3\u524D\u7EBF</span>';
+      if(isPushing){
+        var plFlDiv=document.createElement('div');plFlDiv.className='fl-group player-fl';
+        var s=document.createElement('div');s.className='insert-slot push-slot';
+        s.title='\u27A1 \u70B9\u51FB\u63A8\u7EBF\u81F3\u524D\u7EBF';
+        s.onclick=function(){if(GAME.pendingPush)GAME.pushToSlot(0)};
+        plFlDiv.appendChild(s);
+        fl.appendChild(plFlDiv);
       }else{
         fl.innerHTML='<span class="empty-text">前线（空）</span>';
       }
@@ -3635,18 +3675,39 @@ var GAME={
       }
       if(pl.fl.length){
         var plFlDiv=document.createElement('div');plFlDiv.className='fl-group player-fl';
-        pl.fl.forEach(function(c){
-          var hl=(GAME.phase==='play'&&c.canStillAct);
-          var el=GAME._mkCardEl(c,hl);
-          if(c.justPlayed)el.classList.add((c.ut!=='X'&&(c.atk+c.hp)>=10)?'heavy-deploy':'just-played');
-          if(validTargets&&validTargets.has(c)){el.classList.add('can-target');el.style.cursor='crosshair'}
-          if(GAME.phase==='selectTarget'&&GAME.pendingEffect&&GAME.pendingEffect.targets.indexOf(c)>=0){
-            el.classList.add('effect-target');el.style.cursor='crosshair';el.onclick=function(){GAME.onEffectTargetClick(c)};
-          }
-          plFlDiv.appendChild(el);
-        });
+        if(isPushing){
+          plFlDiv.appendChild(mkPushSlotTouch(0));
+          pl.fl.forEach(function(c,i){
+            var el=GAME._mkCardEl(c,false);
+            if(c.justPlayed)el.classList.add((c.ut!=='X'&&(c.atk+c.hp)>=10)?'heavy-deploy':'just-played');
+            plFlDiv.appendChild(el);
+            plFlDiv.appendChild(mkPushSlotTouch(i+1));
+          });
+        }else{
+          pl.fl.forEach(function(c){
+            var hl=(GAME.phase==='play'&&c.canStillAct);
+            var el=GAME._mkCardEl(c,hl);
+            if(c.justPlayed)el.classList.add((c.ut!=='X'&&(c.atk+c.hp)>=10)?'heavy-deploy':'just-played');
+            if(validTargets&&validTargets.has(c)){el.classList.add('can-target');el.style.cursor='crosshair'}
+            if(GAME.phase==='selectTarget'&&GAME.pendingEffect&&GAME.pendingEffect.targets.indexOf(c)>=0){
+              el.classList.add('effect-target');el.style.cursor='crosshair';el.onclick=function(){GAME.onEffectTargetClick(c)};
+            }
+            plFlDiv.appendChild(el);
+          });
+        }
+        fl.appendChild(plFlDiv);
+      }else if(isPushing){
+        // 有敌方前线但无我方前线——推线插槽在两个区域之间
+        var plFlDiv=document.createElement('div');plFlDiv.className='fl-group player-fl';
+        plFlDiv.appendChild(mkPushSlotTouch(0));
         fl.appendChild(plFlDiv);
       }
+    }
+    function mkPushSlotTouch(pos){
+      var s=document.createElement('div');s.className='insert-slot push-slot';
+      s.title='\u27A1 \u70B9\u51FB\u63A8\u7EBF\u81F3\u524D\u7EBF\u7B2C'+(pos+1)+'\u4F4D';
+      s.onclick=function(e){e.stopPropagation();if(GAME.pendingPush)GAME.pushToSlot(pos)};
+      return s;
     }
     // 前线被守护标记
     markFLGuarded(en.fl);markFLGuarded(pl.fl);
@@ -3926,6 +3987,15 @@ var GAME={
     GAME._dragCard=null;
   },
 
+  dropPushToSlot:function(pos){
+    var card=GAME._dragPush;
+    if(!card||GAME.gameOver)return;
+    GAME._dragPush=null;
+    if(GAME.phase!=='play'||card.zone!=='support')return;
+    GAME.pendingPush=card;
+    GAME.pushToSlot(pos);
+  },
+
   // 选择支援阵线指定槽位完成部署（pos 为该侧内的序号，0=最外 / 末尾=最靠HQ）
   deployToSlot:function(side,pos){
     if(!GAME.pendingDeploy)return;
@@ -4031,7 +4101,7 @@ var GAME={
       // 支持所有兵种推线（炮兵/轰炸机/战斗机亦允许，只是非必要）
       if(card.zone==="support"&&!card.isOrder&&GAME.canPush(GAME.player)&&card.canStillMove){
         if(GAME.isTouchDevice){
-          GAME.pendingPush=card;GAME.pushToFL();return;
+          GAME.pendingPush=card;GAME.selected=null;GAME.render();return;
         }
         GAME.pendingPush=card;
       }
@@ -4098,6 +4168,37 @@ var GAME={
       GAME.log('\u2691 前线控制权变更为：'+(newCtrl==='player'?'我方':newCtrl==='enemy'?'敌方':'无归属'),'system')
     }
 
+    if(GAME.checkEnd())return;
+  },
+
+  pushToSlot:function(pos){
+    var c=GAME.pendingPush;
+    if(!c||GAME.phase!=='play')return;
+    if(c.zone!=='support')return toast('只有支援阵线的单位可以推线');
+    if(!GAME.canPush(GAME.player))return toast('无法推线');
+    if(!c.canStillMove)return toast('已无法移动');
+    if(GAME.player.cmd<c.acost)return toast('指挥点不足（需'+c.acost+'点）');
+    var oldEl=findCardEl(c);
+    var oldRect=oldEl?oldEl.getBoundingClientRect():null;
+    var prevCtrl=GAME.flCtrl?GAME.flCtrl():null;
+    GAME.player.cmd-=c.acost;
+    GAME.player.support=GAME.player.support.filter(function(x){return x!==c});
+    GAME.player.fl.splice(pos,0,c);c.zone='frontline';
+    c.spendAP(1);
+    if(c.hasS)c.smokescreenActive=false;
+    GAME.log(c.cn+' \u27A1 推线至前线 第'+(pos+1)+'位 <span style="color:#f9c74f;font-weight:700">\u26A1'+c.acost+'</span>','combat');
+    SFX.play('push',c.ut);
+    GAME.selected=null;GAME.pendingPush=null;GAME.render();
+    setTimeout(function(){
+      var newEl=findCardEl(c);
+      playPushTrailFromRect(oldRect,newEl,c)
+    },50);
+    var newCtrl=GAME.flCtrl?GAME.flCtrl():null;
+    if(newCtrl!==prevCtrl){
+      var flEl=$('frontline');
+      if(flEl){flEl.classList.add('captured');setTimeout(function(){flEl.classList.remove('captured')},800)}
+      GAME.log('\u2691 前线控制权变更为：'+(newCtrl==='player'?'我方':newCtrl==='enemy'?'敌方':'无归属'),'system')
+    }
     if(GAME.checkEnd())return;
   },
 
@@ -5189,15 +5290,12 @@ $('enemyInfo').addEventListener('click',function(e){
   zoneEl.addEventListener('drop',function(e){
     e.preventDefault();
     zoneEl.classList.remove('drag-over');
-    // 推线拖拽：支援单位拖到前线区域 → 推线
-    var pushCard=GAME._dragPush;GAME._dragPush=null;
+    // 推线拖拽：由前线插槽处理落点，拖到区域空白处取消
+    var pushCard=GAME._dragPush;
     if(pushCard){
-      if(zoneId==='frontline'){
-        GAME.pendingPush=pushCard;
-        GAME.pushToFL();
-      }else{
-        toast('请把单位拖到前线区域进行推线');
-      }
+      GAME._dragPush=null;
+      if(zoneId!=='frontline'){toast('请把单位拖到前线区域进行推线')}
+      GAME.render();
       return;
     }
     var card=GAME._dragCard;GAME._dragCard=null;
@@ -5827,14 +5925,22 @@ var TUT={
   };
 })();
 
-// 钩子注入：拦截 pushToFL 以检测推线完成 + 阻止非法推线
+// 钩子注入：拦截 pushToFL / pushToSlot 以检测推线完成 + 阻止非法推线
 (function(){
   var _origPushToFL=GAME.pushToFL;
+  var _origPushToSlot=GAME.pushToSlot;
   GAME.pushToFL=function(){
     if(TUT.active&&TUT._blockIfNot('pushComplete','请先完成当前教程步骤，再推进单位')){
       return;
     }
     _origPushToFL.apply(this,arguments);
+    if(TUT.active){setTimeout(function(){TUT.onPushComplete()},600)}
+  };
+  GAME.pushToSlot=function(pos){
+    if(TUT.active&&TUT._blockIfNot('pushComplete','请先完成当前教程步骤，再推进单位')){
+      return;
+    }
+    _origPushToSlot.call(this,pos);
     if(TUT.active){setTimeout(function(){TUT.onPushComplete()},600)}
   };
 })();
@@ -5956,6 +6062,7 @@ GAME.newGame();
   <div class="kw-tabs">
     <button class="kw-tab active" id="kw-tab-unit-btn" onclick="switchKwTab('unit')">兵种介绍</button>
     <button class="kw-tab" id="kw-tab-keyword-btn" onclick="switchKwTab('keyword')">词条介绍</button>
+    <button class="kw-tab" id="kw-tab-push-btn" onclick="switchKwTab('push')">推线说明</button>
   </div>
 
   <!-- ====== 兵种介绍面板 ====== -->
@@ -6018,6 +6125,49 @@ GAME.newGame();
     <div class="kw-row"><span class="kw-tag-big C">冲击</span><div class="kw-desc">冲击单位首次攻击时，被攻击单位<b>不会造成任何反击伤害</b>。冲击单位攻击单位后，<b>移除冲击</b>。</div></div>
   </div>
 
+  <!-- ====== 推线说明面板 ====== -->
+  <div class="kw-tab-content" id="kw-tab-push" style="display:none">
+    <h3>什么是推线</h3>
+    <div class="ut-card" style="border-left-color:#f9c74f">
+      <div class="ut-header"><span class="ut-icon" style="background:#f9c74f;color:#111">\u27A1</span><div><div class="ut-name">推线 Push</div><div class="ut-sub">支援阵线 \u2192 前线</div></div></div>
+      <div class="ut-desc">推线是将<b>支援阵线的己方单位</b>推进到<b>前线</b>的战术行动。成功推线后，你的单位将占领前线阵地，获得更有利的战场位置——<b>只有位于前线的单位才能攻击敌方总部</b>。</div>
+    </div>
+
+    <h3>推线条件</h3>
+    <div class="ut-card" style="border-left-color:#4ecca3">
+      <div class="ut-stats"><span>\u2705 敌方前线<b>没有单位</b></span><span>\u2705 前线总人数 <b>&lt; 5</b>（前线最多容纳 5 个单位）</span><span>\u2705 单位位于<b>我方支援阵线</b></span><span>\u2705 单位<b>尚未移动</b>（有剩余行动点）</span><span>\u2705 拥有足够的<b>指挥点</b></span></div>
+    </div>
+
+    <h3>推线消耗</h3>
+    <div class="ut-card" style="border-left-color:#f9c74f">
+      <div class="ut-desc">\u26A1 <b>行动费用</b>：消耗单位标注的行动费用（指挥点）<br>\uD83D\uDD04 <b>1 点行动点 (AP)</b>：推线消耗 1 点 AP<br>\uD83D\uDCA8 <b>失去烟幕</b>：如果单位拥有烟幕，推线后会失去</div>
+    </div>
+
+    <h3>各兵种推线差异</h3>
+    <div class="ut-compare" style="background:#252835;border-radius:8px;padding:2px 0;margin-bottom:14px">
+      <table style="width:100%;border-collapse:collapse;font-size:.7rem;color:#ccc">
+        <tr style="background:#1e2029;color:#f9c74f"><th style="padding:8px 12px;text-align:left">兵种</th><th style="padding:8px 12px;text-align:center">推线后能否攻击</th><th style="padding:8px 12px;text-align:left">说明</th></tr>
+        <tr style="border-bottom:1px solid #2a2d3a"><td style="padding:8px 12px"><span class="ut-icon ut-I" style="display:inline-block;width:18px;height:18px;line-height:18px;font-size:.55rem;vertical-align:middle;margin-right:6px">I</span>步兵</td><td style="padding:8px 12px;text-align:center;color:#e55">\u274C 不能</td><td style="padding:8px 12px;font-size:.65rem">移动和攻击<b>二选一</b></td></tr>
+        <tr style="border-bottom:1px solid #2a2d3a"><td style="padding:8px 12px"><span class="ut-icon ut-T" style="display:inline-block;width:18px;height:18px;line-height:18px;font-size:.55rem;vertical-align:middle;margin-right:6px">T</span>坦克</td><td style="padding:8px 12px;text-align:center;color:#4ecca3">\u2705 可以</td><td style="padding:8px 12px;font-size:.65rem">可<b>移动+攻击</b>同回合</td></tr>
+        <tr style="border-bottom:1px solid #2a2d3a"><td style="padding:8px 12px"><span class="ut-icon ut-A" style="display:inline-block;width:18px;height:18px;line-height:18px;font-size:.55rem;vertical-align:middle;margin-right:6px">A</span>炮兵</td><td style="padding:8px 12px;text-align:center;color:#e55">\u274C 不能</td><td style="padding:8px 12px;font-size:.65rem">通常无需推线</td></tr>
+        <tr style="border-bottom:1px solid #2a2d3a"><td style="padding:8px 12px"><span class="ut-icon ut-F" style="display:inline-block;width:18px;height:18px;line-height:18px;font-size:.55rem;vertical-align:middle;margin-right:6px">F</span>战斗机</td><td style="padding:8px 12px;text-align:center;color:#e55">\u274C 不能</td><td style="padding:8px 12px;font-size:.65rem">移动和攻击<b>二选一</b></td></tr>
+        <tr><td style="padding:8px 12px"><span class="ut-icon ut-O" style="display:inline-block;width:18px;height:18px;line-height:18px;font-size:.55rem;vertical-align:middle;margin-right:6px">B</span>轰炸机</td><td style="padding:8px 12px;text-align:center;color:#e55">\u274C 不能</td><td style="padding:8px 12px;font-size:.65rem">通常无需推线</td></tr>
+      </table>
+    </div>
+
+    <h3>操作方式</h3>
+    <div class="ut-card" style="border-left-color:#6bf">
+      <div class="ut-desc">\uD83D\uDDA5 <b>桌面端</b>：<b>拖拽</b>支援阵线中的己方单位到前线区域<br>\uD83D\uDCF1 <b>手机端</b>：先<b>点击</b>支援阵线中的单位选中，再<b>点击</b>前线区域</div>
+    </div>
+
+    <h3>战术要点</h3>
+    <div class="ut-card" style="border-left-color:#e55">
+      <div class="ut-stats"><span>\uD83C\uDFAF 前线控制权决定谁能攻击敌方总部，<b>推线是争夺前线控制权的关键手段</b></span><span>\u26A1 <b>坦克</b>是最佳推线兵种——推线后仍能攻击</span><span>\uD83D\uDEE1 <b>守护单位</b>推线后可以保护前线其他单位</span><span>\u26A0 推线前确保单位<b>不会被敌方前线单位反击致死</b></span><span>\uD83D\uDCA1 控制前线可以<b>阻止敌方直接推线</b></span></div>
+    </div>
+
+    <div class="kw-modal-note">* 推线是 KARDS 核心战术机制之一 · 合理利用坦克的移动+攻击优势可取得战场主动权</div>
+  </div>
+
 <button class="kw-close" onclick="document.getElementById('kw-modal').classList.remove('show')">关闭</button>
 </div>
 </div>
@@ -6029,14 +6179,19 @@ document.getElementById('kw-modal').addEventListener('click',function(e){
 function switchKwTab(tab){
   var unitPanel=document.getElementById('kw-tab-unit');
   var kwPanel=document.getElementById('kw-tab-keyword');
+  var pushPanel=document.getElementById('kw-tab-push');
   var unitBtn=document.getElementById('kw-tab-unit-btn');
   var kwBtn=document.getElementById('kw-tab-keyword-btn');
+  var pushBtn=document.getElementById('kw-tab-push-btn');
   if(tab==='unit'){
-    unitPanel.style.display='';kwPanel.style.display='none';
-    unitBtn.classList.add('active');kwBtn.classList.remove('active');
+    unitPanel.style.display='';kwPanel.style.display='none';pushPanel.style.display='none';
+    unitBtn.classList.add('active');kwBtn.classList.remove('active');pushBtn.classList.remove('active');
+  }else if(tab==='keyword'){
+    unitPanel.style.display='none';kwPanel.style.display='';pushPanel.style.display='none';
+    unitBtn.classList.remove('active');kwBtn.classList.add('active');pushBtn.classList.remove('active');
   }else{
-    unitPanel.style.display='none';kwPanel.style.display='';
-    unitBtn.classList.remove('active');kwBtn.classList.add('active');
+    unitPanel.style.display='none';kwPanel.style.display='none';pushPanel.style.display='';
+    unitBtn.classList.remove('active');kwBtn.classList.remove('active');pushBtn.classList.add('active');
   }
 }
 // ========== 词条说明数据 & UI图标点击弹窗 ==========
