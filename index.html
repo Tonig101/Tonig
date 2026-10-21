@@ -788,7 +788,8 @@ body{background:var(--bg);color:var(--w);min-height:100vh;display:flex;justify-c
 #sfx-panel h3{color:#aaa;font-size:.75rem;margin:0 0 8px;text-align:center}
 #sfx-panel label{color:#888;font-size:.65rem;display:block;margin:6px 0 2px}
 #sfx-panel input[type=range]{width:100%;accent-color:#f9c74f}
-#sfx-panel .sfx-list{display:grid;grid-template-columns:1fr 1fr;gap:4px;margin-top:8px}
+#sfx-panel .sfx-list{display:grid;grid-template-columns:1fr 1fr 1fr;gap:3px;margin-top:8px}
+#sfx-panel .sfx-sep{grid-column:1/-1;color:#666;font-size:.6rem;margin:4px 0 2px;border-top:1px solid #333;padding-top:4px;text-align:center}
 #sfx-panel .sfx-btn{font-size:.62rem;padding:4px 6px;background:#2a2a3e;color:#ccc;border:1px solid #444;border-radius:4px;cursor:pointer;text-align:left;transition:background .15s}
 #sfx-panel .sfx-btn:hover{background:#3a3a5e;color:#fff}
 #sfx-panel .sfx-btn:active{background:#f9c74f;color:#1a1a2e}
@@ -815,13 +816,23 @@ body{background:var(--bg);color:var(--w);min-height:100vh;display:flex;justify-c
       <button class="sfx-btn" onclick="SFX.play('deploy')">&#x1F3B4; 部署</button>
       <button class="sfx-btn" onclick="SFX.play('deployHeavy')" style="background:#3a2a1a;color:#f9c74f">&#x1F4A5; 重装部署</button>
       <button class="sfx-btn" onclick="SFX.play('order')">&#x1F4DC; 指令</button>
-      <button class="sfx-btn" onclick="SFX.play('attack')">&#x2694; 攻击</button>
       <button class="sfx-btn" onclick="SFX.play('destroy')">&#x1F4A5; 摧毁</button>
       <button class="sfx-btn" onclick="SFX.play('hqDmg')">&#x1F3F0; 总部受击</button>
       <button class="sfx-btn" onclick="SFX.play('turn')">&#x1F504; 回合</button>
-      <button class="sfx-btn" onclick="SFX.play('push')">&#x27A1; 推线</button>
       <button class="sfx-btn" onclick="SFX.play('victory')">&#x1F3C6; 胜利</button>
       <button class="sfx-btn" onclick="SFX.play('defeat')">&#x1F480; 战败</button>
+      <div class="sfx-sep">&#x2694; 攻击音效（分兵种）</div>
+      <button class="sfx-btn" onclick="SFX.play('attack','I')">&#x1F3BE; 步兵</button>
+      <button class="sfx-btn" onclick="SFX.play('attack','T')">&#x1F6E1; 坦克</button>
+      <button class="sfx-btn" onclick="SFX.play('attack','A')">&#x1F3AF; 炮兵</button>
+      <button class="sfx-btn" onclick="SFX.play('attack','F')">&#x2708; 战斗机</button>
+      <button class="sfx-btn" onclick="SFX.play('attack','O')">&#x1F4A3; 轰炸机</button>
+      <div class="sfx-sep">&#x27A1; 移动音效（分兵种）</div>
+      <button class="sfx-btn" onclick="SFX.play('push','I')">&#x1F3BE; 步兵</button>
+      <button class="sfx-btn" onclick="SFX.play('push','T')">&#x1F6E1; 坦克</button>
+      <button class="sfx-btn" onclick="SFX.play('push','A')">&#x1F3AF; 炮兵</button>
+      <button class="sfx-btn" onclick="SFX.play('push','F')">&#x2708; 战斗机</button>
+      <button class="sfx-btn" onclick="SFX.play('push','O')">&#x1F4A3; 轰炸机</button>
     </div>
   </div>
   </div>
@@ -2118,46 +2129,46 @@ var SFX={
     o2.type='triangle';o2.frequency.setValueAtTime(260,t+0.12);o2.frequency.exponentialRampToValueAtTime(22,t+0.38);
     g2.gain.setValueAtTime(0,t+0.12);g2.gain.linearRampToValueAtTime(0.035,t+0.18);g2.gain.exponentialRampToValueAtTime(0.001,t+0.4);
     o2.connect(g2);g2.connect(SFX.masterGain);o2.start(t+0.12);o2.stop(t+0.4);
-    // === CRASH IMPACT (0.36~0.90s) = delayed, the main event ===
+    // === CRASH IMPACT (1.06~1.60s) = delayed 0.7s more, the main event ===
     // Layer A: noise explosion
     var buf=ctx.createBuffer(1,ctx.sampleRate*0.55,ctx.sampleRate),d=buf.getChannelData(0);
     for(var i=0;i<d.length;i++)d[i]=(Math.random()*2-1)*Math.pow(1-i/d.length,2.5);
     var sn=ctx.createBufferSource();sn.buffer=buf;
-    var fl=ctx.createBiquadFilter();fl.type='lowpass';fl.frequency.setValueAtTime(700,t+0.36);fl.frequency.exponentialRampToValueAtTime(12,t+0.72);
-    var gn=ctx.createGain();gn.gain.setValueAtTime(0,t+0.36);gn.gain.linearRampToValueAtTime(1.0,t+0.38);gn.gain.exponentialRampToValueAtTime(0.001,t+0.9);
-    sn.connect(fl);fl.connect(gn);gn.connect(SFX.masterGain);sn.start(t+0.36);sn.stop(t+0.9);
+    var fl=ctx.createBiquadFilter();fl.type='lowpass';fl.frequency.setValueAtTime(700,t+1.06);fl.frequency.exponentialRampToValueAtTime(12,t+1.42);
+    var gn=ctx.createGain();gn.gain.setValueAtTime(0,t+1.06);gn.gain.linearRampToValueAtTime(1.0,t+1.08);gn.gain.exponentialRampToValueAtTime(0.001,t+1.6);
+    sn.connect(fl);fl.connect(gn);gn.connect(SFX.masterGain);sn.start(t+1.06);sn.stop(t+1.6);
     // Layer B: triangle thud
     var oi=ctx.createOscillator(),gi=ctx.createGain();
-    oi.type='triangle';oi.frequency.setValueAtTime(75,t+0.36);oi.frequency.exponentialRampToValueAtTime(12,t+0.55);
-    gi.gain.setValueAtTime(0,t+0.36);gi.gain.linearRampToValueAtTime(0.7,t+0.38);gi.gain.exponentialRampToValueAtTime(0.001,t+0.7);
-    oi.connect(gi);gi.connect(SFX.masterGain);oi.start(t+0.36);oi.stop(t+0.7);
+    oi.type='triangle';oi.frequency.setValueAtTime(75,t+1.06);oi.frequency.exponentialRampToValueAtTime(12,t+1.25);
+    gi.gain.setValueAtTime(0,t+1.06);gi.gain.linearRampToValueAtTime(0.7,t+1.08);gi.gain.exponentialRampToValueAtTime(0.001,t+1.4);
+    oi.connect(gi);gi.connect(SFX.masterGain);oi.start(t+1.06);oi.stop(t+1.4);
     // Layer C: sub-bass rumble
     var osb=ctx.createOscillator(),gsb=ctx.createGain();
     osb.type='sine';osb.frequency.value=30;
-    gsb.gain.setValueAtTime(0,t+0.36);gsb.gain.linearRampToValueAtTime(0.5,t+0.38);gsb.gain.exponentialRampToValueAtTime(0.001,t+0.55);
-    osb.connect(gsb);gsb.connect(SFX.masterGain);osb.start(t+0.36);osb.stop(t+0.55);
+    gsb.gain.setValueAtTime(0,t+1.06);gsb.gain.linearRampToValueAtTime(0.5,t+1.08);gsb.gain.exponentialRampToValueAtTime(0.001,t+1.25);
+    osb.connect(gsb);gsb.connect(SFX.masterGain);osb.start(t+1.06);osb.stop(t+1.25);
     // Layer D: metal resonance ring
     var or=ctx.createOscillator(),gr=ctx.createGain();
-    or.type='square';or.frequency.setValueAtTime(350,t+0.36);or.frequency.exponentialRampToValueAtTime(60,t+0.46);
-    gr.gain.setValueAtTime(0,t+0.36);gr.gain.linearRampToValueAtTime(0.1,t+0.38);gr.gain.exponentialRampToValueAtTime(0.001,t+0.5);
-    or.connect(gr);gr.connect(SFX.masterGain);or.start(t+0.36);or.stop(t+0.5);
-    // Tail rumble (0.65~1.05s)
+    or.type='square';or.frequency.setValueAtTime(350,t+1.06);or.frequency.exponentialRampToValueAtTime(60,t+1.16);
+    gr.gain.setValueAtTime(0,t+1.06);gr.gain.linearRampToValueAtTime(0.1,t+1.08);gr.gain.exponentialRampToValueAtTime(0.001,t+1.2);
+    or.connect(gr);gr.connect(SFX.masterGain);or.start(t+1.06);or.stop(t+1.2);
+    // Tail rumble (1.35~1.80s)
     var o3=ctx.createOscillator(),g3=ctx.createGain();
-    o3.type='sawtooth';o3.frequency.setValueAtTime(25,t+0.65);o3.frequency.exponentialRampToValueAtTime(8,t+1.05);
-    g3.gain.setValueAtTime(0,t+0.65);g3.gain.linearRampToValueAtTime(0.15,t+0.7);g3.gain.exponentialRampToValueAtTime(0.001,t+1.1);
-    o3.connect(g3);g3.connect(SFX.masterGain);o3.start(t+0.65);o3.stop(t+1.1);
+    o3.type='sawtooth';o3.frequency.setValueAtTime(25,t+1.35);o3.frequency.exponentialRampToValueAtTime(8,t+1.75);
+    g3.gain.setValueAtTime(0,t+1.35);g3.gain.linearRampToValueAtTime(0.15,t+1.4);g3.gain.exponentialRampToValueAtTime(0.001,t+1.8);
+    o3.connect(g3);g3.connect(SFX.masterGain);o3.start(t+1.35);o3.stop(t+1.8);
 
   },
   // Type-specific attack sounds
-  _attack_I:function(ctx){var t=ctx.currentTime;for(var i=0;i<4;i++){var buf=ctx.createBuffer(1,ctx.sampleRate*0.03,ctx.sampleRate),d=buf.getChannelData(0);for(var j=0;j<d.length;j++)d[j]=(Math.random()*2-1)*Math.pow(1-j/d.length,3);var s=ctx.createBufferSource();s.buffer=buf;var f=ctx.createBiquadFilter();f.type='bandpass';f.frequency.value=3000;f.Q.value=2;var g=ctx.createGain();g.gain.setValueAtTime(0,t+i*0.07);g.gain.exponentialRampToValueAtTime(0.001,t+i*0.07+0.04);s.connect(f);f.connect(g);g.connect(SFX.masterGain);s.start(t+i*0.07);s.stop(t+i*0.07+0.04);}},
+  _attack_I:function(ctx){var t=ctx.currentTime;for(var i=0;i<4;i++){var o=ctx.createOscillator(),g=ctx.createGain();o.type='sawtooth';o.frequency.setValueAtTime(800,t+i*0.08);o.frequency.exponentialRampToValueAtTime(100,t+i*0.08+0.03);g.gain.setValueAtTime(0.25,t+i*0.08);g.gain.exponentialRampToValueAtTime(0.001,t+i*0.08+0.04);o.connect(g);g.connect(SFX.masterGain);o.start(t+i*0.08);o.stop(t+i*0.08+0.04);}},
   _attack_T:function(ctx){var t=ctx.currentTime;var buf=ctx.createBuffer(1,ctx.sampleRate*0.3,ctx.sampleRate),d=buf.getChannelData(0);for(var i=0;i<d.length;i++)d[i]=(Math.random()*2-1)*0.6*Math.pow(1-i/d.length,2);var s=ctx.createBufferSource();s.buffer=buf;var f=ctx.createBiquadFilter();f.type='lowpass';f.frequency.setValueAtTime(300,t);f.frequency.exponentialRampToValueAtTime(30,t+0.28);var g=ctx.createGain();g.gain.setValueAtTime(0.55,t);g.gain.exponentialRampToValueAtTime(0.001,t+0.35);s.connect(f);f.connect(g);g.connect(SFX.masterGain);s.start();s.stop(t+0.35);var o=ctx.createOscillator(),g2=ctx.createGain();o.type='triangle';o.frequency.setValueAtTime(120,t);o.frequency.exponentialRampToValueAtTime(25,t+0.2);g2.gain.setValueAtTime(0.4,t);g2.gain.exponentialRampToValueAtTime(0.001,t+0.25);o.connect(g2);g2.connect(SFX.masterGain);o.start();o.stop(t+0.25);},
   _attack_A:function(ctx){var t=ctx.currentTime;var o=ctx.createOscillator(),g=ctx.createGain();o.type='sine';o.frequency.setValueAtTime(1800,t);o.frequency.exponentialRampToValueAtTime(200,t+0.5);g.gain.setValueAtTime(0.04,t);g.gain.linearRampToValueAtTime(0.06,t+0.2);g.gain.exponentialRampToValueAtTime(0.001,t+0.55);o.connect(g);g.connect(SFX.masterGain);o.start(t);o.stop(t+0.55);var buf=ctx.createBuffer(1,ctx.sampleRate*0.35,ctx.sampleRate),d=buf.getChannelData(0);for(var i=0;i<d.length;i++)d[i]=(Math.random()*2-1)*0.5*Math.pow(1-i/d.length,2);var s=ctx.createBufferSource();s.buffer=buf;var fl=ctx.createBiquadFilter();fl.type='lowpass';fl.frequency.setValueAtTime(150,t+0.45);fl.frequency.exponentialRampToValueAtTime(20,t+0.7);var gn=ctx.createGain();gn.gain.setValueAtTime(0,t+0.45);gn.gain.linearRampToValueAtTime(0.5,t+0.47);gn.gain.exponentialRampToValueAtTime(0.001,t+0.8);s.connect(fl);fl.connect(gn);gn.connect(SFX.masterGain);s.start(t+0.45);s.stop(t+0.8);},
-  _attack_F:function(ctx){var t=ctx.currentTime;for(var i=0;i<6;i++){var buf=ctx.createBuffer(1,ctx.sampleRate*0.02,ctx.sampleRate),d=buf.getChannelData(0);for(var j=0;j<d.length;j++)d[j]=(Math.random()*2-1)*Math.pow(1-j/d.length,4);var s=ctx.createBufferSource();s.buffer=buf;var f=ctx.createBiquadFilter();f.type='bandpass';f.frequency.value=4500;f.Q.value=1.5;var g=ctx.createGain();g.gain.setValueAtTime(0,t+i*0.05);g.gain.exponentialRampToValueAtTime(0.001,t+i*0.05+0.025);s.connect(f);f.connect(g);g.connect(SFX.masterGain);s.start(t+i*0.05);s.stop(t+i*0.05+0.025);}},
+  _attack_F:function(ctx){var t=ctx.currentTime;for(var i=0;i<6;i++){var buf=ctx.createBuffer(1,ctx.sampleRate*0.02,ctx.sampleRate),d=buf.getChannelData(0);for(var j=0;j<d.length;j++)d[j]=(Math.random()*2-1)*Math.pow(1-j/d.length,4);var s=ctx.createBufferSource();s.buffer=buf;var f=ctx.createBiquadFilter();f.type='bandpass';f.frequency.value=4500;f.Q.value=1.5;var g=ctx.createGain();g.gain.setValueAtTime(0.08,t+i*0.05);g.gain.exponentialRampToValueAtTime(0.001,t+i*0.05+0.025);s.connect(f);f.connect(g);g.connect(SFX.masterGain);s.start(t+i*0.05);s.stop(t+i*0.05+0.025);}},
   _attack_O:function(ctx){var t=ctx.currentTime;var o=ctx.createOscillator(),g=ctx.createGain();o.type='sine';o.frequency.setValueAtTime(600,t);o.frequency.exponentialRampToValueAtTime(120,t+0.45);g.gain.setValueAtTime(0.05,t);g.gain.linearRampToValueAtTime(0.08,t+0.15);g.gain.exponentialRampToValueAtTime(0.001,t+0.5);o.connect(g);g.connect(SFX.masterGain);o.start(t);o.stop(t+0.5);var buf=ctx.createBuffer(1,ctx.sampleRate*0.45,ctx.sampleRate),d=buf.getChannelData(0);for(var i=0;i<d.length;i++)d[i]=(Math.random()*2-1)*0.7*Math.pow(1-i/d.length,2);var s=ctx.createBufferSource();s.buffer=buf;var fl=ctx.createBiquadFilter();fl.type='lowpass';fl.frequency.setValueAtTime(250,t+0.4);fl.frequency.exponentialRampToValueAtTime(15,t+0.7);var gn=ctx.createGain();gn.gain.setValueAtTime(0,t+0.4);gn.gain.linearRampToValueAtTime(0.8,t+0.42);gn.gain.exponentialRampToValueAtTime(0.001,t+0.85);s.connect(fl);fl.connect(gn);gn.connect(SFX.masterGain);s.start(t+0.4);s.stop(t+0.85);},
   // Type-specific push/move sounds
-  _push_I:function(ctx){var t=ctx.currentTime;for(var i=0;i<5;i++){var buf=ctx.createBuffer(1,ctx.sampleRate*0.04,ctx.sampleRate),d=buf.getChannelData(0);for(var j=0;j<d.length;j++)d[j]=(Math.random()*2-1)*0.3*Math.pow(1-j/d.length,5);var s=ctx.createBufferSource();s.buffer=buf;var f=ctx.createBiquadFilter();f.type='bandpass';f.frequency.value=500;f.Q.value=3;var g=ctx.createGain();g.gain.setValueAtTime(0,t+i*0.1);g.gain.exponentialRampToValueAtTime(0.001,t+i*0.1+0.06);s.connect(f);f.connect(g);g.connect(SFX.masterGain);s.start(t+i*0.1);s.stop(t+i*0.1+0.06);}},
+  _push_I:function(ctx){var t=ctx.currentTime;for(var i=0;i<5;i++){var dt=t+i*0.22;var o=ctx.createOscillator(),g=ctx.createGain();o.type='triangle';o.frequency.setValueAtTime(180,dt);o.frequency.exponentialRampToValueAtTime(35,dt+0.07);g.gain.setValueAtTime(0.50,dt);g.gain.exponentialRampToValueAtTime(0.001,dt+0.08);o.connect(g);g.connect(SFX.masterGain);o.start(dt);o.stop(dt+0.08);var buf=ctx.createBuffer(1,ctx.sampleRate*0.05,ctx.sampleRate),d=buf.getChannelData(0);for(var j=0;j<d.length;j++)d[j]=(Math.random()*2-1)*Math.pow(1-j/d.length,3);var s=ctx.createBufferSource();s.buffer=buf;var fl=ctx.createBiquadFilter();fl.type='lowpass';fl.frequency.value=300;var gn=ctx.createGain();gn.gain.setValueAtTime(0.25,dt);gn.gain.exponentialRampToValueAtTime(0.001,dt+0.05);s.connect(fl);fl.connect(gn);gn.connect(SFX.masterGain);s.start(dt);s.stop(dt+0.05);}},
   _push_T:function(ctx){var t=ctx.currentTime;var o=ctx.createOscillator(),g=ctx.createGain();o.type='sawtooth';o.frequency.setValueAtTime(55,t);o.frequency.exponentialRampToValueAtTime(35,t+0.35);g.gain.setValueAtTime(0.04,t);g.gain.linearRampToValueAtTime(0.06,t+0.1);g.gain.exponentialRampToValueAtTime(0.001,t+0.4);o.connect(g);g.connect(SFX.masterGain);o.start(t);o.stop(t+0.4);var buf=ctx.createBuffer(1,ctx.sampleRate*0.35,ctx.sampleRate),d=buf.getChannelData(0);for(var i=0;i<d.length;i++)d[i]=(Math.random()*2-1)*0.15*Math.pow(1-i/d.length,1.5);var s=ctx.createBufferSource();s.buffer=buf;var fl=ctx.createBiquadFilter();fl.type='lowpass';fl.frequency.value=200;var gn=ctx.createGain();gn.gain.setValueAtTime(0.06,t);gn.gain.exponentialRampToValueAtTime(0.001,t+0.35);s.connect(fl);fl.connect(gn);gn.connect(SFX.masterGain);s.start();s.stop(t+0.35);},
-  _push_A:function(ctx){var t=ctx.currentTime;var o=ctx.createOscillator(),g=ctx.createGain();o.type='triangle';o.frequency.setValueAtTime(80,t);o.frequency.exponentialRampToValueAtTime(40,t+0.3);g.gain.setValueAtTime(0.03,t);g.gain.exponentialRampToValueAtTime(0.001,t+0.35);o.connect(g);g.connect(SFX.masterGain);o.start(t);o.stop(t+0.35);},
+  _push_A:function(ctx){var t=ctx.currentTime;var o=ctx.createOscillator(),g=ctx.createGain();o.type='sawtooth';o.frequency.setValueAtTime(70,t);o.frequency.exponentialRampToValueAtTime(45,t+0.4);g.gain.setValueAtTime(0.10,t);g.gain.linearRampToValueAtTime(0.06,t+0.15);g.gain.exponentialRampToValueAtTime(0.001,t+0.45);o.connect(g);g.connect(SFX.masterGain);o.start(t);o.stop(t+0.45);var buf=ctx.createBuffer(1,ctx.sampleRate*0.3,ctx.sampleRate),d=buf.getChannelData(0);for(var i=0;i<d.length;i++)d[i]=(Math.random()*2-1)*0.12*Math.pow(1-i/d.length,2);var s=ctx.createBufferSource();s.buffer=buf;var fl=ctx.createBiquadFilter();fl.type='lowpass';fl.frequency.value=180;var gn=ctx.createGain();gn.gain.setValueAtTime(0.07,t);gn.gain.exponentialRampToValueAtTime(0.001,t+0.3);s.connect(fl);fl.connect(gn);gn.connect(SFX.masterGain);s.start();s.stop(t+0.3);},
   _push_F:function(ctx){var t=ctx.currentTime;var o=ctx.createOscillator(),g=ctx.createGain();o.type='sawtooth';o.frequency.setValueAtTime(120,t);o.frequency.exponentialRampToValueAtTime(200,t+0.15);o.frequency.exponentialRampToValueAtTime(80,t+0.35);g.gain.setValueAtTime(0.03,t);g.gain.linearRampToValueAtTime(0.06,t+0.12);g.gain.exponentialRampToValueAtTime(0.001,t+0.4);o.connect(g);g.connect(SFX.masterGain);o.start(t);o.stop(t+0.4);},
   _push_O:function(ctx){var t=ctx.currentTime;var o=ctx.createOscillator(),g=ctx.createGain();o.type='sawtooth';o.frequency.setValueAtTime(50,t);o.frequency.exponentialRampToValueAtTime(40,t+0.4);g.gain.setValueAtTime(0.04,t);g.gain.linearRampToValueAtTime(0.07,t+0.15);g.gain.exponentialRampToValueAtTime(0.001,t+0.5);o.connect(g);g.connect(SFX.masterGain);o.start(t);o.stop(t+0.5);var o2=ctx.createOscillator(),g2=ctx.createGain();o2.type='sawtooth';o2.frequency.value=53;g2.gain.setValueAtTime(0.03,t);g2.gain.exponentialRampToValueAtTime(0.001,t+0.5);o2.connect(g2);g2.connect(SFX.masterGain);o2.start(t);o2.stop(t+0.5);},
   _order:function(ctx){
