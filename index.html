@@ -952,7 +952,9 @@ body{background:var(--bg);color:var(--w);min-height:100vh;display:flex;justify-c
           <label class="sb-toggle"><input type="checkbox" id="sb-spawn" onchange="SETNB.toggleSpawnMode(this.checked)"> 卡库部署到敌方场上</label>
         </div>
         <div class="sb-act" style="margin-top:4px">
-          <button class="btn btn-ghost" onclick="SETNB.clearEnemyField()" style="color:#e44;border-color:#e44">&#128465; 清空敌方场上全部单位</button>
+          <label style="display:flex;align-items:center;gap:4px;font-size:.72rem;color:#ccc">AI指挥点槽：<input type="number" id="sb-ai-cmd" value="3" min="0" max="999" style="width:54px;padding:2px;background:#1a1d2e;color:#f9c74f;border:1px solid #444;border-radius:3px;text-align:center" onchange="SETNB.setAiCmd(this.value)"></label>
+          <button class="btn btn-ghost" onclick="SETNB.clearEnemyField()" style="color:#e44;border-color:#e44">&#128465; 清空敌方全部单位</button>
+          <button class="btn btn-ghost" onclick="SETNB.clearAllField()" style="color:#e44;border-color:#e44">&#128465; 清空全场单位</button>
         </div>
       </div>
       <div class="sb-filters" id="sb-filters"></div>
@@ -2310,6 +2312,20 @@ var SETNB={
     if(!GAME.enemy||!SANDBOX.active)return toast('请先开启沙盒对战');
     GAME.enemy.support=[];GAME.enemy.fl=[];
     GAME.log('🔬 沙盒：已清空敌方全部单位','system');
+    GAME.render();
+  },
+  clearAllField:function(){
+    if(!GAME.player||!GAME.enemy||!SANDBOX.active)return toast('请先开启沙盒对战');
+    GAME.player.support=[];GAME.player.fl=[];
+    GAME.enemy.support=[];GAME.enemy.fl=[];
+    GAME.log('🔬 沙盒：已清空全场单位（不分敌我）','system');
+    GAME.render();
+  },
+  setAiCmd:function(v){
+    var val=parseInt(v)||0;
+    if(!GAME.enemy||!SANDBOX.active)return;
+    GAME.enemy.baseMaxCmd=val;GAME.enemy.maxCmd=val;GAME.enemy.cmd=val;
+    GAME.log('🔬 沙盒：AI指挥点槽设为 '+val,'system');
     GAME.render();
   },
   _saveSettings:function(){
@@ -6026,6 +6042,34 @@ var TUT={
       }
     }
     return _origDropPlay.call(this,card,side);
+  };
+})();
+
+// 钩子注入：拦截 dropToSlot 以支持拖拽插槽部署 + 阻止非法拖拽
+(function(){
+  var _origDropToSlot=GAME.dropToSlot;
+  GAME.dropToSlot=function(side,pos){
+    if(TUT.active){
+      var card=GAME._dragCard;
+      if(!card)return _origDropToSlot.call(this,side,pos);
+      var s=TUT.stepData;
+      // 无 waitFor = 自由操作步骤，放行；否则只允许 deployCard / deployComplete
+      if(s && s.waitFor && s.waitFor!=='deployCard' && s.waitFor!=='deployComplete'){
+        GAME.log('\u26A0\uFE0F 请先完成当前教程步骤，再拖拽部署','system');
+        toast('\u26A0\uFE0F 请先完成当前教程步骤，再拖拽部署');
+        return;
+      }
+      // deployCard 步骤：验证卡牌并推进步骤
+      if(s && s.waitFor==='deployCard'){
+        if(s.waitCard && card.cn!==s.waitCard){
+          GAME.log('\uD83D\uDCDA '+card.cn+' 不是教程当前需要的卡牌，请拖拽 <b>'+s.waitCard+'</b>','system');
+          return;
+        }
+        TUT.step=TUT.step+1;
+        TUT.stepData=TUT._all[TUT.step];
+      }
+    }
+    return _origDropToSlot.call(this,side,pos);
   };
 })();
 
