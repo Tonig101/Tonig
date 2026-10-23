@@ -110,25 +110,72 @@
   /**
    * 按"发生活费日"计算当前预算周期。
    * 发钱日 15 号则周期为 15 号到次月 14 号。
+   *
+   * 第 3 参同时兼容三种写法（保持 v1 调用方零改动）：
+   *   getCycle(today, payday)                       // v1 行为
+   *   getCycle(today, payday, 30)                   // 固定周期长度（v1 已支持）
+   *   getCycle(today, payday, null, '2025-10-23')    // 自定义起点
+   *   getCycle(today, payday, '2025-10-23')         // 自定义起点（便捷写法）
+   *
    * @param {Date|string} today 今天
    * @param {number} payday 发钱日（1-28）
-   * @param {number} [cycleLen] 周期长度（天），不传则按发钱日推算到次月前一天
-   * @return {{start:string,end:string,totalDays:number,passedDays:number,remainingDays:number}}
+   * @param {number|string} [cycleLenOrStart] 周期长度（天）或自定义起点 'YYYY-MM-DD'
+   * @param {string} [overrideStart] 自定义起点 'YYYY-MM-DD'
+   * @return {{start:string,end:string,totalDays:number,passedDays:number,remainingDays:number,isCustom:boolean}}
    */
-  function getCycle(today, payday, cycleLen) {
+  function getCycle(today, payday, cycleLenOrStart, overrideStart) {
     var now = toDate(today);
     var pd = clampInt(payday, 1, 28, 1);
-    var y = now.getFullYear();
-    var m = now.getMonth();
-    var d = now.getDate();
+    var cycleLen = 0;
+    var customStart = null;
+    var arg3 = cycleLenOrStart;
 
-    var start = (d >= pd) ? new Date(y, m, pd) : new Date(y, m - 1, pd);
-    var len = (typeof cycleLen === 'number' && cycleLen >= 1) ? Math.round(cycleLen) : 0;
+    if (typeof arg3 === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(arg3)) {
+      customStart = arg3;
+    } else if (typeof arg3 === 'number' && arg3 >= 1) {
+      cycleLen = Math.round(arg3);
+    } else if (arg3 && typeof arg3 === 'object') {
+      if (typeof arg3.cycleLen === 'number' && arg3.cycleLen >= 1) {
+        cycleLen = Math.round(arg3.cycleLen);
+      }
+      if (typeof arg3.overrideStart === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(arg3.overrideStart)) {
+        customStart = arg3.overrideStart;
+      }
+    }
+    if (typeof overrideStart === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(overrideStart)) {
+      customStart = overrideStart;
+    }
+
+    /* ---- 分支 A：自定义起点（必须 <= 今天才生效，否则回退发钱日） ---- */
+    var start;
     var end;
-    if (len > 0) {
-      end = addDays(start, len - 1);
-    } else {
-      end = addDays(new Date(start.getFullYear(), start.getMonth() + 1, pd), -1);
+    var isCustom = false;
+
+    if (customStart) {
+      var cs = toDate(customStart);
+      if (cs.getTime() <= now.getTime()) {
+        start = cs;
+        // 该起点之后（严格晚于起点）的第一个发钱日，再减 1 天
+        var nextPayday = new Date(cs.getFullYear(), cs.getMonth(), pd);
+        if (nextPayday.getTime() <= cs.getTime()) {
+          nextPayday = new Date(cs.getFullYear(), cs.getMonth() + 1, pd);
+        }
+        end = addDays(nextPayday, -1);
+        isCustom = true;
+      }
+    }
+
+    /* ---- 分支 B：v1 行为（发钱日推算 / 固定长度） ---- */
+    if (!isCustom) {
+      var y = now.getFullYear();
+      var m = now.getMonth();
+      var d = now.getDate();
+      start = (d >= pd) ? new Date(y, m, pd) : new Date(y, m - 1, pd);
+      if (cycleLen > 0) {
+        end = addDays(start, cycleLen - 1);
+      } else {
+        end = addDays(new Date(start.getFullYear(), start.getMonth() + 1, pd), -1);
+      }
     }
 
     var totalDays = diffDays(start, end) + 1;
@@ -144,7 +191,8 @@
       end: formatDate(end),
       totalDays: totalDays,
       passedDays: passedDays,
-      remainingDays: remainingDays
+      remainingDays: remainingDays,
+      isCustom: isCustom
     };
   }
 
@@ -376,6 +424,42 @@
     return { ratio: ratio, percent: percent, alert: percent > 50 };
   }
 
+  /**
+   * 周期收支概览（看板「收支概览」卡数据源）。
+   * 储蓄率 = (收入 - 支出) / 收入 * 100；收入为 0 时返回 null，避免 NaN / Infinity。
+   * @param {Array} bills 账单
+   * @param {{start:string,end:string}} cycle 周期（getCycle 返回值）
+   * @return {{income:number,expense:number,balance:number,savingsRate:?number,
+   *           incomeCount:number,expenseCount:number,hasIncome:boolean}}
+   */
+  function getIncomeStats(bills, cycle) {
+    var c = cycle || {};
+    var agg = aggregate(bills, c.start, c.end);
+    var income = round2(agg.income);
+    var expense = round2(agg.expense);
+    var balance = round2(income - expense);
+    var savingsRate = income > 0 ? round2(balance / income * 100) : null;
+    var incomeCount = 0;
+    var list = Array.isArray(bills) ? bills : [];
+    var i;
+    for (i = 0; i < list.length; i++) {
+      var b = list[i];
+      if (!b || !b.date || b.type !== 'income') { continue; }
+      if (c.start && b.date < c.start) { continue; }
+      if (c.end && b.date > c.end) { continue; }
+      incomeCount++;
+    }
+    return {
+      income: income,
+      expense: expense,
+      balance: balance,
+      savingsRate: savingsRate,
+      incomeCount: incomeCount,
+      expenseCount: agg.count,
+      hasIncome: income > 0
+    };
+  }
+
   /* ------------------------------------------------------------------ */
   /* 目标测算                                                            */
   /* ------------------------------------------------------------------ */
@@ -445,6 +529,7 @@
     getAlternative: getAlternative,
     aggregate: aggregate,
     getEngel: getEngel,
+    getIncomeStats: getIncomeStats,
     getGoalProjection: getGoalProjection
   };
 

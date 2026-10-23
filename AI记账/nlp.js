@@ -429,6 +429,26 @@
     return false;
   }
 
+  /**
+   * 推断收入来源（生活费 / 兼职 / 奖学金 / 助学金 / 红包 / 退款 / 其他）。
+   * @param {string} text
+   * @return {string}
+   */
+  function detectIncomeSource(text) {
+    var groups = DATA.INCOME_SOURCE_KEYWORDS || [];
+    var i;
+    var j;
+    var t = String(text || '');
+    for (i = 0; i < groups.length; i++) {
+      for (j = 0; j < groups[i].keywords.length; j++) {
+        if (t.indexOf(groups[i].keywords[j]) !== -1) {
+          return groups[i].source;
+        }
+      }
+    }
+    return '其他';
+  }
+
   /** 强社交信号：命中即显著抬高"社交"分类得分（"火锅AA"/"和舍友吃饭" 应判社交而非餐饮） */
   var SOCIAL_BOOST_WORDS = ['AA', '聚餐', '请客', '请吃', '舍友', '室友', '同学', '朋友'];
 
@@ -574,7 +594,7 @@
         var date = lastDate || toDateStr(now);
         var meal = time.meal || inferMealByHour(now.getHours());
         var income = detectIncome(part.text);
-        var category = income ? '其他' : classify(part.text);
+        var category = income ? (DATA.INCOME_CATEGORY || '收入') : classify(part.text);
         // 分段后上下文可能丢失（"9块9的奶茶和18块的黄焖鸡" 的 "奶茶" 被切到下一段），
         // 单段打不出分类时回退到整句再打一次分，仍无命中才归"其他"。
         if (!income && category === '其他') {
@@ -588,6 +608,7 @@
           date: date,
           amount: round2(part.amount),
           category: category,
+          source: income ? detectIncomeSource(part.text) : '',
           note: note,
           motivation: income ? '刚需' : motive.motivation,
           want: income ? false : motive.want,
@@ -613,6 +634,7 @@
     parseTime: parseTime,
     classify: classify,
     detectIncome: detectIncome,
+    detectIncomeSource: detectIncomeSource,
     detectMotivation: detectMotivation,
     buildNote: buildNote,
     chineseToNumber: chineseToNumber,

@@ -93,6 +93,55 @@
     '进账', '收入', '赚了'
   ];
 
+  /** 收入分类名（与支出 9 分类并列，仅用于 type === 'income' 的账单） */
+  var INCOME_CATEGORY = '收入';
+
+  /** 收入来源枚举（录入表单 / 解析推断共用） */
+  var INCOME_SOURCES = ['生活费', '兼职', '奖学金', '助学金', '红包', '退款', '其他'];
+
+  /**
+   * 收入来源推断关键词。
+   * nlp.js 解析「收到生活费2000」「兼职赚了300」时按此表推断 source。
+   */
+  var INCOME_SOURCE_KEYWORDS = [
+    { source: '兼职', keywords: ['兼职', '工资', '日结', '跑腿', '家教', '实习', '勤工'] },
+    { source: '奖学金', keywords: ['奖学金', '国奖', '励志奖'] },
+    { source: '助学金', keywords: ['助学金', '补助', '补贴', '贫困生'] },
+    { source: '红包', keywords: ['红包', '压岁钱', '转账给我'] },
+    { source: '退款', keywords: ['退款', '退回', '退货', '报销'] },
+    { source: '生活费', keywords: ['生活费', '家里打', '打钱', '给我转'] },
+    // 兜底：只出现「到账」时按生活费理解（放在最后，避免抢走「兼职到账」）
+    { source: '生活费', keywords: ['到账'] }
+  ];
+
+  /**
+   * 导入账单（支付宝 / 微信 / 银行）14 类 → 应用内分类映射。
+   * 值为应用内分类名；`收入` 是特殊值（导入层会转成 type: 'income'）。
+   * 未命中时由 analysis.js 回退到 nlp.classify()。
+   */
+  var BILL_CATEGORY_MAP = {
+    '餐饮': '餐饮',
+    '交通': '交通',
+    '购物': '购物',
+    '日用': '购物',
+    '居住': '居住',
+    '通讯': '居住',
+    '医疗': '医疗',
+    '教育': '学习',
+    '娱乐': '娱乐',
+    '人情往来': '社交',
+    '收入': '收入',
+    '其他': '其他',
+    '转账': '其他',
+    '还款': '其他'
+  };
+
+  /**
+   * 导入时不参与消费统计的分类（给室友转账 / 还花呗不是消费）。
+   * analysis.js 会把这些行标记 excluded: true，不计入支出与占比。
+   */
+  var BILL_EXCLUDED_CATEGORIES = ['转账', '还款', '信用还款', '信用卡还款', '转账红包', '投资理财', '借贷'];
+
   /** 日期词 → 相对今天的天数偏移 */
   var DATE_WORDS = [
     { word: '大前天', offset: -3 },
@@ -279,8 +328,9 @@
   var SEED_INCOME = {
     offset: 11,
     amount: 2000,
-    category: '其他',
-    note: '生活费',
+    category: '收入',
+    source: '生活费',
+    note: '生活费到账',
     motivation: '刚需',
     want: false,
     type: 'income'
@@ -310,6 +360,11 @@
     EMOTION_KEYWORDS: EMOTION_KEYWORDS,
     WANT_KEYWORDS: WANT_KEYWORDS,
     INCOME_KEYWORDS: INCOME_KEYWORDS,
+    INCOME_CATEGORY: INCOME_CATEGORY,
+    INCOME_SOURCES: INCOME_SOURCES,
+    INCOME_SOURCE_KEYWORDS: INCOME_SOURCE_KEYWORDS,
+    BILL_CATEGORY_MAP: BILL_CATEGORY_MAP,
+    BILL_EXCLUDED_CATEGORIES: BILL_EXCLUDED_CATEGORIES,
     DATE_WORDS: DATE_WORDS,
     MEAL_WORDS: MEAL_WORDS,
     STOP_WORDS: STOP_WORDS,
