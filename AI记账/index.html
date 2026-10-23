@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#07C160" />
+  <title>AI 校园记账管家 · 月末防吃土</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body data-view="chat">
+  <div class="app" id="app">
+
+    <header class="topbar">
+      <div class="brand">
+        <span class="logo">账</span>
+        <div class="brand-text">
+          <strong>AI 校园记账管家</strong>
+          <small>月末防吃土 · 一句话记账</small>
+        </div>
+      </div>
+      <div class="topbar-actions">
+        <button class="btn-ghost" id="btnExport" type="button">导出 CSV</button>
+        <button class="btn-ghost" id="btnReset" type="button">重置演示数据</button>
+        <button class="btn-icon" id="btnSettings" type="button" title="设置" aria-label="设置">
+          <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
+            <path fill="currentColor" d="M12 15.5A3.5 3.5 0 1 1 12 8.5a3.5 3.5 0 0 1 0 7zm7.4-2.6c.04-.3.06-.6.06-.9s-.02-.6-.06-.9l2-1.55a.5.5 0 0 0 .12-.64l-1.9-3.3a.5.5 0 0 0-.6-.22l-2.36.95a6.9 6.9 0 0 0-1.55-.9l-.36-2.5a.5.5 0 0 0-.5-.42h-3.8a.5.5 0 0 0-.5.42l-.36 2.5c-.55.24-1.07.54-1.55.9l-2.36-.95a.5.5 0 0 0-.6.22l-1.9 3.3a.5.5 0 0 0 .12.64l2 1.55c-.04.3-.06.6-.06.9s.02.6.06.9l-2 1.55a.5.5 0 0 0-.12.64l1.9 3.3c.13.22.39.31.6.22l2.36-.95c.48.36 1 .66 1.55.9l.36 2.5c.04.24.25.42.5.42h3.8c.25 0 .46-.18.5-.42l.36-2.5c.55-.24 1.07-.54 1.55-.9l2.36.95c.21.09.47 0 .6-.22l1.9-3.3a.5.5 0 0 0-.12-.64l-2-1.55z"/>
+          </svg>
+        </button>
+      </div>
+    </header>
+
+    <div class="storage-tip" id="storageTip" hidden>当前为临时模式，关闭页面数据不保留</div>
+
+    <main class="layout">
+
+      <!-- ============================ 聊天 ============================ -->
+      <section class="panel panel-chat" id="panelChat">
+        <div class="chat-head">
+          <span class="dot-live"></span>
+          <span>账小助 · 在线</span>
+          <span class="chat-head-hint">支持一句话多笔，例如「中午黄焖鸡18，晚上聚餐50」</span>
+        </div>
+        <div class="chat-list" id="chatList"></div>
+        <div class="chat-composer">
+          <div class="quick-chips" id="quickChips">
+            <button class="chip" type="button" data-cmd="查余额">查余额</button>
+            <button class="chip" type="button" data-cmd="本月花销饼图">本月花销饼图</button>
+            <button class="chip" type="button" data-cmd="记一笔">记一笔</button>
+            <button class="chip" type="button" data-cmd="我想攒钱">我想攒钱</button>
+            <button class="chip" type="button" data-cmd="设置预算">设置预算</button>
+          </div>
+          <div class="input-row">
+            <button class="btn-mic" id="btnMic" type="button" title="语音输入" aria-label="语音输入">
+              <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
+                <path fill="currentColor" d="M12 14a3 3 0 0 0 3-3V6a3 3 0 0 0-6 0v5a3 3 0 0 0 3 3zm5-3a5 5 0 0 1-10 0H5a7 7 0 0 0 6 6.92V21h2v-3.08A7 7 0 0 0 19 11h-2z"/>
+              </svg>
+            </button>
+            <input id="chatInput" type="text" autocomplete="off" enterkeyhint="send"
+                   placeholder="说一句话，比如：中午食堂 15" />
+            <button class="btn-send" id="btnSend" type="button">发送</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============================ 看板 ============================ -->
+      <aside class="panel panel-dash" id="panelDash">
+        <div class="dash-scroll">
+
+          <div class="card card-budget">
+            <div class="card-head">
+              <h3>周期预算</h3>
+              <span class="badge" id="cycleBadge">—</span>
+            </div>
+            <div class="ring-wrap">
+              <svg class="ring" viewBox="0 0 140 140" aria-hidden="true">
+                <circle class="ring-track" cx="70" cy="70" r="58"></circle>
+                <circle class="ring-bar" id="ringBar" cx="70" cy="70" r="58"></circle>
+              </svg>
+              <div class="ring-center">
+                <span class="ring-amount" id="ringRemaining">¥0.00</span>
+                <span class="ring-label" id="ringPercent">剩余 0%</span>
+              </div>
+            </div>
+            <div class="mini-stats">
+              <div><b id="statDaily">¥0.00</b><small>日均可用</small></div>
+              <div><b id="statToday">¥0.00</b><small>今日已花</small></div>
+              <div><b id="statDays">0 天</b><small>剩余天数</small></div>
+            </div>
+            <div class="budget-cycle" id="budgetCycle">—</div>
+          </div>
+
+          <div class="card card-engel" id="engelCard">
+            <div class="card-head">
+              <h3>恩格尔系数预警</h3>
+              <span class="badge badge-soft" id="engelBadge">—</span>
+            </div>
+            <div class="engel-bar"><i id="engelFill"></i></div>
+            <p class="engel-text" id="engelText">—</p>
+          </div>
+
+          <div class="card">
+            <div class="card-head">
+              <h3>分类占比</h3>
+              <span class="hint">点图例高亮</span>
+            </div>
+            <div class="donut-wrap">
+              <svg class="donut" id="donutChart" viewBox="0 0 160 160" aria-hidden="true"></svg>
+              <div class="donut-center">
+                <b id="donutTotal">¥0.00</b>
+                <small>本周期支出</small>
+              </div>
+            </div>
+            <ul class="legend" id="legendList"></ul>
+          </div>
+
+          <div class="card">
+            <div class="card-head">
+              <h3>近 7 日趋势</h3>
+              <span class="hint" id="trendSum">—</span>
+            </div>
+            <div class="trend-wrap">
+              <svg id="trendChart" viewBox="0 0 320 150" preserveAspectRatio="xMidYMid meet" aria-hidden="true"></svg>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="card-head">
+              <h3>本月账单流水</h3>
+              <span class="hint">最近 8 条</span>
+            </div>
+            <ul class="bill-list" id="billList"></ul>
+          </div>
+
+          <div class="card card-achieve" id="achieveCard"></div>
+
+          <div class="card" id="goalCard">
+            <div class="card-head">
+              <h3>理财目标池</h3>
+              <button class="btn-mini" id="btnAddGoal" type="button">+ 新目标</button>
+            </div>
+            <div class="goal-list" id="goalList"></div>
+          </div>
+
+        </div>
+      </aside>
+    </main>
+
+    <nav class="tabbar" id="tabbar">
+      <button class="tab active" type="button" data-view="chat">聊天</button>
+      <button class="tab" type="button" data-view="dash">看板</button>
+      <button class="tab" type="button" data-view="goals">目标</button>
+    </nav>
+  </div>
+
+  <div class="drawer-mask" id="drawerMask" hidden></div>
+  <aside class="drawer" id="settingsDrawer" aria-hidden="true">
+    <div class="drawer-head">
+      <h3>设置</h3>
+      <button class="btn-icon" id="btnCloseDrawer" type="button" aria-label="关闭">✕</button>
+    </div>
+    <label class="field">
+      <span>每月生活费（¥）</span>
+      <input type="number" id="setTotal" min="0" step="50" inputmode="decimal" />
+    </label>
+    <label class="field">
+      <span>每月发钱日（1-28）</span>
+      <input type="number" id="setPayday" min="1" max="28" step="1" inputmode="numeric" />
+    </label>
+    <label class="field">
+      <span>单笔冷静期阈值（¥）</span>
+      <input type="number" id="setCooldown" min="0" step="10" inputmode="decimal" />
+    </label>
+    <button class="btn-primary" id="btnSaveSettings" type="button">保存并重算</button>
+    <p class="drawer-note">预算周期按发钱日计算：发钱日为 15 号时，本周期是 15 号到次月 14 号，而不是自然月。</p>
+  </aside>
+
+  <div class="modal-mask" id="modalMask" hidden>
+    <div class="modal" id="modalBox" role="dialog" aria-modal="true"></div>
+  </div>
+
+  <script src="data.js"></script>
+  <script src="nlp.js"></script>
+  <script src="engine.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
