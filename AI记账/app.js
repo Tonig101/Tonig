@@ -16,13 +16,211 @@
   var ANA = global.AJ.analysis;
   var OCR = global.AJ.ocr;
 
-  /* 让 ocr.js 的云识别走后端 /api/ocr（服务端签名，密钥不进浏览器）。
-     用 file:// 直接打开页面时后端不可达，ocr.js 会自动回退到本地 detectCloud。 */
+  /* 让 ocr.js 的云端识别走 WorkBuddy 云服务（视觉大模型），而非本地 detectCloud（浏览器直连腾讯云）。
+     由 server.py 托管页面时 AJ_BACKEND_OCR 为真，ocr.js 的 detectBackend 会改调云服务。 */
   global.AJ_BACKEND_OCR = true;
 
-  /* 后端实际可用能力（由 /api/capabilities 异步填充）。
-     前端本地 OCR.capabilities() 不知道后端有没有配 OCR，必须问后端才能准确提示。 */
-  var backendCaps = { ready: false, chat: false, ocr: 'none' };
+  /* WorkBuddy 云服务客户端与能力（由 initCloud() 异步填充）。免密钥，无需任何外部 Key。 */
+  var cloudClient = null;        // WorkBuddyCloud 客户端实例
+  var cloudModels = [];          // 模型列表
+  var cloudChatModel = null;     // 对话用模型
+  var cloudVisionModel = null;   // 截图识别（视觉）用模型
+  var cloudReady = false;        // SDK 已初始化且已取到模型
+  var visionAvailable = false;   // 是否存在标记支持图片输入的模型
+
+  /* 截图识别是否可尝试：云端已连上即可尝试（模型不支持看图时调用会优雅失败并提示手动录入） */
+  function cloudOcrAvailable() { return cloudReady; }
+
+  /* 本应用的线上版本地址（云服务认可的来源，AI 功能必须用它打开）。来源 publicConfig.endpoint。 */
+  var CLOUD_APP_URL = 'https://ai-expense-tracker-91800.app.workbuddy.host/?sharecode=YKQPM3GMYK';
+
+  /** 把模型可能带回的 ```json 围栏 / 前后缀剥掉，尽量解析成对象；失败返回 null */
+  function parseCloudJson(s) {
+    if (!s) { return null; }
+    var t = String(s).trim();
+    var fence = t.match(/```(?:json)?\s*([\s\S]*?)```/i);
+    if (fence) { t = fence[1].trim(); }
+    var a = t.indexOf('{'); var b = t.lastIndexOf('}');
+    if (a !== -1 && b !== -1 && b > a) { t = t.slice(a, b + 1); }
+    try { return JSON.parse(t); } catch (e) { return null; }
+  }
+
+  /**
+   * 调用 WorkBuddy 云服务对话模型：把用户消息 + 精简上下文发给大模型，
+   * 以流式方式收集返回的 JSON（{reply, actions}），解析后回传。
+   * 任何失败都返回 {fallback:true}，上层据此回退到本地 routeCommand。
+   * @param {string} messageText
+   * @param {Object|null} context
+   * @return {Promise<{reply:?string, actions:Array, fallback:boolean, reason:string}>}
+   */
+  function cloudAsk(messageText, context) {
+    return new Promise(function (resolve) {
+      if (!cloudReady || !cloudChatModel || !cloudClient) {
+        resolve({ reply: null, actions: [], fallback: true, reason: '云服务未就绪' });
+        return;
+      }
+      var system = '你是"账小助"，一个面向大学生的校园记账 AI 助手。帮用户一句话记账、查余额、' +
+        '看消费分析、定攒钱目标。用简洁、口语化、带一点鼓励的中文回复。' +
+        '若用户给了消费信息，在 actions 里返回 add_bill；若用户想看余额/饼图/记收入/截屏记账/' +
+        '账单分析/攒钱目标/设置预算，在 actions 里返回对应 command。' +
+        '只返回一个 JSON 对象、不要其它文字：' +
+        '{"reply":"<中文回复>","actions":[' +
+        '{"type":"add_bill","amount":<number>,"category":<"餐饮"|"交通"|"购物"|"娱乐"|"学习"|"居住"|"医疗"|"社交"|"其他">,"note":<string>,"date":<"YYYY-MM-DD"|null>,"motivation":<"刚需"|"情绪">,"want":<bool>},' +
+        '{"type":"command","name":<"balance"|"pie"|"income"|"ocr"|"analysis"|"goals"|"settings">}]}';
+      var userContent = String(messageText || '');
+      if (context && typeof context === 'object') {
+        userContent = '【用户当前情况】\n' + JSON.stringify(context) + '\n\n【用户消息】\n' + userContent;
+      }
+      var messages = [
+        { role: 'system', content: system },
+        { role: 'user', content: userContent }
+      ];
+      var full = '';
+      var done = false;
+      function finish() {
+        if (done) { return; }
+        done = true;
+        var parsed = parseCloudJson(full);
+        if (!parsed) {
+          resolve({ reply: full || null, actions: [], fallback: false, reason: '' });
+          return;
+        }
+        resolve({
+          reply: parsed.reply || null,
+          actions: Array.isArray(parsed.actions) ? parsed.actions : [],
+          fallback: false,
+          reason: ''
+        });
+      }
+      try {
+        var stream = cloudClient.llm.chat.completions.create({
+          model: cloudChatModel.id,
+          messages: messages,
+          stream: true,
+          response_format: { type: 'json_object' }
+        });
+        (async function () {
+          try {
+            for await (var chunk of stream) {
+              var c = chunk && chunk.choices && chunk.choices[0] && chunk.choices[0].delta && chunk.choices[0].delta.content;
+              if (c) { full += c; }
+            }
+            finish();
+          } catch (e) {
+            resolve({ reply: null, actions: [], fallback: true, reason: '云服务返回异常：' + (e && e.message ? e.message : e) });
+          }
+        })();
+      } catch (e) {
+        resolve({ reply: null, actions: [], fallback: true, reason: '云服务调用失败：' + (e && e.message ? e.message : e) });
+      }
+    });
+  }
+
+  /**
+   * 调用 WorkBuddy 云服务视觉模型，把截图原样转录成文字。
+   * 返回与 ocr.js detectBackend 一致的结构 {ok, source, text, reason}。
+   * @param {string} dataUrl 'data:image/png;base64,...'
+   * @return {Promise<{ok:boolean, source:string, text:string, reason:string}>}
+   */
+  function cloudVisionOcr(dataUrl) {
+    return new Promise(function (resolve) {
+      if (!cloudReady || !cloudClient) {
+        resolve({ ok: false, source: 'cloud', text: '', reason: 'WorkBuddy 云服务未连接（请用线上版本打开本应用：' + CLOUD_APP_URL + '）' });
+        return;
+      }
+      var model = cloudVisionModel || cloudChatModel;
+      if (!model) {
+        resolve({ ok: false, source: 'cloud', text: '', reason: '没有可用的视觉模型' });
+        return;
+      }
+      var system = '你是一个票据/截图文字识别助手。只把图片里的文字原样转录出来，' +
+        '按阅读顺序逐行输出，不要解释、不要翻译、不要编造。如果图片里没有任何文字，就只回复"无文字"。';
+      var messages = [
+        { role: 'system', content: system },
+        { role: 'user', content: [
+          { type: 'text', text: '请识别这张截图里的全部文字：' },
+          { type: 'image_url', image_url: { url: dataUrl } }
+        ] }
+      ];
+      var full = '';
+      var done = false;
+      function finish() {
+        if (done) { return; }
+        done = true;
+        var text = full.trim();
+        if (!text || text === '无文字') {
+          resolve({ ok: false, source: 'cloud', text: '', reason: '云端没有识别到文字' });
+          return;
+        }
+        resolve({ ok: true, source: 'cloud', text: text, reason: '' });
+      }
+      try {
+        var stream = cloudClient.llm.chat.completions.create({
+          model: model.id,
+          messages: messages,
+          stream: true
+        });
+        (async function () {
+          try {
+            for await (var chunk of stream) {
+              var c = chunk && chunk.choices && chunk.choices[0] && chunk.choices[0].delta && chunk.choices[0].delta.content;
+              if (c) { full += c; }
+            }
+            finish();
+          } catch (e) {
+            resolve({ ok: false, source: 'cloud', text: '', reason: '云端识别失败：' + (e && e.message ? e.message : e) });
+          }
+        })();
+      } catch (e) {
+        resolve({ ok: false, source: 'cloud', text: '', reason: '云端识别调用失败：' + (e && e.message ? e.message : e) });
+      }
+    });
+  }
+
+  /** 初始化 WorkBuddy 云服务客户端并拉取模型列表，确定对话/视觉模型。 */
+  function initCloud() {
+    if (typeof window.WorkBuddyCloud === 'undefined' || !window.AJ_CLOUD_CONFIG) {
+      cloudReady = false;
+      return;
+    }
+    try {
+      cloudClient = window.WorkBuddyCloud.createWorkBuddyCloud({
+        endpoint: window.AJ_CLOUD_CONFIG.endpoint,
+        oauthRelayBaseUrl: window.AJ_CLOUD_CONFIG.oauthRelayBaseUrl,
+        publishableKey: window.AJ_CLOUD_CONFIG.publishableKey
+      });
+    } catch (e) {
+      cloudClient = null;
+      cloudReady = false;
+      return;
+    }
+    /* 把接口挂到全局，供 ocr.js 的 detectBackend 调用 */
+    if (global.AJ && typeof global.AJ === 'object') {
+      global.AJ.ask = cloudAsk;
+      global.AJ.visionOcr = cloudVisionOcr;
+    }
+    loadCloudModels();
+  }
+
+  /** 拉取模型列表：选第一个启用模型做对话，选第一个支持图片的模型做截图识别。 */
+  function loadCloudModels() {
+    if (!cloudClient) { return; }
+    cloudClient.llm.models.list().then(function (list) {
+      cloudModels = Array.isArray(list) ? list : [];
+      var enabled = cloudModels.filter(function (m) { return m.disabled !== true; });
+      cloudChatModel = enabled[0] || null;
+      cloudVisionModel = enabled.filter(function (m) { return m.supportsImages === true; })[0] || null;
+      cloudReady = !!cloudChatModel;
+      visionAvailable = !!cloudVisionModel;
+      if ($('ocrMask') && !$('ocrMask').hidden) {
+        $('ocrStatus').className = ocrCapabilityClass();
+        $('ocrStatus').textContent = ocrCapabilityText();
+      }
+    }).catch(function () {
+      cloudReady = false;
+      visionAvailable = false;
+    });
+  }
 
   var STORAGE_KEY = DATA.STORAGE_KEY;
   var RING_R = 58;
@@ -1748,41 +1946,32 @@
    * 打开弹窗时就把「这台设备能做什么」说清楚，别让用户点了「开始识别」才发现不行。
    * @return {string}
    */
+  /* 兼容旧调用点：刷新 OCR 弹窗里的能力提示（实际能力来自 WorkBuddy 云服务） */
   function refreshBackendCaps() {
-    if (typeof global.fetch !== 'function' || !global.AJ_BACKEND_OCR) { return; }
-    global.fetch('/api/capabilities', { method: 'POST' }).then(function (r) {
-      return r.json();
-    }).then(function (j) {
-      if (!j || typeof j !== 'object') { return; }
-      backendCaps.ready = true;
-      backendCaps.chat = !!j.chat;
-      backendCaps.ocr = j.ocr || 'none';
-      /* 若 OCR 弹窗正开着，能力变化后刷新提示与按钮状态 */
-      if ($('ocrMask') && !$('ocrMask').hidden) {
-        $('ocrStatus').className = ocrCapabilityClass();
-        $('ocrStatus').textContent = ocrCapabilityText();
-      }
-    }).catch(function () { /* 后端不可达（如 file:// 直接打开）：维持本地判断 */ });
+    if ($('ocrMask') && !$('ocrMask').hidden) {
+      $('ocrStatus').className = ocrCapabilityClass();
+      $('ocrStatus').textContent = ocrCapabilityText();
+    }
   }
 
   function ocrCapabilityText() {
     var cap = OCR.capabilities();
     if (cap.native) { return '可以离线识别：这台设备支持本地文字识别，截图不会离开这台设备。'; }
-    if (backendCaps.ready && backendCaps.ocr === 'tencent') {
-      return '将用后端云识别（腾讯云，需要联网）：截图会发给服务端识别。';
+    if (cloudReady && visionAvailable) {
+      return '将用 WorkBuddy 视觉大模型识别（需要联网）：截图会发给云端识别，金额/分类仍需你确认。';
     }
-    if (backendCaps.ready && backendCaps.ocr === 'vision') {
-      return '将用后端视觉大模型识别（需要联网）：截图会发给已配置的 LLM 识别，金额/分类仍需你确认。';
+    if (cloudReady) {
+      return '已连接 WorkBuddy 云服务，可以试试截图识别（若当前模型不支持看图，会提示你手动录入）。';
     }
     if (cap.cloud) { return '将用云端识别（需要联网）：会调用已配置的云 OCR，图片会上传。'; }
-    return '当前只能用示例小票或手动录入：这台设备不支持离线识别，后端也没配置可用的识别服务（在 .env 配置 LLM_API_KEY 或腾讯云 OCR 即可开启）。';
+    return '正在连接 WorkBuddy 云服务…若长时间未连上，请用线上版本打开本应用：' + CLOUD_APP_URL;
   }
 
   /** 能力不足时状态行用警示色，避免用户以为"点一下就好" */
   function ocrCapabilityClass() {
     var cap = OCR.capabilities();
-    var backendOk = backendCaps.ready && backendCaps.ocr !== 'none';
-    return (cap.native || cap.cloud || backendOk) ? 'ocr-status' : 'ocr-status warn';
+    var ok = cap.native || cap.cloud || cloudOcrAvailable();
+    return ok ? 'ocr-status' : 'ocr-status warn';
   }
 
   /**
@@ -1868,7 +2057,7 @@
       preview.src = ocrImageDataUrl;
       preview.hidden = ocrPreviewSuppressed;
       var cap = OCR.capabilities();
-      var backendOk = backendCaps.ready && backendCaps.ocr !== 'none';
+      var backendOk = cloudOcrAvailable();
       var canOcr = cap.native || cap.cloud || backendOk;
       $('ocrStatus').className = ocrCapabilityClass();
       $('ocrStatus').textContent = canOcr
@@ -1894,7 +2083,8 @@
     var cap = OCR.capabilities();
     /* 「云端被尝试过」判定：优先看 tried，退回看 reason 里是否带云端原因 */
     var cloudTried = tried.indexOf('cloud') !== -1 || tried.indexOf('backend') !== -1 ||
-      reason.indexOf('云端') !== -1 || reason.indexOf('后端') !== -1 || reason.indexOf('视觉') !== -1;
+      reason.indexOf('云端') !== -1 || reason.indexOf('后端') !== -1 || reason.indexOf('视觉') !== -1 ||
+      reason.indexOf('WorkBuddy') !== -1;
 
     if (reason.indexOf('没有可用的图片数据') !== -1 || reason.indexOf('重新选一张截图') !== -1) {
       return {
@@ -1909,6 +2099,14 @@
           '检查一下网络或跨域限制，也可以核对凭据是否正确，或直接手动录入。'
       };
     }
+    /* 走的是 WorkBuddy 云服务（免密钥）但没连上 / 调用失败：引导用线上版本打开 */
+    if (reason.indexOf('WorkBuddy 云服务') !== -1 || reason.indexOf('云端') !== -1 || reason.indexOf('Vision') !== -1) {
+      return {
+        title: 'WorkBuddy 云服务没能识别 —— 可能没连上，或当前模型不支持看图',
+        status: '没识别成功。不是你操作错了：已尝试用 WorkBuddy 云服务识别，但连接或调用失败了 —— ' +
+          '请用线上版本打开本应用（' + CLOUD_APP_URL + '），确认能联网，或直接手动录入。'
+      };
+    }
     if (cap.native) {
       return {
         title: '本地识别没成功 —— 不是你操作的问题，这张图可能太模糊',
@@ -1919,7 +2117,8 @@
     return {
       title: '没识别成功 —— 不是你操作的问题，是这台设备缺少本地识别能力',
       status: '没识别成功。不是你操作错了：这台设备没有可用的文字识别能力，' +
-        '可以看示例小票，或配置云 OCR 后再试，也可以直接手动录入。'
+        '请用线上版本打开本应用以启用 WorkBuddy 云服务视觉识别（' + CLOUD_APP_URL + '），' +
+        '也可以看示例小票或手动录入。'
     };
   }
 
@@ -1930,15 +2129,26 @@
    */
   function showOcrError(reason, title) {
     var host = $('ocrResult');
-    var cloudLabel = OCR.hasCredentials() ? '检查云 OCR 设置' : '配置云 OCR';
+    /* 现在截图识别走 WorkBuddy 云服务（免密钥），没有「腾讯云 OCR 设置」可配；
+       失败时这条按钮改为「打开线上版本」，引导用户用被云服务认可的来源打开。 */
+    var useCloudApp = !!global.AJ_BACKEND_OCR;
+    var cloudLabel = OCR.hasCredentials() ? '检查云 OCR 设置' : (useCloudApp ? '打开线上版本' : '配置云 OCR');
+    var cloudAct = useCloudApp ? 'ocr-cloud-app' : 'ocr-cloud-config';
     host.innerHTML = '<div class="ocr-error">' +
       '<div class="ocr-error-title">' + esc(title || '这次没成功') + '</div>' +
       '<div class="ocr-error-text">' + esc(humanizeOcrReason(reason || '识别失败')) + '</div>' +
       '<div class="ocr-actions">' +
       '<button type="button" class="btn-mini primary" data-act="ocr-sample" data-index="0">用示例小票演示</button>' +
-      '<button type="button" class="btn-mini" data-act="ocr-cloud-config">' + esc(cloudLabel) + '</button>' +
+      '<button type="button" class="btn-mini" data-act="' + cloudAct + '">' + esc(cloudLabel) + '</button>' +
       '<button type="button" class="btn-mini" data-act="ocr-manual">手动录入</button>' +
       '</div></div>';
+  }
+
+  /** 用被云服务认可的线上来源打开本应用（AI 功能必须用它）。 */
+  function openCloudAppLink() {
+    try {
+      if (typeof window.open === 'function') { window.open(CLOUD_APP_URL, '_blank'); }
+    } catch (e) { /* 忽略弹窗被拦截 */ }
   }
 
   /**
@@ -2343,7 +2553,7 @@
   /* ================================================================== */
 
   /* ================================================================== */
-  /* 后端对话（fetch('/api/chat')，失败回退本地 routeCommand）           */
+  /* 云端对话（WorkBuddy 云服务，失败回退本地 routeCommand）           */
   /* ================================================================== */
 
   /**
@@ -2387,7 +2597,7 @@
   };
 
   /**
-   * 把一条消息发给后端 /api/chat，渲染回复并执行 actions；
+   * 把一条消息发给 WorkBuddy 云服务对话模型，渲染回复并执行 actions；
    * 任何失败都回退到本地 routeCommand，保证「开箱即用」。
    * @param {string} text
    */
@@ -2418,17 +2628,12 @@
       routeCommand(raw);
     }
 
-    if (typeof global.fetch !== 'function') { fallback(); return; }
+    if (typeof global.AJ !== 'object' || typeof global.AJ.ask !== 'function') { fallback(); return; }
 
-    global.fetch('/api/chat', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ message: raw, context: buildContext() })
-    }).then(function (r) {
-      return r.json();
-    }).then(function (json) {
+    // 直接调用 WorkBuddy 云服务（免密钥）对话接口；失败或未就绪时回退本地 routeCommand
+    global.AJ.ask(raw, buildContext()).then(function (json) {
       if (!json || json.fallback === true) {
-        // 后端未配置或上游失败 -> 本地兜底
+        // 云服务未就绪或上游失败 -> 本地兜底
         fallback();
         return;
       }
@@ -2443,7 +2648,7 @@
       }
 
       if (actions.length === 0 && !reply) {
-        // 后端既没文字也没动作 -> 本地兜底
+        // 云端既没文字也没动作 -> 本地兜底
         fallback();
         return;
       }
@@ -2711,6 +2916,8 @@
         $('ocrStatus').textContent = '可以重新选图，或再点一次「开始识别」。';
       } else if (act === 'ocr-cloud-config') {
         openOcrCloudSettings();
+      } else if (act === 'ocr-cloud-app') {
+        openCloudAppLink();
       } else if (act === 'ocr-giveup' || act === 'ocr-manual') {
         closeOcrModal();
         switchView('chat');
@@ -2789,7 +2996,7 @@
     renderAll();
     addWelcome();
     switchView('chat');
-    refreshBackendCaps();
+    initCloud();
   }
 
   if (DOC.readyState === 'loading') {

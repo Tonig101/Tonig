@@ -672,7 +672,7 @@
   }
 
   /**
-   * 走后端 /api/ocr 的识别（服务端代签腾讯云，密钥不进浏览器）。
+   * 走 WorkBuddy 云服务视觉大模型识别截图文字（免密钥，由 app.js 注入 global.AJ.visionOcr）。
    * 与 detectCloud 返回同一套结构化结果；任何失败都返回 ok:false，便于上层降级。
    * @param {string} dataUrl 'data:image/png;base64,...'
    * @return {Promise<{ok:boolean, source:string, text:string, reason:string}>}
@@ -686,35 +686,20 @@
         reason: '没有可识别的图片数据'
       });
     }
-    if (typeof global.fetch !== 'function') {
-      return Promise.resolve({ ok: false, source: 'backend', text: '', reason: '当前环境不支持网络请求' });
+    if (typeof global.AJ === 'object' && typeof global.AJ.visionOcr === 'function') {
+      return global.AJ.visionOcr(dataUrl);
     }
-    return global.fetch('/api/ocr', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ image_data_url: dataUrl })
-    }).then(function (r) { return r.json(); }).then(function (j) {
-      if (j && j.error) {
-        return { ok: false, source: 'backend', text: '', reason: j.error };
-      }
-      var text = (j && j.text) || '';
-      if (!text) {
-        return { ok: false, source: 'backend', text: '', reason: '云端没有识别到文字' };
-      }
-      return { ok: true, source: 'backend', text: text, reason: '' };
-    }).catch(function (err) {
-      return {
-        ok: false,
-        source: 'backend',
-        text: '',
-        reason: '后端 OCR 请求失败：' + errorMessage(err)
-      };
+    return Promise.resolve({
+      ok: false,
+      source: 'backend',
+      text: '',
+      reason: 'WorkBuddy 云服务未连接（请用 python server.py 启动本页并确认能联网）'
     });
   }
 
   /**
    * 按开关选择云端识别实现：
-   *   - 启用了后端 OCR（global.AJ_BACKEND_OCR 为真，即由 server.py 托管页面）走 /api/ocr
+   *   - 启用了后端 OCR（global.AJ_BACKEND_OCR 为真，即由 server.py 托管页面）走 WorkBuddy 云服务视觉模型
    *   - 否则保留浏览器直连腾讯云 detectCloud（用 file:// 直接打开页面时）
    */
   function cloudDetect(dataUrl) {
@@ -755,7 +740,8 @@
    * 内置样例的金额和商户，看起来像真的识别成功，属于最严重的信任问题。
    */
   var NO_CAPABILITY_REASON = '当前浏览器没有可用的文字识别能力：Windows 版 Chrome 不支持本地文字识别' +
-    '（TextDetector），且还没有配置云 OCR。可以点下面的「示例小票」看演示效果，或直接手动录入。';
+    '（TextDetector），且 WorkBuddy 云服务也未连接。请用线上版本打开本应用以启用视觉识别，' +
+    '或点下面的「示例小票」看演示效果，或直接手动录入。';
 
   /**
    * 构造结构化失败结果。text 恒为空字符串，绝不携带任何示例文本。
@@ -789,7 +775,7 @@
     } else if (cloudReason) {
       head = '云端识别没有成功，所以没能识别这张截图。';
     } else if (nativeReason) {
-      head = '本地识别没有成功，也没有配置云 OCR，所以没能识别这张截图。';
+      head = '本地识别没有成功，也没有可用的云端识别（WorkBuddy 云服务未连接），所以没能识别这张截图。';
     } else {
       head = NO_CAPABILITY_REASON;
     }
@@ -821,7 +807,11 @@
       if (mode === 'cloud') { return cloudDetect(o.dataUrl); }
 
       var nativeAvailable = (typeof global !== 'undefined' && typeof global.TextDetector === 'function');
-      var cloudAvailable = hasCredentials() && !!o.dataUrl;
+      /* 云端可用性：旧版「腾讯云 OCR 凭据」或新版「WorkBuddy 云服务视觉识别」二者其一即可。
+         注意：hasCredentials() 只认腾讯云凭据；现在截图识别走 WorkBuddy 云服务（免密钥），
+         只要 app.js 已注入 global.AJ.visionOcr 就视为云端可用 —— 否则 auto 模式永远走不到云端。 */
+      var wbCloudFn = (typeof global !== 'undefined' && global.AJ && typeof global.AJ.visionOcr === 'function');
+      var cloudAvailable = !!o.dataUrl && (hasCredentials() || (global.AJ_BACKEND_OCR && wbCloudFn));
 
       /* 已配云端但没拿到图片数据：说明问题在图片，不在能力 */
       if (!nativeAvailable && hasCredentials() && !o.dataUrl) {

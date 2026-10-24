@@ -272,7 +272,7 @@
         <div class="drop-zone drop-zone-sm" id="ocrDrop">
           <div class="drop-icon">🖼️</div>
           <div class="drop-title">点击选择 / 拖拽 / Ctrl+V 粘贴截图</div>
-          <div class="drop-sub">识别只在本机进行；不配置云 OCR 就不发任何网络请求</div>
+          <div class="drop-sub">截图会发送给 WorkBuddy 云服务做视觉识别（免密钥）；也可直接用示例小票或手动录入</div>
           <input type="file" id="ocrFile" accept="image/*" hidden />
         </div>
         <img class="ocr-preview" id="ocrPreview" alt="截图预览" hidden />
@@ -292,6 +292,9 @@
   <script src="engine.js"></script>
   <script src="analysis.js"></script>
   <script src="ocr.js"></script>
+  <!-- WorkBuddy 云服务 SDK（免密钥大模型）：CDN 形式，运行时从 jsdelivr 加载 -->
+  <script src="https://cdn.jsdelivr.net/npm/@tencent-ai/workbuddy-cloud-sdk@dev/lib/index.global.js"></script>
+  <script src="cloud-config.js"></script>
   <script src="app.js"></script>
 </body>
 </html>

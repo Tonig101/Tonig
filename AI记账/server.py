@@ -426,4 +426,4 @@ if __name__ == '__main__':
     # 静态托管已用路由实现，无需额外挂载
     print('AI 校园记账管家 后端已启动： http://127.0.0.1:%d' % port)
     print('（未配置 LLM_API_KEY / TENCENT_SECRET 时，前端会自动回退到本地逻辑）')
-    uvicorn.run(app, host='127.0.0.1', port=port, log_level='info')
+    uvicorn.run(app, host='0.0.0.0', port=port, log_level='info')
