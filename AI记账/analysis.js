@@ -168,6 +168,32 @@
     return (bad / len) > 0.3;
   }
 
+  /** 取文本前 n 个非空行（用于解析失败时的诊断预览） */
+  function firstLines(text, n) {
+    var arr = String(text === undefined || text === null ? '' : text)
+      .split('\n')
+      .map(function (l) { return String(l || '').replace(/\r$/, ''); })
+      .filter(function (l) { return l.trim().length > 0; });
+    return arr.slice(0, n || 4).join('\n');
+  }
+
+  /** 粗略判断一段字节是否像是 PDF / Excel 等二进制（不是文本 CSV） */
+  function looksBinary(bytes) {
+    if (!bytes) { return false; }
+    var b = toBytes(bytes);
+    if (!b) { return false; }
+    var len = Math.min(b.length, 512);
+    var i;
+    // PDF 以 %PDF 开头
+    if (b.length >= 4 && b[0] === 0x25 && b[1] === 0x50 && b[2] === 0x44 && b[3] === 0x46) {
+      return true;
+    }
+    // 大量 NUL 字节（xlsx/zip 等）视为二进制
+    var nul = 0;
+    for (i = 0; i < len; i++) { if (b[i] === 0x00) { nul += 1; } }
+    return len > 0 && (nul / len) > 0.05;
+  }
+
   /**
    * 字节 → 文本。先按 UTF-8 严格解码（fatal），失败再用 GBK/GB18030 兜底。
    * 每次解码后都做乱码校验，避免把二进制文件当 GBK 硬解成一大段乱码。
@@ -702,6 +728,10 @@
       text = file.text;
       result.encoding = file.encoding || 'text';
     } else if (file && file.bytes) {
+      if (looksBinary(file.bytes)) {
+        result.reason = '这看起来是 PDF / Excel 等二进制文件，不是 CSV 文本。请在微信/支付宝里重新导出：选「CSV（用做个人对账）」格式，再导入。';
+        return result;
+      }
       var dec = decodeBytes(file.bytes);
       if (!dec.ok) {
         result.reason = dec.reason || '无法识别文件编码';
@@ -718,6 +748,8 @@
       result.reason = '文件内容为空';
       return result;
     }
+
+    result.preview = firstLines(text, 4);
 
     var rows = parseDelimited(text);
     result.delimiter = detectDelimiter(text);
@@ -1010,6 +1042,7 @@
         name: meta.name,
         ok: !!meta.ok,
         reason: meta.reason || '',
+        preview: meta.preview || '',
         encoding: meta.encoding || '',
         headerRow: meta.headerRow || 0,
         totalRows: meta.totalRows || 0,

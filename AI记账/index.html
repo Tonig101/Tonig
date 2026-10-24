@@ -27,6 +27,9 @@
         <button class="btn-ghost btn-feature" id="btnAnalysis" type="button" aria-label="账单分析" title="账单分析">
           <span class="ico">📊</span><span class="txt">账单分析</span>
         </button>
+        <button class="btn-ghost btn-feature" id="btnImport" type="button" aria-label="导入账单" title="导入微信/支付宝账单">
+          <span class="ico">📥</span><span class="txt">导入账单</span>
+        </button>
         <button class="btn-icon btn-more" id="btnMore" type="button" title="更多" aria-label="更多">⋯</button>
         <button class="btn-icon" id="btnSettings" type="button" title="设置" aria-label="设置">
           <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
@@ -49,6 +52,7 @@
         <div class="chat-head">
           <span class="dot-live"></span>
           <span>账小助 · 在线</span>
+          <button class="btn-mini chat-undo" id="btnUndo" type="button" title="撤回最近一笔记账">↩ 撤回上一步</button>
           <span class="chat-head-hint">支持一句话多笔，例如「中午黄焖鸡18，晚上聚餐50」</span>
         </div>
         <div class="chat-list" id="chatList"></div>
@@ -237,6 +241,11 @@
         <button class="btn-icon" id="btnCloseAnalysis" type="button" aria-label="关闭">✕</button>
       </header>
       <div class="sheet-body" id="analysisBody">
+        <div class="analysis-tabs" id="analysisTabs">
+          <button type="button" class="atab active" data-act="an-mode" data-mode="current">当前账本</button>
+          <button type="button" class="atab" data-act="an-mode" data-mode="imported">导入 CSV</button>
+        </div>
+        <div class="analysis-current-banner" id="analysisCurrentBanner" hidden></div>
         <div class="drop-zone" id="analysisDrop">
           <div class="drop-icon">📄</div>
           <div class="drop-title">点击选择，或把支付宝 / 微信 / 银行导出的 CSV 拖进来</div>
@@ -258,10 +267,236 @@
         <button class="btn-mini primary" id="btnAnalysisImport" type="button">把导入记录并入账本</button>
         <button class="btn-mini danger" id="btnAnalysisClear" type="button">清空导入</button>
       </footer>
-    </section>
-  </div>
+  </section>
+</div>
 
-  <!-- ==================== 截屏记账 ==================== -->
+<!-- ==================== 导入账单（微信 / 支付宝 / 银行 CSV） ==================== -->
+<div class="sheet-mask" id="importMask" hidden>
+  <section class="sheet" role="dialog" aria-modal="true" aria-labelledby="importTitle">
+    <header class="sheet-head">
+      <h3 id="importTitle">📥 导入账单</h3>
+      <button class="btn-icon" id="btnCloseImport" type="button" aria-label="关闭">✕</button>
+    </header>
+    <div class="sheet-body" id="importBody">
+      <div class="import-guide" id="importGuide">
+        <div class="ig-item"><b>微信</b>：我 → 服务 → 钱包 → 账单 → 常见问题 → 下载账单（选「用于个人对账」）→ 得到 CSV</div>
+        <div class="ig-item"><b>支付宝</b>：我的 → 账单 → 右上角 ⋯ → 开具交易流水证明 / 导出 → 选 CSV（不要用 PDF）</div>
+        <div class="ig-sub">支持多选文件；转账 / 还款 / 提现会自动排除；导入后可在聊天里给每笔「值不值」打分。数据只在本机，不上传。</div>
+      </div>
+      <div class="drop-zone" id="importDrop">
+        <div class="drop-icon">📄</div>
+        <div class="drop-title">点击选择，或把微信 / 支付宝 / 银行导出的 CSV 拖进来</div>
+        <div class="drop-sub">支持多选 · .csv / .txt</div>
+        <input type="file" id="importFile" accept=".csv,.txt,text/csv" multiple hidden />
+      </div>
+      <div class="analysis-status" id="importStatus">还没有选择文件。</div>
+      <div class="import-controls" id="importControls" hidden>
+        <label class="checkbox-line">
+          <input type="checkbox" id="importExcludeDup" checked />
+          <span>排除与账本重复的记录（按 日期 + 金额 + 备注 判断）</span>
+        </label>
+        <label class="checkbox-line">
+          <input type="checkbox" id="importExcludeFileDup" />
+          <span>同时排除导入文件内部的重复项</span>
+        </label>
+        <label class="select-line">
+          <span>只导入月份</span>
+          <select id="importMonth"></select>
+        </label>
+      </div>
+      <div class="analysis-report" id="importReport"></div>
+    </div>
+    <footer class="sheet-foot">
+      <button class="btn-mini" id="btnImportClear" type="button">清空</button>
+      <button class="btn-mini primary" id="btnImportConfirm" type="button">确认导入到账本</button>
+    </footer>
+  </section>
+</div>
+
+<!-- ==================== 设置（完整设置界面） ==================== -->
+<div class="sheet-mask" id="settingsMask" hidden>
+  <section class="sheet" role="dialog" aria-modal="true" aria-labelledby="setPageTitle">
+    <header class="sheet-head">
+      <h3 id="setPageTitle">⚙️ 设置</h3>
+      <button class="btn-icon" id="btnCloseSetPage" type="button" aria-label="关闭">✕</button>
+    </header>
+    <div class="sheet-body" id="setPageBody">
+
+      <!-- 账号与安全 -->
+      <section class="set-group" id="setGroupAccount">
+        <h4 class="set-group-title">账号与安全</h4>
+        <div class="set-card">
+          <button type="button" class="set-row" id="rowSetProfile">
+            <span class="set-ico">🙂</span>
+            <span class="set-main"><b>头像与昵称</b><small id="setProfileDesc">点击修改头像和昵称</small></span>
+            <span class="set-value" id="setProfileValue">同学</span>
+            <span class="set-arrow">›</span>
+          </button>
+          <button type="button" class="set-row" id="rowSetBind">
+            <span class="set-ico">🔗</span>
+            <span class="set-main"><b>账号绑定</b><small>微信 / 手机号 / 邮箱</small></span>
+            <span class="set-value">未绑定</span>
+            <span class="set-arrow">›</span>
+          </button>
+          <button type="button" class="set-row" id="rowSetPassword">
+            <span class="set-ico">🔒</span>
+            <span class="set-main"><b>登录密码</b><small>定期修改更安全</small></span>
+            <span class="set-value">未设置</span>
+            <span class="set-arrow">›</span>
+          </button>
+        </div>
+      </section>
+
+      <!-- 通用与偏好 -->
+      <section class="set-group" id="setGroupGeneral">
+        <h4 class="set-group-title">通用与偏好</h4>
+        <div class="set-card">
+          <div class="set-sub">消息通知</div>
+          <label class="set-row set-row-switch">
+            <span class="set-ico">📣</span>
+            <span class="set-main"><b>系统推送</b><small>重要公告与更新提醒</small></span>
+            <input type="checkbox" class="set-switch" id="setSwitchPush" checked />
+          </label>
+          <label class="set-row set-row-switch">
+            <span class="set-ico">⏰</span>
+            <span class="set-main"><b>记账提醒</b><small>每天晚上提醒记一笔</small></span>
+            <input type="checkbox" class="set-switch" id="setSwitchRemind" checked />
+          </label>
+          <label class="set-row set-row-switch">
+            <span class="set-ico">🚨</span>
+            <span class="set-main"><b>超支提醒</b><small>预算快花完时提醒我</small></span>
+            <input type="checkbox" class="set-switch" id="setSwitchOverspend" checked />
+          </label>
+          <div class="set-row set-row-col">
+            <span class="set-ico">🌙</span>
+            <span class="set-main"><b>深色模式</b><small>跟随系统或手动选择</small></span>
+            <div class="set-seg" id="setThemeSeg">
+              <label class="seg-item"><input type="radio" name="setThemeMode" value="system" checked /><span>跟随系统</span></label>
+              <label class="seg-item"><input type="radio" name="setThemeMode" value="light" /><span>浅色</span></label>
+              <label class="seg-item"><input type="radio" name="setThemeMode" value="dark" /><span>深色</span></label>
+            </div>
+          </div>
+          <div class="set-row set-row-col">
+            <span class="set-ico">🔠</span>
+            <span class="set-main"><b>字体大小</b><small>放大聊天与看板文字</small></span>
+            <div class="set-seg" id="setFontSeg">
+              <label class="seg-item"><input type="radio" name="setFontScale" value="sm" /><span>小</span></label>
+              <label class="seg-item"><input type="radio" name="setFontScale" value="md" checked /><span>标准</span></label>
+              <label class="seg-item"><input type="radio" name="setFontScale" value="lg" /><span>大</span></label>
+              <label class="seg-item"><input type="radio" name="setFontScale" value="xl" /><span>特大</span></label>
+            </div>
+          </div>
+          <div class="set-row set-row-col">
+            <span class="set-ico">🌐</span>
+            <span class="set-main"><b>语言</b><small>Language</small></span>
+            <div class="set-seg" id="setLangSeg">
+              <label class="seg-item"><input type="radio" name="setLang" value="zh" checked /><span>简体中文</span></label>
+              <label class="seg-item"><input type="radio" name="setLang" value="en" /><span>English</span></label>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- 数据与隐私 -->
+      <section class="set-group" id="setGroupData">
+        <h4 class="set-group-title">数据与隐私</h4>
+        <div class="set-card">
+          <button type="button" class="set-row" id="rowSetCache">
+            <span class="set-ico">🧹</span>
+            <span class="set-main"><b>清理缓存</b><small>只清缓存，不动账本数据</small></span>
+            <span class="set-value" id="setCacheValue">0 B</span>
+            <span class="set-arrow">›</span>
+          </button>
+          <div class="set-sub">隐私设置</div>
+          <label class="set-row set-row-switch">
+            <span class="set-ico">🖼️</span>
+            <span class="set-main"><b>允许读取相册</b><small>截屏记账需要选择图片</small></span>
+            <input type="checkbox" class="set-switch" id="setSwitchAlbum" checked />
+          </label>
+          <label class="set-row set-row-switch">
+            <span class="set-ico">📋</span>
+            <span class="set-main"><b>允许读取剪贴板</b><small>支持粘贴截图快速记账</small></span>
+            <input type="checkbox" class="set-switch" id="setSwitchClipboard" checked />
+          </label>
+          <button type="button" class="set-row" id="rowSetTerms">
+            <span class="set-ico">📜</span>
+            <span class="set-main"><b>用户协议与隐私政策</b><small>了解数据如何存放与使用</small></span>
+            <span class="set-arrow">›</span>
+          </button>
+          <button type="button" class="set-row" id="rowSetExport">
+            <span class="set-ico">📤</span>
+            <span class="set-main"><b>个人信息导出</b><small>下载账本统计概览与设置（JSON）</small></span>
+            <span class="set-arrow">›</span>
+          </button>
+          <button type="button" class="set-row set-row-danger" id="rowSetDeleteAccount">
+            <span class="set-ico">🗑️</span>
+            <span class="set-main"><b>注销账号</b><small>清空本机全部数据，不可恢复</small></span>
+            <span class="set-arrow">›</span>
+          </button>
+        </div>
+      </section>
+
+      <!-- 帮助与反馈 -->
+      <section class="set-group" id="setGroupHelp">
+        <h4 class="set-group-title">帮助与反馈</h4>
+        <div class="set-card">
+          <div class="set-faq-list" id="setFaqList">
+            <details class="set-faq">
+              <summary>新手怎么用？</summary>
+              <p>直接在聊天框输入一句话，比如「中午食堂 15」，我就会记下来。也可以点顶部的「截屏记账」识别小票，或用「导入账单」批量导入微信 / 支付宝账单 CSV。</p>
+            </details>
+            <details class="set-faq">
+              <summary>怎么修改 / 删除账单？</summary>
+              <p>在聊天里点「撤回上一步」可以撤销最近一笔记账；看板的「本月账单流水」能看到最近的记录。演示版本暂不支持单笔编辑。</p>
+            </details>
+            <details class="set-faq">
+              <summary>怎么导入微信 / 支付宝账单？</summary>
+              <p>点顶部「导入账单」，选择账单导出里的 CSV 文件（不要用 PDF）。支持多选，导入前可以预览、按月份筛选，确认后才会写入账本。</p>
+            </details>
+            <details class="set-faq">
+              <summary>「撤回」和「值不值」是什么？</summary>
+              <p>「撤回」用于撤销误记的账；每笔支出记账后可以给它打「值不值」，帮你复盘哪些钱花得开心、哪些后悔。</p>
+            </details>
+          </div>
+          <div class="set-row set-row-col">
+            <span class="set-ico">✍️</span>
+            <span class="set-main"><b>意见反馈</b><small>遇到问题或有好建议，告诉我们</small></span>
+            <textarea class="set-textarea" id="setFeedbackInput" rows="3" maxlength="500" placeholder="写下你的建议（500 字以内，仅保存在本机）"></textarea>
+            <button type="button" class="btn-mini primary set-feedback-btn" id="btnSetFeedback">提交反馈</button>
+          </div>
+          <div class="set-row set-row-static">
+            <span class="set-ico">📮</span>
+            <span class="set-main"><b>联系我们</b><small>客服邮箱：support@zhangxiaozhu.app</small></span>
+            <span class="set-value">工作日 9:00-18:00</span>
+          </div>
+        </div>
+      </section>
+
+      <!-- 关于 -->
+      <section class="set-group" id="setGroupAbout">
+        <h4 class="set-group-title">关于</h4>
+        <div class="set-card">
+          <div class="set-row set-row-static">
+            <span class="set-ico">💡</span>
+            <span class="set-main"><b>关于我们</b><small>AI 校园记账管家：一句话记账、月末防吃土，陪你看清每一笔花销。「AI 记账 · 创新应用大赛作品」</small></span>
+          </div>
+          <div class="set-row set-row-static">
+            <span class="set-ico">🆕</span>
+            <span class="set-main"><b>检查更新</b><small>当前版本 v1.0.0</small></span>
+            <button type="button" class="btn-mini" id="btnSetCheckUpdate">检查更新</button>
+          </div>
+          <div class="set-row set-row-static">
+            <span class="set-ico">⚖️</span>
+            <span class="set-main"><b>免责声明</b><small>AI 建议仅供参考，不构成专业理财投资建议</small></span>
+          </div>
+        </div>
+      </section>
+
+    </div>
+  </section>
+</div>
+
+<!-- ==================== 截屏记账 ==================== -->
   <div class="modal-mask" id="ocrMask" hidden>
     <div class="modal modal-ocr" id="ocrBox" role="dialog" aria-modal="true" aria-labelledby="ocrTitle">
       <div class="modal-head">

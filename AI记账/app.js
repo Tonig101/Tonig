@@ -77,9 +77,15 @@
       ];
       var full = '';
       var done = false;
+      var timeoutTimer = setTimeout(function () {
+        if (done) { return; }
+        done = true;
+        resolve({ reply: null, actions: [], fallback: true, reason: '云服务响应超时' });
+      }, 10000);
       function finish() {
         if (done) { return; }
         done = true;
+        clearTimeout(timeoutTimer);
         var parsed = parseCloudJson(full);
         if (!parsed) {
           resolve({ reply: full || null, actions: [], fallback: false, reason: '' });
@@ -231,9 +237,13 @@
   var highlightCategory = null;
   var flow = { queue: [], committed: [] };
   var pendingBill = null;
+  /** 撤回栈：按记账顺序记录每笔账单 id（仅内存，不持久化）。供「撤回上一步」使用 */
+  var undoStack = [];
 
   /** 账单分析：最近一次导入的原始结果（默认不写入账本） */
   var analysisData = null;
+  /** 分析模式：'current' 直接分析当前账本；'imported' 分析导入的 CSV */
+  var analysisMode = 'current';
 
   /** 截屏记账：当前图片 dataURL / 当前待确认结果 */
   var ocrImageDataUrl = '';
@@ -312,6 +322,7 @@
       source: isIncome ? String(b.source || '') : '',
       askedCycle: !!b.askedCycle,
       imported: !!b.imported,
+      worth: (b.worth === 'worth' || b.worth === 'mid' || b.worth === 'waste') ? b.worth : '',
       createdAt: isFinite(Number(b.createdAt)) ? Number(b.createdAt) : Date.now()
     };
   }
@@ -327,6 +338,39 @@
       target: ENG.round2(target),
       saved: isFinite(saved) && saved >= 0 ? ENG.round2(saved) : 0,
       deadline: (typeof g.deadline === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(g.deadline)) ? g.deadline : ''
+    };
+  }
+
+  /**
+   * 设置项归一化：任何一项缺失或非法都回退到默认值，
+   * 保证旧版本存档（没有 settings 字段）读进来也能正常用。
+   * @param {Object} raw 存档里的 settings 字段
+   * @return {Object} 归一化后的设置对象
+   */
+  function normalizeSettings(raw) {
+    var s = (raw && typeof raw === 'object') ? raw : {};
+    var profile = (s.profile && typeof s.profile === 'object') ? s.profile : {};
+    var notify = (s.notify && typeof s.notify === 'object') ? s.notify : {};
+    var privacy = (s.privacy && typeof s.privacy === 'object') ? s.privacy : {};
+    return {
+      profile: {
+        nickname: (typeof profile.nickname === 'string' && profile.nickname.trim())
+          ? profile.nickname.trim().slice(0, 12) : '同学',
+        avatar: (typeof profile.avatar === 'string' && profile.avatar.trim())
+          ? profile.avatar.trim().slice(0, 4) : '🙂'
+      },
+      notify: {
+        push: notify.push !== false,
+        remind: notify.remind !== false,
+        overspend: notify.overspend !== false
+      },
+      theme: (s.theme === 'light' || s.theme === 'dark') ? s.theme : 'system',
+      fontScale: (s.fontScale === 'sm' || s.fontScale === 'lg' || s.fontScale === 'xl') ? s.fontScale : 'md',
+      lang: s.lang === 'en' ? 'en' : 'zh',
+      privacy: {
+        album: privacy.album !== false,
+        clipboard: privacy.clipboard !== false
+      }
     };
   }
 
@@ -359,7 +403,8 @@
       },
       goals: goals,
       savedMoney: clampNumber(s.savedMoney, 0, 99999999, 0),
-      blockedCount: Math.round(clampNumber(s.blockedCount, 0, 999999, 0))
+      blockedCount: Math.round(clampNumber(s.blockedCount, 0, 999999, 0)),
+      settings: normalizeSettings(s.settings)
     };
   }
 
@@ -430,7 +475,8 @@
       budget: budget,
       goals: goals,
       savedMoney: 0,
-      blockedCount: 0
+      blockedCount: 0,
+      settings: normalizeSettings(null)
     };
   }
 
@@ -539,13 +585,17 @@
     tags += '<span class="tag">' + esc(bill.date) + '</span>';
 
     return '' +
-      '<div class="bill-card">' +
+      '<div class="bill-card" data-bill="' + esc(bill.id) + '">' +
       '  <div class="bill-card-head"><span>' + (isIncome ? '收入入账' : '支出记账') + '</span><span>' + esc(bill.date) + '</span></div>' +
       '  <div class="bill-card-main">' +
       '    <span class="bill-card-note">' + esc(bill.note) + '</span>' +
       '    <span class="bill-card-amount ' + cls + '">' + sign + money(bill.amount) + '</span>' +
       '  </div>' +
       '  <div class="bill-card-tags">' + tags + '</div>' +
+      '  <div class="bill-card-actions">' +
+      (isIncome ? '' : '<span class="worth-q">值不值？</span>' + worthBtns(bill)) +
+      '    <button type="button" class="undo-btn" data-act="undo" data-bill="' + esc(bill.id) + '">撤回</button>' +
+      '  </div>' +
       '</div>';
   }
 
@@ -565,7 +615,7 @@
     return Number(draft.amount) >= threshold;
   }
 
-  function commitBill(draft) {
+  function commitBill(draft, skipUndo) {
     var isIncome = draft.type === 'income';
     var bill = {
       id: uid('b'),
@@ -583,8 +633,86 @@
       createdAt: Date.now()
     };
     state.bills.push(bill);
+    // 批量导入的账单不进单步撤回栈（撤回只针对手动记错的那一笔），避免一次导入污染撤回
+    if (!skipUndo) { undoStack.push(bill.id); }
     saveState();
     return bill;
+  }
+
+  /** 按 id 查找账单 */
+  function findBill(id) {
+    if (!id) { return null; }
+    for (var i = 0; i < state.bills.length; i++) {
+      if (state.bills[i].id === id) { return state.bills[i]; }
+    }
+    return null;
+  }
+
+  /** 撤回（删除）某笔账单，并刷新看板 */
+  function deleteBill(id) {
+    var b = findBill(id);
+    if (!b) { return; }
+    state.bills = state.bills.filter(function (x) { return x.id !== id; });
+    // 同步从撤回栈移除，避免「撤回上一步」误删已删记录
+    undoStack = undoStack.filter(function (x) { return x !== id; });
+    saveState();
+    // 从聊天流里移除这张账单卡片所在的整条消息
+    var chatCards = DOC.querySelectorAll('#chatList .bill-card[data-bill="' + id + '"]');
+    for (var ci = 0; ci < chatCards.length; ci++) {
+      var row = chatCards[ci].closest ? chatCards[ci].closest('.msg-row') : null;
+      if (row && row.parentNode) { row.parentNode.removeChild(row); }
+    }
+    renderAll();
+    addAIMessage(aiBubble('↩️ 已撤回「' + esc(b.note) + '」' +
+      (b.type === 'income' ? '（收入 ' : '（支出 ') + money(b.amount) + '），已恢复。'));
+  }
+
+  /** 给某笔支出打「值不值」标签（再次点击同一项可取消） */
+  function setBillWorth(id, val) {
+    var b = findBill(id);
+    if (!b || b.type === 'income') { return; }
+    b.worth = (b.worth === val) ? '' : val;
+    saveState();
+    // 只刷新这张卡片，避免整段聊天被重绘
+    var cards = DOC.querySelectorAll('.bill-card');
+    for (var k = 0; k < cards.length; k++) {
+      if (cards[k].getAttribute('data-bill') === id) {
+        var tmp = DOC.createElement('div');
+        tmp.innerHTML = billCardHtml(b);
+        var fresh = tmp.firstChild;
+        if (fresh && fresh.nodeType === 1 && cards[k].parentNode) {
+          cards[k].parentNode.replaceChild(fresh, cards[k]);
+        }
+        break;
+      }
+    }
+  }
+
+  /** 撤回上一步：删除最近一次记入的账单 */
+  function undoLast() {
+    if (!state.bills.length) {
+      addAIMessage(aiBubble('现在没有可撤回的记录啦～'));
+      return;
+    }
+    if (!undoStack.length) {
+      addAIMessage(aiBubble('这一步没法自动撤回（比如是导入 / 重置产生的）。你可以直接点账单卡片上的「撤回」按钮删掉它。'));
+      return;
+    }
+    var id = undoStack.pop();
+    deleteBill(id);
+  }
+
+  /** 值不值 三选一按钮 */
+  function worthBtns(bill) {
+    var opts = [['worth', '值'], ['mid', '一般'], ['waste', '不值']];
+    var html = '';
+    for (var i = 0; i < opts.length; i++) {
+      var v = opts[i];
+      var active = bill.worth === v[0] ? ' active' : '';
+      html += '<button type="button" class="worth-btn' + active + '" data-act="worth" data-bill="' +
+        esc(bill.id) + '" data-val="' + v[0] + '">' + v[1] + '</button>';
+    }
+    return html;
   }
 
   /** 开始处理一批解析结果 */
@@ -1193,6 +1321,7 @@
     box.querySelector('[data-act="reset-ok"]').addEventListener('click', function () {
       state = seedState();
       highlightCategory = null;
+      undoStack = [];
       saveState();
       closeModal();
       renderAll();
@@ -1297,6 +1426,399 @@
       state.budget.payday + ' 号，冷静期阈值 ' + money(state.budget.cooldownThreshold) +
       '。当前周期 ' + esc(ov.cycle.start) + ' ~ ' + esc(ov.cycle.end) +
       (ov.cycle.isCustom ? '（自定义起点）' : '') + '，看板已重算。'));
+  }
+
+  /* ================================================================== */
+  /* 完整设置界面（setPage* / setGroup*，与预算抽屉相互独立）             */
+  /* ================================================================== */
+
+  /** 可选头像（emoji，演示用） */
+  var PROFILE_AVATARS = ['🙂', '😎', '🐶', '🐱', '🐰', '🦊', '🐼', '🦉', '🌟', '💰'];
+  /** 字体大小档位 -> body 上的 class（样式在 styles.css） */
+  var FONT_SCALE_CLASS = { sm: 'font-scale-sm', md: '', lg: 'font-scale-lg', xl: 'font-scale-xl' };
+  /** 应用版本号（关于页展示 & 检查更新提示） */
+  var APP_VERSION = 'v1.0.0';
+  /** 反馈本地存储 key */
+  var FEEDBACK_KEY = 'ledger.feedback';
+
+  /* 系统深色偏好监听（深色模式选「跟随系统」时用） */
+  var themeMediaQuery = null;
+  try {
+    themeMediaQuery = global.matchMedia ? global.matchMedia('(prefers-color-scheme: dark)') : null;
+  } catch (e) {
+    themeMediaQuery = null;
+  }
+
+  /** 取当前设置（带默认值兜底，旧存档没有 settings 也能用） */
+  function getSettings() {
+    if (!state || typeof state !== 'object') { return normalizeSettings(null); }
+    if (!state.settings || typeof state.settings !== 'object') {
+      state.settings = normalizeSettings(null);
+    }
+    return state.settings;
+  }
+
+  /** 归一化设置、持久化、应用外观并刷新设置页 */
+  function persistSettings() {
+    state.settings = normalizeSettings(state.settings);
+    saveState();
+    applyAppearance();
+    renderSettingsPage();
+  }
+
+  /** 当前生效的主题：system 时跟随系统偏好 */
+  function resolveTheme() {
+    var mode = getSettings().theme;
+    if (mode === 'dark') { return 'dark'; }
+    if (mode === 'light') { return 'light'; }
+    if (themeMediaQuery && typeof themeMediaQuery.matches === 'boolean') {
+      return themeMediaQuery.matches ? 'dark' : 'light';
+    }
+    return 'light';
+  }
+
+  /** 把主题与字体档位应用到 <html data-theme> / body class 上 */
+  function applyAppearance() {
+    var root = DOC.documentElement;
+    if (root) { root.setAttribute('data-theme', resolveTheme()); }
+    var body = DOC.body;
+    if (!body) { return; }
+    body.classList.remove('font-scale-sm', 'font-scale-lg', 'font-scale-xl');
+    var cls = FONT_SCALE_CLASS[getSettings().fontScale];
+    if (cls) { body.classList.add(cls); }
+  }
+
+  /** 系统深色偏好变化时，若设置为「跟随系统」则实时切换 */
+  function onSystemThemeChange() {
+    if (getSettings().theme === 'system') { applyAppearance(); }
+  }
+
+  function openSettingsPage() {
+    renderSettingsPage();
+    $('settingsMask').hidden = false;
+  }
+
+  function closeSettingsPage() {
+    $('settingsMask').hidden = true;
+  }
+
+  /** 单选组（radio）按值勾选 */
+  function checkRadioGroup(name, value) {
+    var inputs = DOC.querySelectorAll('input[name="' + name + '"]');
+    var i;
+    for (i = 0; i < inputs.length; i++) {
+      inputs[i].checked = (inputs[i].value === value);
+    }
+  }
+
+  /** 按当前 state.settings 刷新设置页各控件的显示值 */
+  function renderSettingsPage() {
+    var st = getSettings();
+    $('setProfileValue').textContent = st.profile.nickname;
+    $('setProfileDesc').textContent = '当前头像 ' + st.profile.avatar + ' · 点击修改';
+    $('setSwitchPush').checked = st.notify.push;
+    $('setSwitchRemind').checked = st.notify.remind;
+    $('setSwitchOverspend').checked = st.notify.overspend;
+    checkRadioGroup('setThemeMode', st.theme);
+    checkRadioGroup('setFontScale', st.fontScale);
+    checkRadioGroup('setLang', st.lang);
+    $('setSwitchAlbum').checked = st.privacy.album;
+    $('setSwitchClipboard').checked = st.privacy.clipboard;
+    $('setCacheValue').textContent = estimateCacheSize();
+  }
+
+  /** 设置页所有事件绑定（在 bindEvents 里调用一次） */
+  function bindSettingsEvents() {
+    $('btnCloseSetPage').addEventListener('click', closeSettingsPage);
+    $('settingsMask').addEventListener('click', function (e) {
+      if (e.target === $('settingsMask')) { closeSettingsPage(); }
+    });
+
+    /* ---- 账号与安全 ---- */
+    $('rowSetProfile').addEventListener('click', openProfileModal);
+    $('rowSetBind').addEventListener('click', function () {
+      showToast('演示版本暂不支持真实绑定');
+    });
+    $('rowSetPassword').addEventListener('click', function () {
+      showToast('演示版本暂不支持修改密码');
+    });
+
+    /* ---- 通用与偏好：三个通知开关 ---- */
+    $('setSwitchPush').addEventListener('change', function () {
+      getSettings().notify.push = this.checked;
+      persistSettings();
+    });
+    $('setSwitchRemind').addEventListener('change', function () {
+      getSettings().notify.remind = this.checked;
+      persistSettings();
+    });
+    $('setSwitchOverspend').addEventListener('change', function () {
+      getSettings().notify.overspend = this.checked;
+      persistSettings();
+    });
+
+    /* ---- 深色模式 / 字体大小 / 语言：分段单选（change 会冒泡） ---- */
+    $('setThemeSeg').addEventListener('change', function (e) {
+      var input = (e.target && e.target.closest) ? e.target.closest('input[name="setThemeMode"]') : null;
+      if (!input) { return; }
+      getSettings().theme = input.value;
+      persistSettings();
+      showToast(input.value === 'dark' ? '已切换到深色模式'
+        : (input.value === 'light' ? '已切换到浅色模式' : '深色模式：跟随系统'));
+    });
+    $('setFontSeg').addEventListener('change', function (e) {
+      var input = (e.target && e.target.closest) ? e.target.closest('input[name="setFontScale"]') : null;
+      if (!input) { return; }
+      getSettings().fontScale = input.value;
+      persistSettings();
+      showToast('字体大小已切换');
+    });
+    $('setLangSeg').addEventListener('change', function (e) {
+      var input = (e.target && e.target.closest) ? e.target.closest('input[name="setLang"]') : null;
+      if (!input) { return; }
+      getSettings().lang = input.value;
+      persistSettings();
+      if (input.value === 'en') { showToast('演示版本暂仅支持简体中文'); }
+    });
+
+    /* ---- 数据与隐私 ---- */
+    $('rowSetCache').addEventListener('click', clearAppCache);
+    $('setSwitchAlbum').addEventListener('change', function () {
+      getSettings().privacy.album = this.checked;
+      persistSettings();
+      showToast(this.checked ? '已允许读取相册' : '已关闭读取相册，截屏记账将不可用');
+    });
+    $('setSwitchClipboard').addEventListener('change', function () {
+      getSettings().privacy.clipboard = this.checked;
+      persistSettings();
+    });
+    $('rowSetTerms').addEventListener('click', openTermsModal);
+    $('rowSetExport').addEventListener('click', exportPersonalInfo);
+    $('rowSetDeleteAccount').addEventListener('click', confirmDeleteAccount);
+
+    /* ---- 帮助与反馈 / 关于 ---- */
+    $('btnSetFeedback').addEventListener('click', submitSettingsFeedback);
+    $('btnSetCheckUpdate').addEventListener('click', function () {
+      showToast('已是最新版本（演示）· ' + APP_VERSION);
+    });
+
+    /* 系统深色偏好变化（兼容旧版 Safari 的 addListener） */
+    if (themeMediaQuery) {
+      if (typeof themeMediaQuery.addEventListener === 'function') {
+        themeMediaQuery.addEventListener('change', onSystemThemeChange);
+      } else if (typeof themeMediaQuery.addListener === 'function') {
+        themeMediaQuery.addListener(onSystemThemeChange);
+      }
+    }
+  }
+
+  /** 头像与昵称编辑弹层 */
+  function openProfileModal() {
+    var st = getSettings();
+    var avatars = PROFILE_AVATARS.map(function (a) {
+      return '<button type="button" class="avatar-pick' + (a === st.profile.avatar ? ' active' : '') +
+        '" data-avatar="' + a + '" aria-label="选择头像">' + a + '</button>';
+    }).join('');
+    var box = openModal('' +
+      '<h4>头像与昵称</h4>' +
+      '<p>选一个喜欢的头像，再取个昵称。</p>' +
+      '<div class="avatar-picker" id="avatarPicker">' + avatars + '</div>' +
+      '<label class="field"><span>昵称（最多 12 个字）</span>' +
+      '<input id="setNickInput" type="text" maxlength="12" value="' + esc(st.profile.nickname) + '" /></label>' +
+      '<div class="modal-actions">' +
+      '<button type="button" class="btn-cancel" data-act="modal-cancel">取消</button>' +
+      '<button type="button" class="btn-ok" data-act="profile-save">保存</button>' +
+      '</div>');
+    var picked = st.profile.avatar;
+    box.querySelector('#avatarPicker').addEventListener('click', function (e) {
+      var btn = (e.target && e.target.closest) ? e.target.closest('[data-avatar]') : null;
+      if (!btn) { return; }
+      picked = btn.getAttribute('data-avatar');
+      var all = box.querySelectorAll('.avatar-pick');
+      var i;
+      for (i = 0; i < all.length; i++) { all[i].classList.remove('active'); }
+      btn.classList.add('active');
+    });
+    box.querySelector('[data-act="modal-cancel"]').addEventListener('click', closeModal);
+    box.querySelector('[data-act="profile-save"]').addEventListener('click', function () {
+      var name = String(box.querySelector('#setNickInput').value || '').trim();
+      if (!name) {
+        box.querySelector('#setNickInput').focus();
+        showToast('昵称不能为空');
+        return;
+      }
+      st.profile.nickname = name.slice(0, 12);
+      st.profile.avatar = picked;
+      persistSettings();
+      closeModal();
+      showToast('资料已更新');
+    });
+    var input = box.querySelector('#setNickInput');
+    if (input) { input.focus(); }
+  }
+
+  /** 用户协议与隐私政策（演示占位文本） */
+  function openTermsModal() {
+    openModal('' +
+      '<h4>用户协议与隐私政策</h4>' +
+      '<p>【演示占位文本】本应用为「AI 记账 · 创新应用大赛」参赛作品，仅用于功能演示。</p>' +
+      '<p>1. 所有账单、目标与设置数据仅保存在你的浏览器 localStorage 中，不上传服务器。</p>' +
+      '<p>2. 截屏识别功能会将图片发送至第三方云服务做文字识别，请勿上传含敏感信息的图片。</p>' +
+      '<p>3. AI 给出的记账建议仅供参考，不构成专业理财或投资建议。</p>' +
+      '<p>4. 正式版本的协议与隐私政策以线上页面为准。</p>' +
+      '<div class="modal-actions">' +
+      '<button type="button" class="btn-ok" data-act="modal-cancel">我知道了</button>' +
+      '</div>');
+  }
+
+  /** 估算非账本缓存占用（主账本 key 不计入；UTF-16 粗估 2 字节/字符） */
+  function estimateCacheSize() {
+    var total = 0;
+    try {
+      var keys = Object.keys(global.localStorage);
+      var i;
+      for (i = 0; i < keys.length; i++) {
+        if (keys[i] === STORAGE_KEY) { continue; }
+        var val = global.localStorage.getItem(keys[i]);
+        total += (keys[i].length + (val ? val.length : 0)) * 2;
+      }
+    } catch (e) {
+      return '—';
+    }
+    if (total < 1024) { return total + ' B'; }
+    return (total / 1024).toFixed(1) + ' KB';
+  }
+
+  /** 清理缓存：只删账本主 key 之外的本地数据，账本绝不碰 */
+  function clearAppCache() {
+    var removed = 0;
+    try {
+      var keys = Object.keys(global.localStorage);
+      var i;
+      for (i = 0; i < keys.length; i++) {
+        if (keys[i] === STORAGE_KEY) { continue; }
+        global.localStorage.removeItem(keys[i]);
+        removed++;
+      }
+    } catch (e) {
+      showToast('清理失败：当前浏览器不允许操作本地存储');
+      return;
+    }
+    $('setCacheValue').textContent = estimateCacheSize();
+    showToast(removed > 0 ? '已清理 ' + removed + ' 项缓存，账本数据完好' : '当前没有可清理的缓存');
+  }
+
+  /** 意见反馈：存 localStorage（ledger.feedback 数组），仅本地演示 */
+  function submitSettingsFeedback() {
+    var input = $('setFeedbackInput');
+    var text = String(input.value || '').trim();
+    if (!text) {
+      showToast('先写点建议再提交吧');
+      input.focus();
+      return;
+    }
+    var list = [];
+    try {
+      var raw = global.localStorage.getItem(FEEDBACK_KEY);
+      var parsed = raw ? JSON.parse(raw) : [];
+      if (Array.isArray(parsed)) { list = parsed; }
+    } catch (e) {
+      list = [];
+    }
+    list.push({ text: text.slice(0, 500), at: new Date().toISOString() });
+    try {
+      global.localStorage.setItem(FEEDBACK_KEY, JSON.stringify(list));
+      input.value = '';
+      $('setCacheValue').textContent = estimateCacheSize();
+      showToast('已收到反馈（本地演示）');
+    } catch (e2) {
+      showToast('保存失败：当前浏览器不支持本地存储');
+    }
+  }
+
+  /** 个人信息导出：账本统计概览 + 设置，不含账单明细与敏感信息 */
+  function exportPersonalInfo() {
+    var ov = getOverview();
+    var st = getSettings();
+    var payload = {
+      app: 'AI 校园记账管家',
+      version: APP_VERSION,
+      exportedAt: new Date().toISOString(),
+      overview: {
+        billCount: state.bills.length,
+        cycleStart: ov.cycle.start,
+        cycleEnd: ov.cycle.end,
+        budgetTotal: state.budget.total,
+        cycleExpense: ov.cycleAgg.expense,
+        cycleIncome: ov.cycleAgg.income,
+        goalCount: state.goals.length
+      },
+      settings: {
+        profile: st.profile,
+        theme: st.theme,
+        fontScale: st.fontScale,
+        lang: st.lang,
+        notify: st.notify,
+        privacy: st.privacy
+      }
+    };
+    downloadJson('personal-info.json', payload);
+  }
+
+  /** 注销账号：二次确认后清空 localStorage 全部数据并刷新 */
+  function confirmDeleteAccount() {
+    var box = openModal('' +
+      '<h4>注销账号？</h4>' +
+      '<p>将清空本机所有数据（账单、目标、设置、反馈），并刷新页面。此操作不可撤销。</p>' +
+      '<div class="modal-actions">' +
+      '<button type="button" class="btn-cancel" data-act="modal-cancel">取消</button>' +
+      '<button type="button" class="btn-danger" data-act="delete-ok">确认注销</button>' +
+      '</div>');
+    box.querySelector('[data-act="modal-cancel"]').addEventListener('click', closeModal);
+    box.querySelector('[data-act="delete-ok"]').addEventListener('click', function () {
+      try {
+        global.localStorage.clear();
+      } catch (e) { /* 隐私模式下忽略，依旧执行刷新 */ }
+      closeModal();
+      closeSettingsPage();
+      global.location.reload();
+    });
+  }
+
+  /** 下载 JSON 文件 */
+  function downloadJson(filename, obj) {
+    try {
+      var blob = new Blob([JSON.stringify(obj, null, 2)], { type: 'application/json' });
+      var url = global.URL.createObjectURL(blob);
+      var a = DOC.createElement('a');
+      a.href = url;
+      a.download = filename;
+      DOC.body.appendChild(a);
+      a.click();
+      DOC.body.removeChild(a);
+      setTimeout(function () { global.URL.revokeObjectURL(url); }, 5000);
+      showToast('已导出个人信息 JSON（不含账单明细与敏感信息）');
+    } catch (e) {
+      showToast('导出失败：当前浏览器不支持文件下载');
+    }
+  }
+
+  /* 轻提示（设置页 / 开关反馈用） */
+  var toastTimer = null;
+  function showToast(text) {
+    var el = $('appToast');
+    if (!el) {
+      el = DOC.createElement('div');
+      el.id = 'appToast';
+      el.className = 'app-toast';
+      DOC.body.appendChild(el);
+    }
+    el.textContent = String(text || '');
+    el.classList.add('show');
+    if (toastTimer) { global.clearTimeout(toastTimer); }
+    toastTimer = global.setTimeout(function () {
+      el.classList.remove('show');
+    }, 2200);
   }
 
   /* ================================================================== */
@@ -1528,11 +2050,107 @@
 
   function openAnalysisSheet() {
     $('analysisMask').hidden = false;
-    renderAnalysis();
+    // 默认直接分析当前账本（无需导入）；没有记录时才停留在导入模式
+    if (state.bills.length > 0) {
+      analysisMode = 'current';
+      analyzeCurrentBills();
+    } else if (analysisData) {
+      analysisMode = 'imported';
+      renderAnalysis();
+    } else {
+      analysisMode = 'imported';
+      renderAnalysis();
+    }
+    syncAnalysisTabs();
   }
 
   function closeAnalysisSheet() {
     $('analysisMask').hidden = true;
+  }
+
+  /** 把当前账本（state.bills）转成 analysis 模块可用的 rows，并触发分析 */
+  function analyzeCurrentBills() {
+    var bills = state.bills || [];
+    var rows = bills.map(function (b) {
+      var isIncome = b.type === 'income';
+      return {
+        date: b.date,
+        amount: b.amount,
+        category: isIncome ? DATA.INCOME_CATEGORY : b.category,
+        type: isIncome ? 'income' : 'expense',
+        counterparty: '',
+        desc: b.note || '',
+        note: b.note || '',
+        worth: b.worth || '',
+        month: (b.date || '').slice(0, 7)
+      };
+    });
+    var monthSet = {};
+    var i;
+    for (i = 0; i < rows.length; i++) {
+      if (rows[i].month) { monthSet[rows[i].month] = true; }
+    }
+    var monthList = Object.keys(monthSet).sort();
+    var month = monthList.length ? monthList[monthList.length - 1] : ENG.formatDate(new Date()).slice(0, 7);
+    analysisData = {
+      rows: rows,
+      files: [{
+        name: '当前账本', ok: true, reason: '', encoding: '', headerRow: 0,
+        totalRows: rows.length, skipped: 0, skippedBefore: 0, transferIncomeCount: 0,
+        columns: {}, delimiter: ',', records: rows.length
+      }],
+      duplicates: [],
+      months: monthList,
+      month: month,
+      source: 'current'
+    };
+    renderAnalysis();
+  }
+
+  /** 切换分析模式标签的选中态 */
+  function syncAnalysisTabs() {
+    var tabs = DOC.querySelectorAll('[data-act="an-mode"]');
+    for (var i = 0; i < tabs.length; i++) {
+      var m = tabs[i].getAttribute('data-mode');
+      tabs[i].classList.toggle('active', m === analysisMode);
+    }
+  }
+
+  /** 统计「值不值」自评 */
+  function worthStats(bills) {
+    var s = { worth: 0, mid: 0, waste: 0, none: 0, wasteAmount: 0, totalExpense: 0 };
+    for (var i = 0; i < bills.length; i++) {
+      var b = bills[i];
+      if (b.type === 'income') { continue; }
+      s.totalExpense += b.amount;
+      if (b.worth === 'worth') { s.worth += 1; }
+      else if (b.worth === 'mid') { s.mid += 1; }
+      else if (b.worth === 'waste') { s.waste += 1; s.wasteAmount += b.amount; }
+      else { s.none += 1; }
+    }
+    s.wasteRate = s.totalExpense > 0 ? (s.wasteAmount / s.totalExpense * 100) : 0;
+    return s;
+  }
+
+  /** 「值不值」自评区块 HTML */
+  function worthSectionHtml(s) {
+    if (s.totalExpense <= 0 && s.none === 0) {
+      return emptyLine('当前账本还没有支出记录');
+    }
+    var rated = s.worth + s.mid + s.waste;
+    return '<div class="worth-stats">' +
+      '<div class="worth-grid">' +
+      '  <div class="wcell w-worth"><b>' + s.worth + '</b><small>值 ✅</small></div>' +
+      '  <div class="wcell w-mid"><b>' + s.mid + '</b><small>一般</small></div>' +
+      '  <div class="wcell w-waste"><b>' + s.waste + '</b><small>不值 ❌</small></div>' +
+      '  <div class="wcell"><b>' + s.none + '</b><small>未评价</small></div>' +
+      '</div>' +
+      '<div class="worth-bar"><i style="width:' + s.wasteRate.toFixed(1) + '%"></i></div>' +
+      '<p class="worth-text">在已评价的支出里，你给 <b>' + s.waste + '</b> 笔打了「不值」，合计 <b>' +
+        money(s.wasteAmount) + '</b>，占支出 <b>' + s.wasteRate.toFixed(1) + '%</b>。' +
+        (s.none > 0 ? '还有 ' + s.none + ' 笔没评价，回聊天里给它们打个分吧～' : '评价得很全面，继续保持！') +
+      '</p>' +
+      '</div>';
   }
 
   /** 把文件读成 ArrayBuffer 再交给 analysis.parseFile（解码在纯函数里完成） */
@@ -1569,9 +2187,12 @@
         files: built.files,
         duplicates: built.duplicates,
         months: monthList,
-        month: month
+        month: month,
+        source: 'imported'
       };
+      analysisMode = 'imported';
       renderAnalysis();
+      syncAnalysisTabs();
     }
 
     files.forEach(function (file, index) {
@@ -1606,6 +2227,50 @@
     return '<div class="sec-empty">' + esc(text) + '</div>';
   }
 
+  /** 解析失败时的诊断卡片：把「静默空白」变成明确的「为什么没识别」。
+   *  未选择文件时不渲染任何卡片（拖拽区 + 状态行已有引导），只更新状态文字。 */
+  function analysisFailCard(data, statusEl) {
+    if (!data || !data.files || data.files.length === 0) {
+      if (statusEl) {
+        statusEl.textContent = '还没有导入文件。导出账单时请选择「CSV（用做个人对账）」，不要用 PDF / Excel。';
+      }
+      // 分析页（导入模式）与顶栏导入页的拖拽区、状态行已有引导，
+      // 这里不再重复渲染「还没有可分析的账单文件」大卡片，避免整页冗余。
+      return '';
+    }
+    var bad = data.files.filter(function (f) { return !f.ok; });
+    var good = data.files.filter(function (f) { return f.ok; });
+    var lines = '';
+    if (bad.length > 0) {
+      lines += '<div class="pf-sub">以下文件没能解析出记录：</div>';
+      bad.forEach(function (f) {
+        lines += '<div class="pf-item">' +
+          '<div class="pf-name">❌ ' + esc(f.name) + '</div>' +
+          '<div class="pf-reason">' + esc(f.reason || '解析失败') + '</div>';
+        if (f.preview) {
+          lines += '<pre class="pf-preview">' + esc(f.preview) + '</pre>';
+        }
+        lines += '</div>';
+      });
+    }
+    if (good.length > 0 && data.rows.length === 0) {
+      lines += '<div class="pf-sub">已识别文件但筛选后没有记录（可能都被月份筛选或去重过滤了）。</div>';
+    }
+    if (statusEl) {
+      statusEl.textContent = bad.length > 0
+        ? '有 ' + bad.length + ' 个文件未解析出记录，详见下方说明。'
+        : '还没有解析出有效记录。';
+    }
+    return '<div class="parse-fail">' +
+      '<div class="pf-emoji">😕</div>' +
+      '<div class="pf-title">这份文件没能解析出账单记录</div>' +
+      lines +
+      '<p class="pf-tip">常见原因：① 导出时选了 <b>PDF / Excel</b>，请改选 <b>CSV</b>；' +
+      '② 微信/支付宝需选「用做个人对账」的明细；③ 文件编码异常。' +
+      '如果还有问题，把文件前 2 行发给我，我帮你适配格式。</p>' +
+      '</div>';
+  }
+
   function barHtml(label, value, max, color) {
     var pct = max > 0 ? Math.max(2, value / max * 100) : 0;
     return '<div class="bar-row">' +
@@ -1622,25 +2287,40 @@
     var toolbar = $('analysisToolbar');
     if (!reportEl) { return; }
 
-    if (!analysisData || !analysisData.rows || analysisData.rows.length === 0) {
-      reportEl.innerHTML = '';
-      if (statusEl) {
-        var failLines = '';
-        if (analysisData && analysisData.files) {
-          var bad = analysisData.files.filter(function (f) { return !f.ok; });
-          if (bad.length > 0) {
-            failLines = bad.map(function (f) { return f.name + '：' + (f.reason || '解析失败'); }).join('；');
-          }
-        }
-        statusEl.textContent = failLines
-          ? '没有解析出有效记录。' + failLines
-          : '还没有导入文件。导出账单时请选择「CSV」，不要用 PDF。';
+    // 以「当前激活的标签」为准，而不是以数据残留判断：
+    // 否则从「当前账本」切到「导入 CSV」时，analysisData 还是账本数据，会误显当前账本内容。
+    var isCurrent = (analysisMode === 'current');
+    var dropEl = $('analysisDrop');
+    var bannerEl = $('analysisCurrentBanner');
+    var importBtn = $('btnAnalysisImport');
+    var clearBtn = $('btnAnalysisClear');
+    if (dropEl) { dropEl.hidden = isCurrent; }
+    if (bannerEl) {
+      bannerEl.hidden = !isCurrent;
+      if (isCurrent) {
+        bannerEl.textContent = '📒 正在分析你当前账本里已记的 ' + (state.bills || []).length +
+          ' 笔记录（直接来自账本，无需导入）';
       }
+    }
+    if (importBtn) { importBtn.hidden = isCurrent; }
+    if (clearBtn) { clearBtn.hidden = isCurrent; }
+
+    if (!analysisData || !analysisData.rows || analysisData.rows.length === 0) {
+      var failHtml;
+      if (isCurrent) {
+        if (statusEl) { statusEl.textContent = '当前账本还没有记录。'; }
+        failHtml = '<div class="parse-fail"><div class="pf-emoji">📒</div>' +
+          '<div class="pf-title">账本还是空的</div>' +
+          '<p class="pf-tip">回到聊天说一句「中午黄焖鸡18」就能记账；也可以切到上方「导入 CSV」把微信 / 支付宝账单导进来。</p></div>';
+      } else {
+        failHtml = analysisFailCard(analysisData, statusEl);
+      }
+      reportEl.innerHTML = failHtml;
       if (toolbar) { toolbar.hidden = true; }
       return;
     }
 
-    if (toolbar) { toolbar.hidden = false; }
+    if (toolbar) { toolbar.hidden = isCurrent ? true : false; }
     var excludeDup = !!($('analysisExcludeDup') && $('analysisExcludeDup').checked);
     var rep = ANA.report(analysisData.rows, {
       month: analysisData.month,
@@ -1668,6 +2348,10 @@
           ' 条为转账型收入，已计入；若为本人账户互转请手动排除。';
       }
       statusEl.textContent = statusText + '数据只在本机，没有上传。';
+    }
+    if (isCurrent && statusEl) {
+      statusEl.textContent = '数据来自你当前账本（' + analysisData.rows.length +
+        ' 条记录），仅在本地分析，没有上传。';
     }
 
     var ov = rep.overview;
@@ -1861,6 +2545,12 @@
     }
     html += reportSection('9. 解析情况', fileBody, false);
 
+    /* ---- 值不值 · 我的自评（仅当前账本模式） ---- */
+    if (isCurrent) {
+      var ws = worthStats(state.bills);
+      html += reportSection('值不值 · 我的自评', worthSectionHtml(ws), true);
+    }
+
     reportEl.innerHTML = html;
   }
 
@@ -1923,6 +2613,223 @@
     var toolbar = $('analysisToolbar');
     if (toolbar) { toolbar.hidden = true; }
     var reportEl = $('analysisReport');
+    if (reportEl) { reportEl.innerHTML = ''; }
+  }
+
+  /* ================================================================== */
+  /* 导入账单（微信 / 支付宝 / 银行 CSV）→ 直接并入账本                    */
+  /* ================================================================== */
+
+  var importState = null;
+
+  function openImportSheet() {
+    $('importMask').hidden = false;
+    renderImportPreview();
+  }
+
+  function closeImportSheet() {
+    $('importMask').hidden = true;
+  }
+
+  /** 把用户选择的文件读成二进制后交给 analysis.parseFile（解码在纯函数里完成） */
+  function handleImportFiles(fileList) {
+    var files = Array.prototype.slice.call(fileList || []);
+    if (files.length === 0) { return; }
+    var metas = [];
+    var pending = files.length;
+    var statusEl = $('importStatus');
+    if (statusEl) { statusEl.textContent = '正在解析 ' + files.length + ' 个文件…'; }
+
+    function done() {
+      pending -= 1;
+      if (pending > 0) { return; }
+      var built = ANA.buildRows(metas);
+      var monthCount = {};
+      var i;
+      for (i = 0; i < built.rows.length; i++) {
+        var mk = built.rows[i].month || built.rows[i].date.slice(0, 7);
+        monthCount[mk] = (monthCount[mk] || 0) + 1;
+      }
+      var monthList = Object.keys(monthCount).sort();
+      // 默认看「记录最多的那个月」（平手取较新月份）
+      var month = monthList.length > 0 ? monthList[monthList.length - 1] : ENG.formatDate(new Date()).slice(0, 7);
+      var bestCount = -1;
+      for (i = 0; i < monthList.length; i++) {
+        if (monthCount[monthList[i]] >= bestCount) {
+          bestCount = monthCount[monthList[i]];
+          month = monthList[i];
+        }
+      }
+      importState = {
+        rows: built.rows,
+        files: built.files,
+        duplicates: built.duplicates,
+        months: monthList,
+        month: month
+      };
+      renderImportPreview();
+    }
+
+    files.forEach(function (file, index) {
+      var reader = new FileReader();
+      reader.onload = function () {
+        var parsed;
+        try {
+          parsed = ANA.parseFile({ name: file.name, bytes: reader.result });
+        } catch (e) {
+          parsed = { name: file.name, ok: false, reason: '解析失败：' + (e && e.message ? e.message : '未知错误'), records: [], skipped: 0 };
+        }
+        metas[index] = parsed;
+        done();
+      };
+      reader.onerror = function () {
+        metas[index] = { name: file.name, ok: false, reason: '读取文件失败', records: [], skipped: 0 };
+        done();
+      };
+      reader.readAsArrayBuffer(file);
+    });
+  }
+
+  /** 计算「将要导入」的账单草稿，并与账本已有记录按 日期+金额+备注 去重 */
+  function computeImportDrafts() {
+    if (!importState || !importState.rows) { return { toImport: [], skipDup: 0 }; }
+    var excludeFileDup = !!($('importExcludeFileDup') && $('importExcludeFileDup').checked);
+    var excludeLedgerDup = !!($('importExcludeDup') && $('importExcludeDup').checked);
+    var month = importState.month;
+    var drafts = ANA.rowsToBills(importState.rows, {
+      month: month,
+      excludeDuplicates: excludeFileDup
+    });
+    var ledgerKeys = {};
+    state.bills.forEach(function (b) {
+      ledgerKeys[b.date + '|' + ENG.round2(b.amount).toFixed(2) + '|' + String(b.note || '').trim()] = true;
+    });
+    var toImport = [];
+    var skipDup = 0;
+    drafts.forEach(function (d) {
+      var key = d.date + '|' + ENG.round2(d.amount).toFixed(2) + '|' + String(d.note || '').trim();
+      if (excludeLedgerDup && ledgerKeys[key]) { skipDup += 1; return; }
+      toImport.push(d);
+    });
+    return { toImport: toImport, skipDup: skipDup };
+  }
+
+  /** 渲染导入预览：解析统计 + 月份/去重控件 + 预览列表 */
+  function renderImportPreview() {
+    var reportEl = $('importReport');
+    var statusEl = $('importStatus');
+    var controls = $('importControls');
+    if (!reportEl) { return; }
+
+    if (!importState || !importState.rows || importState.rows.length === 0) {
+      if (controls) { controls.hidden = true; }
+      reportEl.innerHTML = analysisFailCard(importState, statusEl);
+      return;
+    }
+
+    var rows = importState.rows;
+    var computed = computeImportDrafts();
+    var toImport = computed.toImport;
+    var skipDup = computed.skipDup;
+
+    var inc = 0, exp = 0, excl = 0;
+    rows.forEach(function (r) {
+      if (r.excluded) { excl += 1; }
+      else if (r.type === 'income') { inc += 1; }
+      else { exp += 1; }
+    });
+
+    if (statusEl) {
+      var okCount = importState.files.filter(function (f) { return f.ok; }).length;
+      var badFiles = importState.files.filter(function (f) { return !f.ok; });
+      var msg = '已解析 ' + okCount + ' / ' + importState.files.length + ' 个文件，共 ' + rows.length + ' 条记录。';
+      if (badFiles.length > 0) {
+        msg += '（' + badFiles.length + ' 个文件未识别：' +
+          badFiles.map(function (f) { return esc(f.name) + (f.reason ? '(' + esc(f.reason) + ')' : ''); }).join('、') + '）';
+      }
+      statusEl.textContent = msg;
+    }
+
+    if (controls) {
+      controls.hidden = false;
+      var sel = $('importMonth');
+      if (sel) {
+        sel.innerHTML = (importState.months || []).map(function (m) {
+          return '<option value="' + m + '"' + (m === importState.month ? ' selected' : '') + '>' + m + '</option>';
+        }).join('');
+      }
+    }
+
+    var html = '';
+    html += '<div class="import-summary">';
+    html += '  <div class="isum isum-inc"><b>' + inc + '</b><small>收入</small></div>';
+    html += '  <div class="isum isum-exp"><b>' + exp + '</b><small>支出</small></div>';
+    html += '  <div class="isum isum-excl"><b>' + excl + '</b><small>已排除(转账/还款)</small></div>';
+    html += '  <div class="isum isum-imp"><b>' + toImport.length + '</b><small>将导入</small></div>';
+    if (skipDup > 0) { html += '  <div class="isum isum-skip"><b>' + skipDup + '</b><small>与账本重复</small></div>'; }
+    html += '</div>';
+    html += '<p class="import-note">将导入 <b>' + toImport.length + '</b> 条到 <b>' + esc(importState.month) + '</b>' +
+      (skipDup > 0 ? '（已跳过 ' + skipDup + ' 条与账本重复的）' : '') + '。转账 / 还款已自动排除，导入后预算统计立即重算。</p>';
+
+    var preview = toImport.slice(0, 40);
+    if (preview.length > 0) {
+      html += '<div class="import-list">';
+      preview.forEach(function (d) {
+        var cls = d.type === 'income' ? 'in' : 'out';
+        var sign = d.type === 'income' ? '+' : '-';
+        html += '<div class="import-row ' + cls + '">' +
+          '<span class="ir-date">' + esc(d.date) + '</span>' +
+          '<span class="ir-note">' + esc(d.note || d.category) + '</span>' +
+          '<span class="ir-cat">' + esc(d.category) + '</span>' +
+          '<span class="ir-amt">' + sign + money(d.amount) + '</span>' +
+          '</div>';
+      });
+      if (toImport.length > preview.length) {
+        html += '<div class="import-more">…还有 ' + (toImport.length - preview.length) + ' 条</div>';
+      }
+      html += '</div>';
+    } else {
+      html += '<div class="sec-empty">没有可导入的记录（可能都被月份筛选或去重过滤掉了）。</div>';
+    }
+
+    reportEl.innerHTML = html;
+    importState._toImport = toImport;
+    importState._skipDup = skipDup;
+  }
+
+  /** 确认把预览中的记录并入账本 */
+  function confirmImportBills() {
+    if (!importState || !importState.rows || importState.rows.length === 0) {
+      addAIMessage(aiBubble('还没有可导入的记录。'));
+      return;
+    }
+    var toImport = importState._toImport;
+    if (!toImport || toImport.length === 0) {
+      addAIMessage(aiBubble('没有可导入的记录（可能都和账本重复，或被月份筛选过滤掉了）。'));
+      return;
+    }
+    var count = 0;
+    toImport.forEach(function (d) {
+      commitBill(d, true); // 导入批量账单不进单步撤回栈
+      count += 1;
+    });
+    renderAll();
+    closeImportSheet();
+    addAIMessage(aiBubble('已导入 ' + count + ' 条账单（' + esc(importState.month) +
+      '）。转账 / 还款已自动排除，预算统计已重新计算。回到聊天可以给每笔「值不值」打分～'));
+    importState = null;
+  }
+
+  /** 清空导入（只清缓存，不动账本） */
+  function clearImport() {
+    importState = null;
+    var statusEl = $('importStatus');
+    if (statusEl) { statusEl.textContent = '还没有选择文件。'; }
+    var fileInput = $('importFile');
+    if (fileInput) { fileInput.value = ''; }
+    var controls = $('importControls');
+    if (controls) { controls.hidden = true; }
+    var reportEl = $('importReport');
     if (reportEl) { reportEl.innerHTML = ''; }
   }
 
@@ -2012,6 +2919,11 @@
   }
 
   function openOcrModal() {
+    /* 隐私开关：关闭「允许读取相册」时不允许进入截屏记账 */
+    if (!getSettings().privacy.album) {
+      showToast('已关闭「允许读取相册」，截屏记账不可用；可在 设置 → 数据与隐私 中打开');
+      return;
+    }
     ocrPendingFile = null;
     ocrImageDataUrl = '';
     ocrDraft = null;
@@ -2363,53 +3275,46 @@
     '记收入': openIncomeModal,
     '记一笔收入': openIncomeModal,
     '账单分析': openAnalysisSheet,
-    '导入账单': openAnalysisSheet,
+    '导入账单': openImportSheet,
     '截屏记账': openOcrModal,
     '截图记账': openOcrModal,
     '我想攒钱': showGoalGuide,
     '我想攒钱买': showGoalGuide,
+    '设置': openSettingsPage,
     '设置预算': openDrawer
   };
+
+  /**
+   * 判断一句话是否命中「本地命令」（无需云端即可处理的明确指令）。
+   * 命中返回对应的处理函数，否则返回 null（应交给云端 / NLP 解析）。
+   */
+  function localCommandName(raw) {
+    var text = String(raw || '').trim();
+    if (!text) { return null; }
+    if (Object.prototype.hasOwnProperty.call(EXACT_COMMANDS, text)) {
+      return EXACT_COMMANDS[text];
+    }
+    var compact = text.replace(/\s+/g, '');
+    if (compact === '查余额' || compact === '余额' || compact === '还能花多少' || compact === '还能花多少钱' ||
+      compact === '我还剩多少' || compact === '看余额') { return showBalanceCard; }
+    if (compact.indexOf('饼图') !== -1 || compact === '本月花销' || compact === '花销占比') { return showPieCard; }
+    if (compact.indexOf('设置预算') !== -1 || compact === '预算设置') { return openDrawer; }
+    if (compact === '设置' || compact === '系统设置' || compact === '偏好设置' ||
+      compact === '通用设置' || compact === '打开设置') { return openSettingsPage; }
+    if (compact.indexOf('我想攒钱') !== -1 || compact.indexOf('攒钱买') !== -1) { return showGoalGuide; }
+    if (compact.indexOf('记收入') !== -1 || compact.indexOf('记一笔收入') !== -1) { return openIncomeModal; }
+    if (compact.indexOf('账单分析') !== -1) { return openAnalysisSheet; }
+    if (compact.indexOf('导入') !== -1 && compact.indexOf('账单') !== -1) { return openImportSheet; }
+    if (compact.indexOf('截屏记账') !== -1 || compact.indexOf('截图记账') !== -1) { return openOcrModal; }
+    return null;
+  }
 
   function routeCommand(raw) {
     var text = String(raw || '').trim();
     if (!text) { return; }
 
-    if (Object.prototype.hasOwnProperty.call(EXACT_COMMANDS, text)) {
-      EXACT_COMMANDS[text]();
-      return;
-    }
-
-    var compact = text.replace(/\s+/g, '');
-    if (compact === '查余额' || compact === '余额' || compact === '还能花多少' || compact === '还能花多少钱' ||
-      compact === '我还剩多少' || compact === '看余额') {
-      showBalanceCard();
-      return;
-    }
-    if (compact.indexOf('饼图') !== -1 || compact === '本月花销' || compact === '花销占比') {
-      showPieCard();
-      return;
-    }
-    if (compact.indexOf('设置预算') !== -1 || compact === '预算设置') {
-      openDrawer();
-      return;
-    }
-    if (compact.indexOf('我想攒钱') !== -1 || compact.indexOf('攒钱买') !== -1) {
-      showGoalGuide();
-      return;
-    }
-    if (compact.indexOf('记收入') !== -1 || compact.indexOf('记一笔收入') !== -1) {
-      openIncomeModal();
-      return;
-    }
-    if (compact.indexOf('账单分析') !== -1 || compact.indexOf('导入账单') !== -1) {
-      openAnalysisSheet();
-      return;
-    }
-    if (compact.indexOf('截屏记账') !== -1 || compact.indexOf('截图记账') !== -1) {
-      openOcrModal();
-      return;
-    }
+    var fn = localCommandName(text);
+    if (fn) { fn(); return; }
 
     var parsed = NLP.parseBill(text);
     if (parsed.items.length === 0) {
@@ -2593,7 +3498,7 @@
     ocr: openOcrModal,
     analysis: openAnalysisSheet,
     goals: showGoalGuide,
-    settings: openDrawer
+    settings: openSettingsPage
   };
 
   /**
@@ -2605,16 +3510,29 @@
     var raw = String(text || '').trim();
     if (!raw) { return; }
 
+    // 明确是本地命令（记收入 / 查余额 / 设置预算 / 账单分析 / 截屏记账 / 我想攒钱 …）直接本地处理：
+    // 不走云端、不出现「思考中」，彻底避免云端挂起导致的卡死，也更跟手。
+    var localFn = localCommandName(raw);
+    if (localFn) { localFn(); return; }
+
+    // 自由文本记账：本地 NLP 能解析出账单条目时直接本地处理（秒回、不出现「思考中」）。
+    // 只有真正需要对话理解的问句才走云端，避免无谓的云端延迟。
+    var parsed = NLP.parseBill(raw);
+    if (parsed.items.length > 0) { startFlow(parsed.items); return; }
+
     // 先插一个「思考中」气泡，拿到结果后只替换气泡里的文字（保留时间戳）
     addAIMessage(aiBubble('账小助正在思考…'));
     var thinkingRow = chatListEl().lastElementChild;
 
-    function setReply(text) {
+    // 防止云端（流式）长时间无响应导致一直「思考中」：handled 锁定后，超时与云端结果只会生效一次
+    var handled = false;
+
+    function setReply(t) {
       if (thinkingRow && thinkingRow.parentNode) {
         var bubble = thinkingRow.querySelector ? thinkingRow.querySelector('.bubble') : null;
-        if (bubble) { bubble.textContent = text; return; }
+        if (bubble) { bubble.textContent = t; return; }
       }
-      addAIMessage(aiBubble(esc(text)));
+      addAIMessage(aiBubble(esc(t)));
     }
 
     function clearThinking() {
@@ -2623,15 +3541,16 @@
       }
     }
 
+    // 本地兜底：云端未就绪 / 失败 / 超时 -> 用本地 routeCommand 处理
     function fallback() {
+      if (handled) { return; }
+      handled = true;
       clearThinking();
       routeCommand(raw);
     }
 
-    if (typeof global.AJ !== 'object' || typeof global.AJ.ask !== 'function') { fallback(); return; }
-
-    // 直接调用 WorkBuddy 云服务（免密钥）对话接口；失败或未就绪时回退本地 routeCommand
-    global.AJ.ask(raw, buildContext()).then(function (json) {
+    function onCloudDone(json) {
+      if (handled) { return; }
       if (!json || json.fallback === true) {
         // 云服务未就绪或上游失败 -> 本地兜底
         fallback();
@@ -2640,17 +3559,20 @@
       var reply = json.reply;
       var actions = Array.isArray(json.actions) ? json.actions : [];
 
+      if (!reply && actions.length === 0) {
+        // 云端既没文字也没动作 -> 本地兜底
+        fallback();
+        return;
+      }
+
+      // 云端结果可用，锁定，超时不再回退
+      handled = true;
+
       if (reply) {
         setReply(reply);
       } else {
         // 没有文字回复时把「思考中」气泡去掉，避免残留
         clearThinking();
-      }
-
-      if (actions.length === 0 && !reply) {
-        // 云端既没文字也没动作 -> 本地兜底
-        fallback();
-        return;
       }
 
       actions.forEach(function (a) {
@@ -2673,7 +3595,27 @@
           if (fn) { fn(); }
         }
       });
+    }
+
+    if (typeof global.AJ !== 'object' || typeof global.AJ.ask !== 'function') { fallback(); return; }
+
+    // 兜底超时：云端（流式）长时间不返回时，回退到本地 routeCommand，避免一直「思考中」
+    var safetyTimer = setTimeout(function () { fallback(); }, 12000);
+
+    // 直接调用 WorkBuddy 云服务（免密钥）对话接口；失败或未就绪时回退本地 routeCommand
+    var cloudPromise;
+    try {
+      cloudPromise = global.AJ.ask(raw, buildContext());
+    } catch (e) {
+      clearTimeout(safetyTimer);
+      fallback();
+      return;
+    }
+    Promise.resolve(cloudPromise).then(function (json) {
+      clearTimeout(safetyTimer);
+      onCloudDone(json);
     }).catch(function () {
+      clearTimeout(safetyTimer);
       fallback();
     });
   }
@@ -2730,6 +3672,14 @@
       var act = e.target.closest ? e.target.closest('[data-act]') : null;
       if (!act) { return; }
       var name = act.getAttribute('data-act');
+      if (name === 'undo') {
+        deleteBill(act.getAttribute('data-bill'));
+        return;
+      }
+      if (name === 'worth') {
+        setBillWorth(act.getAttribute('data-bill'), act.getAttribute('data-val'));
+        return;
+      }
       if (name === 'cycle-yes' || name === 'cycle-no') {
         var billId = act.getAttribute('data-bill') || '';
         var yes = name === 'cycle-yes';
@@ -2782,7 +3732,7 @@
     });
 
     $('btnAddGoal').addEventListener('click', openGoalModal);
-    $('btnSettings').addEventListener('click', openDrawer);
+    $('btnSettings').addEventListener('click', openSettingsPage);
     $('btnCloseDrawer').addEventListener('click', closeDrawer);
     $('drawerMask').addEventListener('click', closeDrawer);
     $('btnSaveSettings').addEventListener('click', saveSettings);
@@ -2792,9 +3742,13 @@
     $('btnSaveOcr').addEventListener('click', saveOcrCredentials);
     $('btnClearOcr').addEventListener('click', clearOcrCredentials);
 
+    /* ---- 完整设置界面 ---- */
+    bindSettingsEvents();
+
     /* ---- 顶部工具栏：截屏记账 / 账单分析 / 更多菜单 ---- */
     $('btnOcr').addEventListener('click', openOcrModal);
     $('btnAnalysis').addEventListener('click', openAnalysisSheet);
+    $('btnUndo').addEventListener('click', undoLast);
     $('btnMore').addEventListener('click', function (e) {
       e.stopPropagation();
       var menu = $('moreMenu');
@@ -2820,6 +3774,28 @@
 
     /* ---- 账单分析 sheet ---- */
     $('btnCloseAnalysis').addEventListener('click', closeAnalysisSheet);
+    var analysisTabsEl = $('analysisTabs');
+    if (analysisTabsEl) {
+      analysisTabsEl.addEventListener('click', function (e) {
+        var t = e.target.closest ? e.target.closest('[data-act="an-mode"]') : null;
+        if (!t) { return; }
+        var mode = t.getAttribute('data-mode');
+        if (mode === 'current') {
+          analysisMode = 'current';
+          if (state.bills.length > 0) { analyzeCurrentBills(); }
+          else { analysisData = null; renderAnalysis(); }
+        } else {
+          analysisMode = 'imported';
+          // 切到「导入 CSV」但还没导入过文件时，清掉可能是「当前账本」的残留数据，
+          // 否则 renderAnalysis 会拿旧账本数据渲染成当前账本内容。
+          if (!analysisData || analysisData.source !== 'imported') {
+            analysisData = null;
+          }
+          renderAnalysis();
+        }
+        syncAnalysisTabs();
+      });
+    }
     $('analysisMask').addEventListener('click', function (e) {
       if (e.target === $('analysisMask')) { closeAnalysisSheet(); }
     });
@@ -2840,6 +3816,40 @@
     $('btnAnalysisExport').addEventListener('click', exportAnalysisMarkdown);
     $('btnAnalysisImport').addEventListener('click', confirmImportAnalysis);
     $('btnAnalysisClear').addEventListener('click', clearAnalysis);
+
+    /* ---- 导入账单 sheet ---- */
+    $('btnImport').addEventListener('click', openImportSheet);
+    $('btnCloseImport').addEventListener('click', closeImportSheet);
+    $('importMask').addEventListener('click', function (e) {
+      if (e.target === $('importMask')) { closeImportSheet(); }
+    });
+    $('importDrop').addEventListener('click', function () { $('importFile').click(); });
+    $('importFile').addEventListener('change', function () {
+      handleImportFiles(this.files);
+      this.value = '';
+    });
+    $('importExcludeDup').addEventListener('change', renderImportPreview);
+    $('importExcludeFileDup').addEventListener('change', renderImportPreview);
+    $('importMonth').addEventListener('change', function () {
+      if (!importState) { return; }
+      importState.month = this.value;
+      renderImportPreview();
+    });
+    $('btnImportConfirm').addEventListener('click', confirmImportBills);
+    $('btnImportClear').addEventListener('click', clearImport);
+    ['importDrop'].forEach(function (id) {
+      var zone = $(id);
+      ['dragenter', 'dragover'].forEach(function (evt) {
+        zone.addEventListener(evt, function (e) { e.preventDefault(); zone.classList.add('dragging'); });
+      });
+      ['dragleave', 'drop'].forEach(function (evt) {
+        zone.addEventListener(evt, function (e) { e.preventDefault(); zone.classList.remove('dragging'); });
+      });
+      zone.addEventListener('drop', function (e) {
+        var dt = e.dataTransfer;
+        if (dt && dt.files && dt.files.length > 0) { handleImportFiles(dt.files); }
+      });
+    });
 
     /* 拖拽上传（分析 + 截图共用视觉语言） */
     ['analysisDrop'].forEach(function (id) {
@@ -2963,6 +3973,7 @@
         if (!$('analysisMask').hidden) { closeAnalysisSheet(); }
         if (!$('ocrMask').hidden) { closeOcrModal(); }
         if ($('settingsDrawer').classList.contains('open')) { closeDrawer(); }
+        if ($('modalMask').hidden && !$('settingsMask').hidden) { closeSettingsPage(); }
       }
     });
 
@@ -2986,6 +3997,7 @@
   function init() {
     loadState();
     if (!storageOK) { showStorageTip(); }
+    applyAppearance();
     var ring = $('ringBar');
     if (ring) {
       ring.style.strokeDasharray = RING_C + ' ' + RING_C;
