@@ -48,6 +48,7 @@ INDEX_FILE = os.path.join(BASE_DIR, 'index.html')
 ALLOWED_EXT = {
     '.html', '.htm', '.js', '.css', '.png', '.jpg', '.jpeg', '.gif',
     '.svg', '.ico', '.json', '.map', '.woff', '.woff2', '.ttf', '.txt',
+    '.csv',   # 真实商家日历.csv 可直接从本地服务下载
 }
 DENY_NAMES = {'server.py', 'requirements.txt', '.env', '.env.example', '后端启动说明.md'}
 

@@ -205,78 +205,210 @@
    * times = 文案里"本周少 X 次"的次数，用于计算本周可省金额（save × times），
    *         必须与 timesText 的措辞严格一致。
    */
+  /**
+   * 南海北区专属省钱平替库（21 条）。
+   * 数据与《广轻大南海北区理财与平替指南》一致，含校内 / 周边真实点位。
+   * save = 品牌参考价 brandPrice - altPrice（统一按单价计算，不跟随整笔实付金额）
+   * times = 文案里"本周少 X 次"的次数，用于计算本周可省金额（save × times），
+   *         必须与 timesText 的措辞严格一致。
+   * tip   = 理财教练话术前半句（后面自动接"更香"），必须带校区点位或频次建议。
+   */
   var ALTERNATIVES = [
+    /* ---- 一、餐饮 ---- */
     {
-      id: 'starbucks', keywords: ['星巴克', 'starbucks', '馥芮白'],
-      brand: '星巴克', brandPrice: 32, altName: '三食堂现磨咖啡', altPrice: 10,
-      unit: '杯', times: 2, timesText: '本周少喝两杯'
+      id: 'takeout', keywords: ['外卖', '美团', '饿了么', '轻食'],
+      brand: '外卖轻食', brandPrice: 30, altName: '食堂一荤一素（南海北区饭堂）', altPrice: 11,
+      unit: '顿', times: 3, timesText: '本周少点三次',
+      tip: '一周少点 3 次外卖立省 50+，'
     },
     {
-      id: 'luckin', keywords: ['瑞幸', '库迪', 'luckin', '幸运咖'],
-      brand: '瑞幸/库迪', brandPrice: 19, altName: '食堂美式咖啡', altPrice: 6,
-      unit: '杯', times: 2, timesText: '本周少喝两杯'
+      id: 'kfc', keywords: ['炸鸡', '肯德基', 'kfc', 'KFC', '疯狂星期四'],
+      brand: '校门口炸鸡', brandPrice: 45, altName: '周四去校门口商业街的肯德基', altPrice: 25,
+      unit: '份', times: 2, timesText: '本月控制在两次',
+      tip: '比点外卖便宜至少 15 元，但每月控制在 1-2 次，'
+    },
+    {
+      id: 'mcd', keywords: ['麦当劳', '金拱门', '麦乐鸡'],
+      brand: '麦当劳单点', brandPrice: 25, altName: '阳光广场麦当劳周一 13.9 元随心配', altPrice: 13.9,
+      unit: '份', times: 2, timesText: '月初手头紧时去两次',
+      tip: '比单点省 10 元左右，'
+    },
+    {
+      id: 'drinkbox', keywords: ['饮料', '可乐', '矿泉水', '雪碧', '整箱'],
+      brand: '校内便利店瓶装饮料', brandPrice: 5, altName: '拼多多整箱送到菜鸟驿站', altPrice: 2.5,
+      unit: '瓶', times: 5, timesText: '本周少买五瓶',
+      tip: '均价能省一半，'
+    },
+
+    /* ---- 二、饮品 ---- */
+    {
+      id: 'starbucks', keywords: ['星巴克', 'starbucks', '馥芮白'],
+      brand: '星巴克', brandPrice: 32, altName: '瑞幸 / 库迪 9.9 元（阳光广场）', altPrice: 9.9,
+      unit: '杯', times: 2, timesText: '每周最多两杯',
+      tip: '单杯省 15-20 元，'
     },
     {
       id: 'chayi', keywords: ['喜茶', '奈雪', '霸王茶姬', '茶百道', '古茗', '沪上阿姨'],
-      brand: '喜茶/奈雪', brandPrice: 22, altName: '食堂奶茶', altPrice: 6,
-      unit: '杯', times: 2, timesText: '本周少喝两杯'
+      brand: '喜茶/奈雪', brandPrice: 22, altName: '瑞幸 / 库迪 9.9 元（每周二）', altPrice: 9.9,
+      unit: '杯', times: 2, timesText: '每周最多两杯',
+      tip: '每周最多 2 杯，'
     },
     {
-      id: 'milktea', keywords: ['奶茶'],
-      brand: '奶茶', brandPrice: 15, altName: '自泡茶包', altPrice: 2,
-      unit: '杯', times: 3, timesText: '本周少喝三杯'
+      id: 'milktea', keywords: ['奶茶', '一点点', '益禾堂'],
+      brand: '阳光广场奶茶', brandPrice: 18, altName: '食堂免费热水 / 宿舍速溶咖啡', altPrice: 2,
+      unit: '杯', times: 3, timesText: '本周少喝三杯',
+      tip: '这笔是纯情绪消费，'
     },
     {
-      id: 'waimai', keywords: ['外卖', '美团', '饿了么'],
-      brand: '外卖', brandPrice: 28, altName: '食堂两荤一素', altPrice: 12,
-      unit: '顿', times: 3, timesText: '本周少点三次'
+      id: 'coffee', keywords: ['咖啡', '拿铁', '美式'],
+      brand: '校外咖啡', brandPrice: 28, altName: '瑞幸 / 库迪 9.9 元（阳光广场）', altPrice: 9.9,
+      unit: '杯', times: 2, timesText: '本周少喝两杯',
+      tip: '走过去也就几分钟，'
+    },
+
+    /* ---- 三、日用品与购物 ---- */
+    {
+      id: 'print', keywords: ['打印', '复印', '打印店'],
+      brand: '校外打印店', brandPrice: 0.5, altName: '校内宿舍打印店（17A / E2 / E3，黑白 0.1 元/面）', altPrice: 0.1,
+      unit: '面', times: 10, timesText: '本周的一百页',
+      tip: '校外门店贵 3-5 倍，'
     },
     {
-      id: 'taxi', keywords: ['打车', '滴滴', '出租车', '网约车'],
-      brand: '打车', brandPrice: 23, altName: '校车/共享单车', altPrice: 1.5,
-      unit: '次', times: 2, timesText: '本周少打两次'
+      id: 'convenience', keywords: ['便利店', '小卖部'],
+      brand: '校内便利店', brandPrice: 25, altName: '润泰超市（正门斜对面 150 米）', altPrice: 15,
+      unit: '次', times: 2, timesText: '本周少逛两次',
+      tip: '别在这买整箱饮料，'
     },
     {
-      id: 'skin', keywords: ['皮肤', '抽卡', '充值', '点券', '点卡'],
-      brand: '游戏充值', brandPrice: 99, altName: '等打折/二手账号', altPrice: 49,
-      unit: '次', times: 1, timesText: '等一个折扣季'
+      id: 'snack', keywords: ['零食', '薯片', '辣条'],
+      brand: '校内便利店的零食', brandPrice: 25, altName: '赵一鸣（阳光广场）', altPrice: 15,
+      unit: '份', times: 2, timesText: '本月控制在两次',
+      tip: '只买清单上的东西，别囤太多，'
     },
     {
-      id: 'blindbox', keywords: ['盲盒', '手办', '谷子'],
-      brand: '盲盒', brandPrice: 59, altName: '闲鱼二手', altPrice: 20,
-      unit: '个', times: 1, timesText: '二手同款'
+      id: 'miniso', keywords: ['名创优品', 'miniso', 'MINISO'],
+      brand: '名创优品的小物件', brandPrice: 40, altName: '赵一鸣 / 拼多多', altPrice: 22,
+      unit: '次', times: 1, timesText: '本月少逛一次',
+      tip: '这里的零食比赵一鸣贵，'
+    },
+    {
+      id: 'zunte', keywords: ['尊特', '第二饭堂三楼', '校内超市'],
+      brand: '尊特优选（第二饭堂三楼）', brandPrice: 50, altName: '拼多多百亿补贴', altPrice: 30,
+      unit: '单', times: 1, timesText: '不急的单子等网购',
+      tip: '急用才去尊特，不急的等网购，'
+    },
+
+    /* ---- 四、健身与娱乐 ---- */
+    {
+      id: 'gym', keywords: ['健身房', '健身卡', '私教'],
+      brand: '校外健身房', brandPrice: 199, altName: '南海北区 39 栋负一层 2 号健身房（免费）', altPrice: 0,
+      unit: '月', times: 1, timesText: '每月白捡一次',
+      tip: '7:00-21:30 免费开放，有氧和力量区都有，'
+    },
+    {
+      id: 'strength', keywords: ['力量训练', '器械'],
+      brand: '校外健身房的力量区', brandPrice: 199, altName: '田径场看台下 3 号健身房（免费）', altPrice: 0,
+      unit: '月', times: 1, timesText: '每月白捡一次',
+      tip: '专门做大力量训练，同样免费，'
+    },
+    {
+      id: 'ktv', keywords: ['KTV', 'ktv', '剧本杀', '密室'],
+      brand: '校外 KTV / 剧本杀', brandPrice: 60, altName: '操场夜跑 / 社团免费活动', altPrice: 0,
+      unit: '次', times: 1, timesText: '本月少去一次',
+      tip: '这笔属于娱乐-非刚需，'
+    },
+    {
+      id: 'billiards', keywords: ['台球', '网吧', '网咖'],
+      brand: '校外台球 / 网吧', brandPrice: 35, altName: '操场夜跑 / 社团活动', altPrice: 0,
+      unit: '次', times: 2, timesText: '本月控制在两次',
+      tip: '月底复盘会发现这是隐形黑洞，'
     },
     {
       id: 'movie', keywords: ['电影', '影院', '观影'],
       brand: '商业影院', brandPrice: 45, altName: '校园影院', altPrice: 8,
-      unit: '张', times: 1, timesText: '校园影院一场'
+      unit: '张', times: 1, timesText: '校园影院一场',
+      tip: '免费和低价资源先捞一遍，'
+    },
+
+    /* ---- 五、交通出行 ---- */
+    {
+      id: 'taxi', keywords: ['打车', '滴滴', '出租车', '网约车'],
+      brand: '打车去市区', brandPrice: 32, altName: '公交 K5 到岭南新天地', altPrice: 5,
+      unit: '趟', times: 2, timesText: '本周少打两次',
+      tip: '全程约 1.5 小时但只花几块钱，'
     },
     {
-      id: 'gym', keywords: ['健身房', '健身卡', '私教'],
-      brand: '校外健身房', brandPrice: 199, altName: '学校体育馆', altPrice: 0,
-      unit: '月', times: 1, timesText: '凭学生证免费'
+      id: 'metro', keywords: ['地铁站', '广佛线', '龙溪'],
+      brand: '打车到地铁站', brandPrice: 30, altName: '公交佛 275 到龙溪地铁站', altPrice: 4,
+      unit: '趟', times: 2, timesText: '本周少打两次',
+      tip: '约 1 小时 10 分直达广佛线，'
+    },
+    {
+      id: 'bike', keywords: ['共享单车', '单车', '青桔', '美团单车'],
+      brand: '共享单车单次扫码', brandPrice: 3, altName: '共享单车月卡（10 元/月）', altPrice: 0.5,
+      unit: '次', times: 10, timesText: '本月看成十次',
+      tip: '办月卡短途出行够用，'
+    },
+    {
+      id: 'skin', keywords: ['皮肤', '抽卡', '充值', '点券', '点卡'],
+      brand: '游戏充值', brandPrice: 99, altName: '等打折 / 二手账号', altPrice: 49,
+      unit: '次', times: 1, timesText: '等一个折扣季',
+      tip: '这笔要进冷静期，'
+    },
+    {
+      id: 'blindbox', keywords: ['盲盒', '手办', '谷子', '潮玩'],
+      brand: '盲盒', brandPrice: 59, altName: '闲鱼二手', altPrice: 20,
+      unit: '个', times: 1, timesText: '二手同款',
+      tip: '这笔要进冷静期，'
     },
     {
       id: 'haircut', keywords: ['理发', '剪头', 'tony', 'Tony'],
       brand: '校外理发店', brandPrice: 68, altName: '学校理发店', altPrice: 15,
-      unit: '次', times: 1, timesText: '校内一次'
-    },
-    {
-      id: 'print', keywords: ['打印', '复印'],
-      brand: '校外打印店', brandPrice: 1, altName: '图书馆自助打印', altPrice: 0.1,
-      unit: '张', times: 1, timesText: '本周少打一次'
-    },
-    {
-      id: 'snack', keywords: ['零食', '超市', '便利店'],
-      brand: '超市零食', brandPrice: 25, altName: '食堂水果', altPrice: 5,
-      unit: '份', times: 1, timesText: '食堂水果更便宜'
-    },
-    {
-      id: 'coffee', keywords: ['咖啡'],
-      brand: '校外咖啡', brandPrice: 28, altName: '食堂现磨咖啡', altPrice: 10,
-      unit: '杯', times: 2, timesText: '本周少喝两杯'
+      unit: '次', times: 1, timesText: '校内一次',
+      tip: '校内便宜一大截，'
     }
   ];
+
+  /** 南海北区商家词典：记账时从自然语句里提取「商家」字段（业务规则第 1 条） */
+  var MERCHANTS = [
+    { key: '南海北区饭堂', words: ['食堂', '饭堂', '一饭', '二饭', '三饭', '四饭'], cat: '餐饮' },
+    { key: '外卖平台（美团 / 饿了么）', words: ['外卖', '美团', '饿了么'], cat: '餐饮' },
+    { key: '宿舍打印店（17A / E2 / E3）', words: ['打印店', '打印', '复印'], cat: '学习' },
+    { key: '肯德基（校门口商业街）', words: ['肯德基', 'kfc', 'KFC', '疯狂星期四'], cat: '餐饮' },
+    { key: '麦当劳（阳光广场）', words: ['麦当劳', '金拱门', '麦乐鸡'], cat: '餐饮' },
+    { key: '瑞幸 / 库迪（阳光广场）', words: ['瑞幸', '库迪', 'luckin'], cat: '餐饮' },
+    { key: '赵一鸣零食（阳光广场）', words: ['赵一鸣', '零食'], cat: '餐饮' },
+    { key: '尊特优选（第二饭堂三楼）', words: ['尊特', '第二饭堂'], cat: '购物' },
+    { key: '校内便利店（各饭堂旁）', words: ['便利店', '小卖部'], cat: '购物' },
+    { key: '润泰超市（正门斜对面）', words: ['润泰', '超市'], cat: '购物' },
+    { key: '宿舍楼下小卖部', words: ['楼下小卖部', '宿管小卖部'], cat: '购物' },
+    { key: '名创优品（阳光广场）', words: ['名创优品', 'miniso', 'MINISO'], cat: '购物' },
+    { key: '星巴克', words: ['星巴克', 'starbucks'], cat: '餐饮' },
+    { key: '喜茶', words: ['喜茶', '奈雪', '霸王茶姬', '茶百道', '古茗'], cat: '餐饮' },
+    { key: '菜鸟驿站', words: ['菜鸟驿站', '拼多多', '百亿补贴'], cat: '购物' },
+    { key: '京东', words: ['京东'], cat: '购物' },
+    { key: '淘宝/天猫', words: ['淘宝', '天猫'], cat: '购物' },
+    { key: '闲鱼二手', words: ['闲鱼', '二手'], cat: '购物' }
+  ];
+
+  /**
+   * 单笔非刚需支出触发「冷静期」的关键词（业务规则：冲动消费冷静期）。
+   * 只要命中其一且金额 ≥ 冷静期阈值，就必须弹出冷静期提醒。
+   */
+  var COOLDOWN_KEYWORDS = [
+    '游戏充值', '游戏皮肤', '抽卡', '点券', '首充', '月卡礼包',
+    '盲盒', '手办', '谷子', '潮玩', '扭蛋',
+    '剧本杀', '密室', 'KTV', 'ktv', '台球', '网吧',
+    '聚餐AA', '请客', '生日局', '社团聚会', '份子', '随礼'
+  ];
+
+  /** 宿舍电费防刺客小贴士（月结 / 分摊场景用） */
+  var ELECTRICITY_TIPS = [
+    '空调开 26 度，每低 1 度电费明显上涨',
+    '出门前检查一下空调到底关没关',
+    '月底分摊时如果自己用电最多，主动多承担一点，别因小钱闹宿舍矛盾'
+  ];
+
 
   /** 分类预算默认占比（用于 budgets.csv 的"预算金额"列） */
   var CATEGORY_BUDGET_RATIO = {
@@ -370,6 +502,9 @@
     STOP_WORDS: STOP_WORDS,
     LEADING_CONNECTORS: LEADING_CONNECTORS,
     ALTERNATIVES: ALTERNATIVES,
+    MERCHANTS: MERCHANTS,
+    COOLDOWN_KEYWORDS: COOLDOWN_KEYWORDS,
+    ELECTRICITY_TIPS: ELECTRICITY_TIPS,
     DEFAULT_BUDGET: DEFAULT_BUDGET,
     DEFAULT_GOALS: DEFAULT_GOALS,
     SEED_BILLS: SEED_BILLS,

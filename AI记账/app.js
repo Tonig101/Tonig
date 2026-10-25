@@ -5,6 +5,7 @@
  *   data.js  -> window.AJ.data
  *   nlp.js   -> window.AJ.nlp
  *   engine.js-> window.AJ.engine
+ *   coach.js -> window.AJ.coach（理财教练模式）
  */
 (function (global) {
   'use strict';
@@ -15,6 +16,8 @@
   var ENG = global.AJ.engine;
   var ANA = global.AJ.analysis;
   var OCR = global.AJ.ocr;
+  var COACH = global.AJ.coach;
+  var DEALS = global.AJ.deals;
 
   /* 让 ocr.js 的云端识别走 WorkBuddy 云服务（视觉大模型），而非本地 detectCloud（浏览器直连腾讯云）。
      由 server.py 托管页面时 AJ_BACKEND_OCR 为真，ocr.js 的 detectBackend 会改调云服务。 */
@@ -404,6 +407,7 @@
       goals: goals,
       savedMoney: clampNumber(s.savedMoney, 0, 99999999, 0),
       blockedCount: Math.round(clampNumber(s.blockedCount, 0, 999999, 0)),
+      uiMode: (s.uiMode === 'simple') ? 'simple' : 'full',
       settings: normalizeSettings(s.settings)
     };
   }
@@ -476,6 +480,7 @@
       goals: goals,
       savedMoney: 0,
       blockedCount: 0,
+      uiMode: 'full',
       settings: normalizeSettings(null)
     };
   }
@@ -569,8 +574,19 @@
     return '<span class="tag' + (cls ? ' ' + cls : '') + '">' + esc(text) + '</span>';
   }
 
-  /** 单笔账单卡片 HTML */
-  function billCardHtml(bill) {
+  /**
+   * 「💡 理财教练说」卡片（理财教练模式 · 核心格式）。
+   * 记账结果之后触发：娱乐 / 冲动消费 / 高溢价品牌，一条 ≤50 字的建议。
+   */
+  function coachSayHtml(text) {
+    return '<div class="coach-say">' +
+      '<div class="coach-say-head">💡 <b>理财教练说</b></div>' +
+      '<div class="coach-say-body">' + esc(text) + '</div>' +
+      '</div>';
+  }
+
+  /** 单笔账单卡片 HTML（success=true 时按业务规则 5 显示「【记账成功】」） */
+  function billCardHtml(bill, success) {
     var isIncome = bill.type === 'income';
     var sign = isIncome ? '+' : '-';
     var cls = isIncome ? 'income' : 'expense';
@@ -582,11 +598,14 @@
       tags += tagHtml(bill.motivation, bill.motivation === '情绪' ? 'orange' : '');
       tags += tagHtml(bill.want ? '想要' : '需要', bill.want ? 'orange' : '');
     }
+    // 业务规则 1：账单卡片上必须能看到提取出来的「商家」
+    if (bill.merchant) { tags += tagHtml(bill.merchant, 'gray'); }
     tags += '<span class="tag">' + esc(bill.date) + '</span>';
 
     return '' +
       '<div class="bill-card" data-bill="' + esc(bill.id) + '">' +
-      '  <div class="bill-card-head"><span>' + (isIncome ? '收入入账' : '支出记账') + '</span><span>' + esc(bill.date) + '</span></div>' +
+      '  <div class="bill-card-head"><span>' + (isIncome ? '收入入账' : '【记账成功】支出记账') + '</span>' +
+      '<span>' + esc(bill.date) + '</span></div>' +
       '  <div class="bill-card-main">' +
       '    <span class="bill-card-note">' + esc(bill.note) + '</span>' +
       '    <span class="bill-card-amount ' + cls + '">' + sign + money(bill.amount) + '</span>' +
@@ -605,6 +624,8 @@
 
   function isImpulse(draft) {
     if (!draft || draft.type !== 'expense') { return false; }
+    // 业务规则：单笔非刚需支出（游戏充值 / 盲盒 / 潮玩 / 超出日常预算的聚会）
+    if (ENG.hitsCooldownKeyword(draft)) { return true; }
     return draft.motivation === '情绪' || draft.want === true;
   }
 
@@ -626,6 +647,8 @@
       note: draft.note || draft.category || '未命名',
       motivation: draft.motivation === '情绪' ? '情绪' : '刚需',
       want: !!draft.want,
+      // 业务规则 1：必须从用户话语中提取「商家」
+      merchant: draft.merchant || ENG.extractMerchant((draft.note || '') + ' ' + (draft.raw || '')),
       type: isIncome ? 'income' : 'expense',
       source: isIncome ? String(draft.source || '') : '',
       askedCycle: !!draft.askedCycle,
@@ -754,58 +777,91 @@
       if (list[i].type === 'expense') { totalExpense += list[i].amount; }
     }
 
+    var overview = getOverview();
+    // 业务规则 5：每笔都要给到【记账成功】卡片 + 【余额概览】+【理财教练一句话建议】
     for (i = 0; i < list.length; i++) {
       var bill = list[i];
       var head;
       if (bill.type === 'income') {
-        head = aiBubble('💰 记好了，这是一笔收入（' + esc(bill.source || '其他') + '），已经加进本周期，不计入支出统计。');
+        head = aiBubble('💰 <b>【记账成功】</b>这是一笔收入（' + esc(bill.source || '其他') + '），已经加进本周期，不计入支出统计。');
       } else {
-        head = aiBubble('记好啦～已归类为 <span class="hl">' + esc(bill.category) + '</span>' +
+        head = aiBubble('<b>【记账成功】</b>记好啦～归类为 <span class="hl">' + esc(bill.category) + '</span>' +
+          (bill.merchant ? '，商家 <span class="hl">' + esc(bill.merchant) + '</span>' : '') +
           (bill.motivation === '情绪' ? '（情绪消费，我盯着你呢）' : '') + '。');
       }
-      var html = head + billCardHtml(bill);
-
-      var alt = bill.type === 'expense' ? ENG.getAlternative(bill) : null;
-      if (alt && alt.save > 0) {
-        html += aiBubble('💡 校园平替：<span class="hl">' + esc(alt.altName) + '</span>只要 ' +
-          money(alt.altPrice) + '，' + esc(alt.tip) + '能省 ' +
-          money(alt.weeklySave || alt.save * (alt.times || 1)) + '。');
-      }
+      var html = head + billCardHtml(bill, true);
+      html += balanceOverviewHtml(overview);
+      html += coachSayHtml(COACH.oneLineAdvice(bill, overview));
       addAIMessage(html);
       if (bill.type === 'income') {
         maybeAskCycleReset(bill);
       }
     }
-
-    if (totalExpense > 0) {
-      var overview = getOverview();
-      addAIMessage(aiBubble(overview.sentence));
-    }
   }
 
-  /** 冷静期警示卡 */
+  /** 【余额概览】卡片：本周期收入 / 支出 / 余额 + 日月馒头额度 */
+  function balanceOverviewHtml(overview) {
+    var st = overview.cycleAgg;
+    var bs = overview.budgetState;
+    var sentence = overview.sentence || '';
+    return '' +
+      '<div class="balance-card">' +
+      '  <div class="bc-title">📊 【余额概览】</div>' +
+      '  <div class="bc-grid">' +
+      '    <div><b>' + money(st.income) + '</b><small>本周期收入</small></div>' +
+      '    <div><b>' + money(st.expense) + '</b><small>本周期支出</small></div>' +
+      '    <div><b class="' + (bs.remaining < 0 ? 'expense' : 'income') + '">' + money(bs.remaining) + '</b><small>剩余额度</small></div>' +
+      '    <div><b>' + money(Math.max(0, bs.dailyAllowance)) + '</b><small>剩余每天可花</small></div>' +
+      '  </div>' +
+      '  <div class="bc-sentence">' + esc(sentence) + '</div>' +
+      '</div>';
+  }
+
+  /** 冷静期决策卡（设计稿 P4：聚焦 + 单一主决策 + 校园平替） */
   function showCooldownCard(draft) {
-    var percent = state.budget.total > 0 ? (draft.amount / state.budget.total * 100) : 0;
     var overview = getOverview();
     var sim = ENG.simulatePurchase({
       amount: draft.amount,
       state: overview.budgetState,
       remainingDays: overview.cycle.remainingDays
     });
+    var alt = ENG.getAlternative({ note: draft.note, category: draft.category, amount: draft.amount });
+
+    // 业务规则：冷静期提醒必须说清「占生活费的比例」+「24 小时」+「对食堂伙食预算的影响」
+    var ratioText = '';
+    var totalBudget = Number(state.budget.total) || 0;
+    if (totalBudget > 0) {
+      ratioText = '这笔占你南海北区生活费的 ' + Math.round(draft.amount / totalBudget * 1000) / 10 + '%。';
+    }
+    var cooldownNotice = ratioText +
+      '这笔消费占你南海北区生活费的比例偏高。建议加入购物车冷静 24 小时。如果买了它，接下来几天的食堂伙食预算会受影响。';
+
+    var rows = '' +
+      dcRow('商品', esc(draft.note || draft.category || '未命名')) +
+      dcRow('金额', '<b class="mono">' + money(draft.amount) + '</b>') +
+      dcRow('分类', esc(draft.category) + ' · 非必需');
 
     var html = '' +
-      '<div class="warn-card">' +
-      '  <div class="warn-title">⚠️ 这笔超线了，先冷静 24 小时？</div>' +
-      '  <div class="warn-text">这笔 <b>' + money(draft.amount) + '</b> 的「' + esc(draft.category) + ' · ' + esc(draft.note) +
-      '」占你本周期生活费的 <b>' + percent.toFixed(1) + '%</b>，已超过单笔 ' + money(state.budget.cooldownThreshold) +
-      ' 的冷静线。建议先放进购物车，冷静 24 小时。</div>' +
-      '  <div class="warn-sim">📉 ' + esc(sim.message) + '</div>' +
-      '  <div class="warn-actions">' +
-      '    <button type="button" class="btn-mini warn" data-act="cooldown-buy">坚持购买</button>' +
-      '    <button type="button" class="btn-mini" data-act="cooldown-skip">算了，不买了</button>' +
+      '<div class="decision-card">' +
+      '  <div class="dc-icon">!</div>' +
+      '  <div class="dc-title">冷静期提醒</div>' +
+      '  <div class="dc-sub">检测到一笔 ' + money(draft.amount) + ' 的冲动消费</div>' +
+      '  <div class="dc-detail">' + rows + '</div>' +
+      '  <div class="dc-alert"><span class="dc-dot"></span><span>' + esc(cooldownNotice) + ' ' + esc(sim.message) + '</span></div>' +
+      (alt
+        ? '  <div class="dc-suggest"><span class="dc-dot"></span><span>校园平替：' + esc(alt.altName) +
+          ' 约 ' + money(alt.altPrice) + '，可省 ' + money(alt.save) + '</span></div>'
+        : '') +
+      '  <div class="dc-actions">' +
+      '    <button type="button" class="dc-primary" data-act="cooldown-skip">先不买，省下 ' + money(draft.amount) + '</button>' +
+      '    <button type="button" class="dc-secondary" data-act="cooldown-buy">仍然记下这笔</button>' +
       '  </div>' +
       '</div>';
     addAIMessage(html);
+  }
+
+  function dcRow(label, valueHtml) {
+    return '<div class="dc-row"><span>' + label + '</span><span>' + valueHtml + '</span></div>';
   }
 
   var PUSH_BACK_LINES = [
@@ -824,15 +880,147 @@
       flow.committed.push(bill);
       var line = PUSH_BACK_LINES[Math.floor(Math.random() * PUSH_BACK_LINES.length)];
       addAIMessage(aiBubble(esc(line) + '<br>这笔 ' + money(bill.amount) + ' 已标记为「情绪消费」。'));
+      showToast('已记下这笔，并标记为冲动消费', 'warn');
     } else {
       state.savedMoney = ENG.round2(state.savedMoney + draft.amount);
-      state.blockedCount = state.blockedCount + 1;
+      state.blockedCount = ENG.round2(state.blockedCount + 1);
       saveState();
       addAIMessage(aiBubble('这波省下 ' + money(draft.amount) + '，已记进你的「省下的钱」成就（累计 ' +
         money(state.savedMoney) + '）。👏'));
+      showToast('已为你省下 ' + money(draft.amount), 'ok');
       renderAll();
     }
     stepFlow();
+  }
+
+  /* ================================================================== */
+  /* 理财教练 · 剁手冷静法                                                */
+  /* ================================================================== */
+
+  /** 剁手冷静法会话状态：{item, price, step, answers}；step 为 0 基索引 */
+  var cooling = null;
+
+  /** 启动剁手冷静法（用户表达「想买 XX」时由 sendToAssistant 调用） */
+  function startCoolingFlow(item, price) {
+    cooling = { item: String(item || '想买的东西'), price: Number(price) || 0, step: 0, answers: [] };
+    renderCoolingIntro();
+  }
+
+  function renderCoolingIntro() {
+    var html =
+      '<div class="decision-card cool-card">' +
+      '  <div class="dc-icon cool">🛑</div>' +
+      '  <div class="dc-title">剁手冷静法</div>' +
+      '  <div class="dc-sub">想买：' + esc(cooling.item) + '</div>' +
+      '  <div class="dc-detail">' + dcRow('方法', '回答 3 个问题，30 秒看清该不该买') + '</div>' +
+      '  <div class="dc-actions">' +
+      '    <button type="button" class="dc-primary" data-act="cool-next">开始冷静问答</button>' +
+      '  </div>' +
+      '</div>';
+    addAIMessage(html);
+  }
+
+  function renderCoolingQuestion() {
+    var stepDef = COACH.COOLING_STEPS[cooling.step];
+    if (!stepDef) { renderCoolingVerdict(); return; }
+    var opts = '';
+    for (var i = 0; i < stepDef.options.length; i++) {
+      opts += '<button type="button" class="cool-opt" data-act="cool-answer" data-val="' +
+        esc(stepDef.options[i].val) + '">' + esc(stepDef.options[i].label) + '</button>';
+    }
+    var html =
+      '<div class="decision-card cool-card">' +
+      '  <div class="dc-icon cool">🤔</div>' +
+      '  <div class="dc-title">' + esc(stepDef.q) + '</div>' +
+      '  <div class="dc-sub">想买：' + esc(cooling.item) + ' · 第 ' + (cooling.step + 1) + ' / 3 问</div>' +
+      '  <div class="cool-opts">' + opts + '</div>' +
+      '</div>';
+    addAIMessage(html);
+  }
+
+  function renderCoolingVerdict() {
+    var v = COACH.coolingVerdict(cooling.answers);
+    var actions = '';
+    if (cooling.price > 0) {
+      actions += '<button type="button" class="dc-primary" data-act="cool-record">还是要买，帮我记下 ' +
+        money(cooling.price) + '</button>';
+      actions += '<button type="button" class="dc-secondary" data-act="cool-skip">先不买了，省下 ' +
+        money(cooling.price) + '</button>';
+    } else {
+      actions += '<div class="cool-note">告诉我它的价格，我帮你记上这笔。</div>';
+      actions += '<button type="button" class="dc-secondary" data-act="cool-skip">先不买了</button>';
+    }
+    var html =
+      '<div class="decision-card cool-card verdict-' + v.level + '">' +
+      '  <div class="dc-icon cool">' + v.icon + '</div>' +
+      '  <div class="dc-title">' + esc(v.title) + '</div>' +
+      '  <div class="dc-sub">想买：' + esc(cooling.item) + '</div>' +
+      '  <div class="dc-detail">' + dcRow('教练判断', esc(v.text)) + '</div>' +
+      '  <div class="dc-actions">' + actions + '</div>' +
+      '</div>';
+    addAIMessage(html);
+  }
+
+  /** 三步问答中的一步作答（btnEl 用于把问题卡标记为已作答，防重复点击） */
+  function coolingAnswer(val, btnEl) {
+    if (!cooling) { return; }
+    var card = btnEl && btnEl.closest ? btnEl.closest('.cool-card') : null;
+    if (card) {
+      if (card.getAttribute('data-done') === '1') { return; }
+      card.setAttribute('data-done', '1');
+      var stepDef = COACH.COOLING_STEPS[cooling.step];
+      var label = val;
+      if (stepDef) {
+        for (var i = 0; i < stepDef.options.length; i++) {
+          if (stepDef.options[i].val === val) { label = stepDef.options[i].label; }
+        }
+      }
+      var optsBox = card.querySelector('.cool-opts');
+      if (optsBox) { optsBox.innerHTML = '<span class="tag green">已选：' + esc(label) + '</span>'; }
+    }
+    cooling.answers.push(val);
+    cooling.step++;
+    if (cooling.step >= COACH.COOLING_STEPS.length) {
+      renderCoolingVerdict();
+    } else {
+      renderCoolingQuestion();
+    }
+  }
+
+  /** 结论后选择「仍然购买」：直接入账（已走完冷静流程，不再二次弹冷静期） */
+  function coolingRecord() {
+    if (!cooling) { return; }
+    var draft = {
+      amount: cooling.price,
+      category: '购物',
+      note: cooling.item,
+      date: ENG.formatDate(new Date()),
+      motivation: '情绪',
+      want: true,
+      type: 'expense'
+    };
+    var bill = commitBill(draft);
+    cooling = null;
+    renderAll();
+    reportCommitted([bill]);
+  }
+
+  /** 结论后选择「先不买」：金额计入「省下的钱」成就 */
+  function coolingSkip() {
+    if (!cooling) { return; }
+    var amount = cooling.price;
+    if (amount > 0) {
+      state.savedMoney = ENG.round2(state.savedMoney + amount);
+      state.blockedCount = ENG.round2(state.blockedCount + 1);
+      saveState();
+      addAIMessage(aiBubble('漂亮！这波省下 ' + money(amount) +
+        '，已记进「省下的钱」（累计 ' + money(state.savedMoney) + '）。👏'));
+      showToast('已为你省下 ' + money(amount), 'ok');
+      renderAll();
+    } else {
+      addAIMessage(aiBubble('好，那先不买。把它加进购物车晾 48 小时，还想要再来找我。'));
+    }
+    cooling = null;
   }
 
   /* ================================================================== */
@@ -892,6 +1080,97 @@
   function renderAll() {
     renderDashboard();
     renderGoals();
+    renderCoachPanel();
+  }
+
+  /* ================================================================== */
+  /* 理财教练面板渲染                                                     */
+  /* ================================================================== */
+
+  /** 渲染「理财教练」Tab：专属建议 + 理财学院 */
+  function renderCoachPanel() {
+    renderCoachTips();
+    renderCoachAcademy();
+  }
+
+  /** 专属建议：基于本周期账单数据动态生成（COACH.personalTips） */
+  function renderCoachTips() {
+    var box = $('coachTips');
+    if (!box) { return; }
+    var ov = getOverview();
+    var tips = COACH.personalTips(state, ov);
+    var html = '';
+    for (var i = 0; i < tips.length; i++) {
+      var t = tips[i];
+      html += '<div class="coach-tip level-' + esc(t.level) + '">' +
+        '<div class="coach-tip-head"><span class="coach-tip-ico">' + esc(t.icon) + '</span>' +
+        '<b>' + esc(t.title) + '</b></div>' +
+        '<div class="coach-tip-text">' + esc(t.text) + '</div>' +
+        '</div>';
+    }
+    box.innerHTML = html;
+  }
+
+  /** 理财学院：可折叠知识卡（COACH.ACADEMY） */
+  function renderCoachAcademy() {
+    var box = $('coachAcademy');
+    if (!box) { return; }
+    var html = '';
+    for (var i = 0; i < COACH.ACADEMY.length; i++) {
+      var l = COACH.ACADEMY[i];
+      html += '<div class="coach-lesson" data-lesson="' + esc(l.id) + '">' +
+        '<button type="button" class="coach-lesson-head">' +
+        '<span class="coach-lesson-ico">' + esc(l.icon) + '</span>' +
+        '<span class="coach-lesson-title">' + esc(l.title) + '</span>' +
+        '<span class="coach-lesson-tag">' + esc(l.tag) + '</span>' +
+        '<span class="coach-lesson-arrow">›</span>' +
+        '</button>' +
+        '<div class="coach-lesson-body">' + l.body.split('\n').map(esc).join('<br>') + '</div>' +
+        '</div>';
+    }
+    box.innerHTML = html;
+  }
+
+  /** 教练问答入口：「怎么省钱」 */
+  function showSaveMoneyGuide() {
+    addAIMessage('<div class="bubble ai coach-bubble">' + COACH.saveMoneyAnswer() + '</div>');
+  }
+
+  /** 教练问答入口：「怎么赚钱」 */
+  function showMakeMoneyGuide() {
+    addAIMessage('<div class="bubble ai coach-bubble">' + COACH.makeMoneyAnswer() + '</div>');
+  }
+
+  /** 教练问答入口：「剁手冷静法」——方法说明 + 立即测试 */
+  function showCoolingGuide() {
+    var lesson = null;
+    for (var i = 0; i < COACH.ACADEMY.length; i++) {
+      if (COACH.ACADEMY[i].id === 'cooldown') { lesson = COACH.ACADEMY[i]; break; }
+    }
+    var html = '<div class="coach-qa-title">🛑 剁手冷静法 · 48 小时法则</div>';
+    if (lesson) {
+      html += '<div class="coach-qa-body">' + lesson.body.split('\n').map(esc).join('<br>') + '</div>';
+    }
+    html += '<div class="coach-qa-actions">' +
+      '<button type="button" class="btn-mini primary" data-act="cool-start">测一测：我现在想买…</button>' +
+      '</div>';
+    addAIMessage('<div class="bubble ai coach-bubble">' + html + '</div>');
+  }
+
+  /** 教练面板「问教练」按钮：切回聊天，给出教练能回答的问题入口 */
+  function showAskCoachIntro() {
+    switchView('chat');
+    addAIMessage(
+      '<div class="bubble ai coach-bubble">' +
+      '<div class="coach-qa-title">🎓 理财教练 · 可以这样问我</div>' +
+      '<div class="coach-qa-chips">' +
+      '<button type="button" class="chip" data-cmd="怎么省钱">怎么省钱</button>' +
+      '<button type="button" class="chip" data-cmd="怎么赚钱">怎么赚钱</button>' +
+      '<button type="button" class="chip" data-cmd="剁手冷静法">剁手冷静法</button>' +
+      '</div>' +
+      '<div class="coach-qa-foot">或者直接说「我想买个 XX」，我陪你走冷静法。</div>' +
+      '</div>'
+    );
   }
 
   /**
@@ -922,10 +1201,41 @@
     }
   }
 
+  /**
+   * 常驻预算状态条 + 看板预算卡状态芯片。
+   * 与看板共用 getOverview()，任何视图（聊天/看板/目标）下都保持最新，
+   * 解决原设计「聊天时看不到核心预算」的问题。
+   */
+  function renderBudgetBar(ov) {
+    var bar = $('budgetBar');
+    if (!bar) { return; }
+    var bs = ov.budgetState;
+    var total = state.budget.total;
+    var ratio = total > 0 ? Math.max(0, Math.min(1, bs.remaining / total)) : 0;
+    var label = bs.isOver ? '已超支' : (bs.status === 'tight' ? '紧张' : '安全');
+
+    bar.className = 'budget-bar state-' + bs.status;
+    $('bbAmount').textContent = money(bs.remaining);
+    $('bbDaily').textContent = money(bs.dailyAllowance);
+    $('bbDays').textContent = ov.cycle.remainingDays + ' 天';
+    $('bbFill').style.width = (ratio * 100).toFixed(1) + '%';
+
+    var chip = $('bbStatus');
+    if (chip) { chip.textContent = label; }
+    var stateChip = $('budgetStateChip');
+    if (stateChip) {
+      stateChip.textContent = label;
+      stateChip.className = 'badge state-' + bs.status;
+    }
+  }
+
   function renderDashboard() {
     var ov = getOverview();
     var bs = ov.budgetState;
     var total = state.budget.total;
+
+    renderBudgetBar(ov);
+    renderDealsMini();
 
     /* ---- 预算环 ---- */
     var ring = $('ringBar');
@@ -964,9 +1274,9 @@
       engelCard.className = 'card card-engel alert';
       $('engelBadge').className = 'badge badge-soft warn';
       var food = ENG.round2(ov.cycleAgg.byCategory['餐饮'] || 0);
-      $('engelText').textContent = '餐饮占比 ' + engelPercent +
-        '%，属于偏高，注意别把社交预算吃掉。本月餐饮已花 ' + money(food) +
-        '，把外卖和奶茶压掉两成，还能省回约 ' + money(food * 0.2) + '。';
+      // 业务规则 3：餐饮占比 > 60% 时提示，文案按《记账与预算业务规则》
+      $('engelText').textContent = '本月餐饮占比过高，建议多去南海北区食堂少点外卖。本月餐饮已花 ' +
+        money(food) + '，把外卖和奶茶压掉两成，还能省回约 ' + money(food * 0.2) + '。';
     } else {
       engelCard.className = 'card card-engel';
       $('engelBadge').className = 'badge badge-soft';
@@ -1233,6 +1543,88 @@
     box.innerHTML = '';
   }
 
+  /** 轻提示 Toast：2.4s 自动消失（设计稿三型：ok / warn / danger） */
+  function showToast(text, type) {
+    var root = $('toastRoot');
+    if (!root) { return; }
+    var el = DOC.createElement('div');
+    el.className = 'toast ' + (type === 'warn' ? 'warn' : (type === 'danger' ? 'danger' : 'ok'));
+    el.textContent = text;
+    root.appendChild(el);
+    setTimeout(function () {
+      el.classList.add('leaving');
+      setTimeout(function () {
+        if (el.parentNode) { el.parentNode.removeChild(el); }
+      }, 280);
+    }, 2400);
+  }
+
+  /**
+   * 快捷记账面板（顶栏「＋ 记一笔」）：金额 / 分类 / 备注 / 日期。
+   * 直接走 commitBill 落账，提交后聊天空出回执、预算条即时刷新。
+   */
+  function openQuickAddModal() {
+    var todayStr = ENG.formatDate(new Date());
+    var options = '';
+    var i;
+    for (i = 0; i < DATA.CATEGORIES.length; i++) {
+      options += '<option value="' + esc(DATA.CATEGORIES[i].key) + '">' + esc(DATA.CATEGORIES[i].key) + '</option>';
+    }
+    var box = openModal('' +
+      '<h4>记一笔</h4>' +
+      '<p>金额和分类必填，备注可选。记完预算条会立刻更新。</p>' +
+      '<label class="field"><span>金额（¥）</span><input id="qaAmount" type="number" min="0.01" step="0.01" inputmode="decimal" placeholder="0.00" /></label>' +
+      '<label class="field"><span>分类</span><select id="qaCategory">' + options + '</select></label>' +
+      '<label class="field"><span>备注</span><input id="qaNote" type="text" placeholder="例如：黄焖鸡米饭" maxlength="30" /></label>' +
+      '<label class="field"><span>日期</span><input id="qaDate" type="date" value="' + todayStr + '" /></label>' +
+      '<div class="modal-actions">' +
+      '<button type="button" class="btn-cancel" data-act="modal-cancel">取消</button>' +
+      '<button type="button" class="btn-ok" data-act="quick-add-save">记好了</button>' +
+      '</div>');
+
+    box.querySelector('[data-act="modal-cancel"]').addEventListener('click', closeModal);
+    box.querySelector('[data-act="quick-add-save"]').addEventListener('click', function () {
+      var amount = Number(box.querySelector('#qaAmount').value);
+      if (!isFinite(amount) || amount <= 0) {
+        showToast('请先填写有效金额', 'warn');
+        box.querySelector('#qaAmount').focus();
+        return;
+      }
+      var category = box.querySelector('#qaCategory').value;
+      var note = box.querySelector('#qaNote').value.trim();
+      var date = box.querySelector('#qaDate').value || todayStr;
+      var bill = commitBill({ amount: amount, category: category, note: note, date: date });
+      closeModal();
+      var ov = getOverview();
+      addAIMessage(aiBubble('已记下 <b>' + money(bill.amount) + '</b>（' + esc(category) +
+        (note ? ' · ' + esc(note) : '') + '）。本周期还剩 <b>' + money(ov.budgetState.remaining) +
+        '</b>，日均可用 <b>' + money(ov.budgetState.dailyAllowance) + '</b>。'));
+      renderAll();
+      showToast('已记下 ' + money(bill.amount), 'ok');
+    });
+    setTimeout(function () {
+      var amountInput = box.querySelector('#qaAmount');
+      if (amountInput) { amountInput.focus(); }
+    }, 50);
+  }
+
+  /** 点击常驻预算条 → 切到看板并高亮「预算焦点卡」 */
+  function focusBudgetCard() {
+    switchView('dash');
+    var card = DOC.querySelector('#panelDash .card-budget');
+    if (!card) { return; }
+    card.classList.remove('flash');
+    void card.offsetWidth; /* 重置 CSS 动画 */
+    card.classList.add('flash');
+    if (typeof card.scrollIntoView === 'function') {
+      try {
+        card.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+      } catch (e) {
+        card.scrollIntoView();
+      }
+    }
+  }
+
   function openGoalModal() {
     var todayStr = ENG.formatDate(new Date());
     var box = openModal('' +
@@ -1426,6 +1818,7 @@
       state.budget.payday + ' 号，冷静期阈值 ' + money(state.budget.cooldownThreshold) +
       '。当前周期 ' + esc(ov.cycle.start) + ' ~ ' + esc(ov.cycle.end) +
       (ov.cycle.isCustom ? '（自定义起点）' : '') + '，看板已重算。'));
+    showToast('设置已保存，预算已重算', 'ok');
   }
 
   /* ================================================================== */
@@ -1488,6 +1881,31 @@
     if (cls) { body.classList.add(cls); }
   }
 
+  /** 取当前 UI 类型（简洁版 / 完整版），缺省回退到完整版 */
+  function getUiMode() {
+    return (state && state.uiMode === 'simple') ? 'simple' : 'full';
+  }
+
+  /** 把 UI 类型应用到 <body data-ui-mode>，并处理不可见视图的回退 */
+  function applyUiMode() {
+    var mode = getUiMode();
+    DOC.body.setAttribute('data-ui-mode', mode);
+    if (mode === 'simple') {
+      var v = DOC.body.getAttribute('data-view');
+      if (v === 'coach' || v === 'goals') { switchView('dash'); }
+    }
+  }
+
+  /** 切换 UI 类型并持久化（共用同一套账单数据，切换不丢数据） */
+  function setUiMode(mode) {
+    if (mode !== 'simple' && mode !== 'full') { return; }
+    if (!state) { return; }
+    state.uiMode = mode;
+    saveState();
+    applyUiMode();
+    showToast(mode === 'simple' ? '已切换到简洁版（日常型）' : '已切换到完整版（报表型）', 'ok');
+  }
+
   /** 系统深色偏好变化时，若设置为「跟随系统」则实时切换 */
   function onSystemThemeChange() {
     if (getSettings().theme === 'system') { applyAppearance(); }
@@ -1522,6 +1940,7 @@
     checkRadioGroup('setThemeMode', st.theme);
     checkRadioGroup('setFontScale', st.fontScale);
     checkRadioGroup('setLang', st.lang);
+    checkRadioGroup('setUiMode', state.uiMode);
     $('setSwitchAlbum').checked = st.privacy.album;
     $('setSwitchClipboard').checked = st.privacy.clipboard;
     $('setCacheValue').textContent = estimateCacheSize();
@@ -1579,6 +1998,11 @@
       getSettings().lang = input.value;
       persistSettings();
       if (input.value === 'en') { showToast('演示版本暂仅支持简体中文'); }
+    });
+    $('setUiModeSeg').addEventListener('change', function (e) {
+      var input = (e.target && e.target.closest) ? e.target.closest('input[name="setUiMode"]') : null;
+      if (!input) { return; }
+      setUiMode(input.value);
     });
 
     /* ---- 数据与隐私 ---- */
@@ -1803,23 +2227,7 @@
     }
   }
 
-  /* 轻提示（设置页 / 开关反馈用） */
-  var toastTimer = null;
-  function showToast(text) {
-    var el = $('appToast');
-    if (!el) {
-      el = DOC.createElement('div');
-      el.id = 'appToast';
-      el.className = 'app-toast';
-      DOC.body.appendChild(el);
-    }
-    el.textContent = String(text || '');
-    el.classList.add('show');
-    if (toastTimer) { global.clearTimeout(toastTimer); }
-    toastTimer = global.setTimeout(function () {
-      el.classList.remove('show');
-    }, 2200);
-  }
+  /* 轻提示统一走 toastRoot 容器版 showToast（三型：ok / warn / danger） */
 
   /* ================================================================== */
   /* 快捷指令响应                                                        */
@@ -3071,7 +3479,7 @@
     closeOcrModal();
     openDrawer();
     var idInput = $('setOcrId');
-    var section = idInput && idInput.closest ? idInput.closest('.drawer-section') : null;
+    var section = idInput && idInput.closest ? idInput.closest('.drawer-group') : null;
     var target = section || idInput;
     if (!target) { return; }
     setTimeout(function () {
@@ -3262,6 +3670,443 @@
   }
 
   /* ================================================================== */
+  /* 省钱雷达：活动日历 + 比价计算器                                      */
+  /* ================================================================== */
+
+  var dealsTab = 'today';
+  var dealsLastResult = null;
+  var dealsForm = {
+    item: '充电宝',
+    budget: '',
+    rows: [
+      { platform: '淘宝', price: '', spec: '10000mAh', ship: '', coupon: '', need: '' },
+      { platform: '拼多多', price: '', spec: '10000mAh', ship: '', coupon: '', need: '' },
+      { platform: '京东', price: '', spec: '10000mAh', ship: '', coupon: '', need: '' }
+    ]
+  };
+  var DEAL_PLATFORMS = ['淘宝', '天猫', '京东', '拼多多', '抖音', '唯品会', '美团', '饿了么', '线下门店'];
+
+  function dealsNow() { return new Date(); }
+  function dealsReady() { return DEALS && typeof DEALS.compareOffers === 'function'; }
+
+  /** 统一处理卡片/面板里的动作按钮 */
+  function handleDealAct(act) {
+    if (!act) { return; }
+    if (act === 'open-today' || act === 'open-deals') { openDealsSheet('today'); return; }
+    if (act === 'open-calendar') { openDealsSheet('calendar'); return; }
+    if (act === 'open-compare') { openDealsSheet('compare'); return; }
+    if (act === 'close') { closeDealsSheet(); return; }
+    if (act === 'record') { recordDealBill(); return; }
+  }
+
+  function openDealsSheet(tab) {
+    if (!dealsReady()) {
+      addAIMessage(aiBubble('省钱雷达模块没加载起来，刷新一下页面再试。'));
+      return;
+    }
+    dealsTab = tab || dealsTab || 'today';
+    $('dealsMask').hidden = false;
+    renderDealsSheet();
+  }
+
+  function closeDealsSheet() { $('dealsMask').hidden = true; }
+
+  function renderDealsSheet() {
+    var d = dealsNow();
+    $('dealsHeadDate').textContent = DEALS.dateKey(d) + ' ' + DEALS.weekdayCn(d);
+    var tabs = DOC.querySelectorAll('#dealsTabs .atab');
+    var i;
+    for (i = 0; i < tabs.length; i++) {
+      tabs[i].classList.toggle('active', tabs[i].getAttribute('data-deal-tab') === dealsTab);
+    }
+    var pane = $('dealsPane');
+    if (dealsTab === 'calendar') { pane.innerHTML = dealsCalendarHtml(d); }
+    else if (dealsTab === 'compare') { pane.innerHTML = dealsCompareHtml(d); }
+    else if (dealsTab === 'about') { pane.innerHTML = dealsAboutHtml(d); }
+    else { pane.innerHTML = dealsTodayHtml(d); }
+  }
+
+  /** 今天：限时活动 + 未来 7 天 + 常驻活动 */
+  function dealsTodayHtml(d) {
+    var all = DEALS.dealsOn(d);
+    var limited = all.filter(function (x) { return x.type !== 'always'; });
+    var always = all.filter(function (x) { return x.type === 'always'; });
+    var np = DEALS.nextPromo(d);
+    var html = '';
+
+    if (np) {
+      html += '<div class="deals-promo-banner">' +
+        '<b>' + esc(np.promo.name) + (np.days === 0 ? ' 就是今天' : ' 还有 ' + np.days + ' 天') + '</b>' +
+        '<span>' + esc(np.promo.depth) + ' · 适合买：' + esc(np.promo.bestFor) + '</span>' +
+        '</div>';
+    }
+
+    html += '<div class="deals-sec">今天的限时活动</div>';
+    if (!limited.length) {
+      var kfc = DEALS.nextOf('kfc', d);
+      html += '<div class="deals-empty">今天是' + esc(DEALS.weekdayCn(d)) +
+        '，没有固定的限时活动（肯德基在周四、麦当劳在周一、瑞幸 / 库迪在周二）。<br>' +
+        '最近一场：<b>肯德基疯狂星期四 ' + esc(DEALS.dateKey(kfc)) + '（' + esc(DEALS.weekdayCn(kfc)) +
+        '）</b>，还有 ' + DEALS.daysBetween(d, kfc) + ' 天。</div>';
+    } else {
+      limited.forEach(function (it) {
+        html += '<div class="deal-item">' +
+          '<div class="di-head"><span class="di-emoji">' + esc(it.emoji) + '</span>' +
+          '<b>' + esc(it.name) + ' · ' + esc(it.title) + '</b>' +
+          '<span class="di-tag">' + esc(it.tag) + '</span></div>' +
+          (it.place ? '<div class="di-place">📍 ' + esc(it.place) + '</div>' : '') +
+          '<p>' + esc(it.what) + '</p>' +
+          '<p class="di-how">👉 ' + esc(it.how) + '</p>' +
+          '<p class="di-tip">⚠ ' + esc(it.tip) + '</p>' +
+          (it.coach ? '<p class="di-coach">🎓 ' + esc(it.coach) + '</p>' : '') +
+          '</div>';
+      });
+    }
+
+    var up = DEALS.upcoming(8, d).filter(function (x) { return x.items.length && x.offset > 0; });
+    if (up.length) {
+      html += '<div class="deals-sec">接下来 7 天</div><div class="deals-up">';
+      up.forEach(function (day) {
+        var names = day.items.map(function (x) { return x.name + '·' + x.title; }).join('；');
+        var tag = day.items.length > 1 ? day.items.length + ' 场' : day.items[0].tag;
+        html += '<div class="deals-up-row">' +
+          '<span class="du-date">' + esc(day.date.slice(5)) + '<small>' + esc(day.weekday) + '</small></span>' +
+          '<span class="du-text">' + esc(names) + '</span>' +
+          '<span class="du-tag">' + esc(tag) + '</span>' +
+          '</div>';
+      });
+      html += '</div>';
+    }
+
+    if (always.length) {
+      html += '<div class="deals-sec">常驻优惠（不用等）</div><div class="deals-pills">';
+      always.forEach(function (it) {
+        html += '<span class="deals-pill" title="' + esc(it.tip) + '">' + esc(it.emoji) + ' ' +
+          esc(it.name) + '·' + esc(it.title) + (it.place ? '（' + esc(it.place) + '）' : '') + '</span>';
+      });
+      html += '</div>';
+    }
+
+    html += '<p class="deals-note">活动日期由本地日历按「每周几 / 每月几号」计算，真实有效不联网也不会过期；' +
+      '具体单品、价格与参与门店以官方页面为准——这里不编价格。</p>';
+    return html;
+  }
+
+  /** 14 天日历 */
+  function dealsCalendarHtml(d) {
+    var days = DEALS.upcoming(14, d);
+    var html = '<div class="deals-cal">';
+    days.forEach(function (day) {
+      var isToday = day.offset === 0;
+      html += '<div class="deals-cal-row' + (isToday ? ' is-today' : '') + '">' +
+        '<div class="dc-day"><b>' + esc(day.date.slice(5)) + '</b><small>' + esc(day.weekday) +
+        (isToday ? ' · 今天' : '') + '</small></div>' +
+        '<div class="dc-items">';
+      if (!day.items.length) {
+        html += '<span class="dc-none">—</span>';
+      } else {
+        day.items.forEach(function (it) {
+          html += '<span class="dc-chip ' + (it.type === 'promo' ? 'is-promo' : '') + '">' +
+            esc(it.emoji) + ' ' + esc(it.name) + '·' + esc(it.title) + '</span>';
+        });
+      }
+      html += '</div></div>';
+    });
+    html += '</div>';
+    html += '<p class="deals-note">日历由日期算法生成：周四 = 校门口肯德基，周一 = 阳光广场麦当劳，周二 = 阳光广场瑞幸 / 库迪；' +
+      '大促只标「预热开始」和「当天」，不重复刷屏。</p>';
+    return html;
+  }
+
+  /** 比价计算器 */
+  function dealsCompareHtml(d) {
+    var html = '';
+    html += '<div class="dc-grid">' +
+      '<label class="dc-field"><span>买什么</span>' +
+      '<input id="dcItem" type="text" value="' + esc(dealsForm.item) + '" placeholder="如 充电宝 10000mAh" /></label>' +
+      '<label class="dc-field"><span>预算（¥，选填）</span>' +
+      '<input id="dcBudget" type="number" inputmode="decimal" value="' + esc(dealsForm.budget) + '" placeholder="如 100" /></label>' +
+      '</div>';
+
+    html += '<div class="deals-sec">各平台报价（你看到的价，不是猜的）</div><div class="dc-offers" id="dcOffers">';
+    dealsForm.rows.forEach(function (r, idx) {
+      html += dealOfferRowHtml(r, idx);
+    });
+    html += '</div>';
+
+    html += '<div class="dcz-actions">' +
+      '<button class="btn-mini primary" id="btnDealCalc" type="button">算一算</button>' +
+      '<button class="btn-mini" id="btnDealDemo" type="button">填示例（充电宝）</button>' +
+      '<button class="btn-mini" id="btnDealAdd" type="button">+ 加一个平台</button>' +
+      '</div>';
+
+    html += '<div id="dealsResult">' + (dealsLastResult ? dealResultHtml(dealsLastResult) : '') + '</div>';
+
+    var band = DEALS.findBand(dealsForm.item);
+    if (band) {
+      html += '<p class="deals-note">「' + esc(band.name) + '」价格带参考：入门 ' + band.low[0] + '-' + band.low[1] +
+        ' 元 / 中档 ' + band.mid[0] + '-' + band.mid[1] + ' 元 / 高档 ' + band.high[0] + '-' + band.high[1] +
+        ' 元，通常 ' + esc(band.channel) + ' 更便宜。</p>';
+    }
+    html += '<p class="deals-note">口径：到手价 = 标价 × 需买件数 + 运费 − 券；规格不同的只能比折合单价。' +
+      '本工具不抓电商页面、不保证最低价，请以下单页实时价为准。</p>';
+    return html;
+  }
+
+  function dealOfferRowHtml(r, idx) {
+    var opts = '';
+    DEAL_PLATFORMS.forEach(function (p) {
+      opts += '<option value="' + esc(p) + '"' + (r.platform === p ? ' selected' : '') + '>' + esc(p) + '</option>';
+    });
+    return '<div class="dc-offer" data-offer>' +
+      '<div class="dco-main">' +
+      '<select class="dc-plat">' + opts + '</select>' +
+      '<input class="dc-price" type="number" inputmode="decimal" placeholder="价格" value="' + esc(r.price) + '" />' +
+      '<input class="dc-spec" type="text" placeholder="规格 10000mAh / 12包" value="' + esc(r.spec) + '" />' +
+      '</div>' +
+      '<div class="dco-extra">' +
+      '<input class="dc-ship" type="number" inputmode="decimal" placeholder="运费" value="' + esc(r.ship) + '" />' +
+      '<input class="dc-coupon" type="number" inputmode="decimal" placeholder="券" value="' + esc(r.coupon) + '" />' +
+      '<input class="dc-need" type="number" inputmode="numeric" placeholder="需买N件" value="' + esc(r.need) + '" />' +
+      (idx > 0 ? '<button class="dc-del" type="button" data-del-row="' + idx + '" aria-label="删除这行">✕</button>' : '<span class="dc-del-ph"></span>') +
+      '</div></div>';
+  }
+
+  /** 把表单当前值读回 dealsForm，避免切 tab 丢输入 */
+  function syncDealForm() {
+    var itemEl = $('dcItem');
+    if (itemEl) { dealsForm.item = itemEl.value.trim(); }
+    var budgetEl = $('dcBudget');
+    if (budgetEl) { dealsForm.budget = budgetEl.value.trim(); }
+    var rows = DOC.querySelectorAll('#dcOffers [data-offer]');
+    if (rows.length) {
+      var out = [];
+      for (var i = 0; i < rows.length; i++) {
+        out.push({
+          platform: rows[i].querySelector('.dc-plat').value,
+          price: rows[i].querySelector('.dc-price').value,
+          spec: rows[i].querySelector('.dc-spec').value,
+          ship: rows[i].querySelector('.dc-ship').value,
+          coupon: rows[i].querySelector('.dc-coupon').value,
+          need: rows[i].querySelector('.dc-need').value
+        });
+      }
+      dealsForm.rows = out;
+    }
+  }
+
+  function runDealCompare() {
+    if (!dealsReady()) { return; }
+    syncDealForm();
+    var offers = [];
+    dealsForm.rows.forEach(function (r) {
+      if (String(r.price).trim() === '') { return; }
+      offers.push({
+        platform: r.platform,
+        price: r.price,
+        spec: r.spec,
+        ship: r.ship || 0,
+        coupon: r.coupon || 0,
+        needQty: r.need || 1
+      });
+    });
+    if (!offers.length) {
+      $('dealsResult').innerHTML = '<div class="deals-empty">先填至少一个平台的价格，我才算得出来。' +
+        '价格不用精确到分，看到多少填多少。</div>';
+      return;
+    }
+    var res = DEALS.compareOffers(offers, {
+      item: dealsForm.item || '这个商品',
+      budget: dealsForm.budget
+    });
+    dealsLastResult = res;
+    var box = $('dealsResult');
+    box.innerHTML = dealResultHtml(res);
+    if (box.scrollIntoView) {
+      try { box.scrollIntoView({ behavior: 'smooth', block: 'nearest' }); } catch (e) { /* 老浏览器忽略 */ }
+    }
+  }
+
+  function dealResultHtml(r) {
+    var html = '<div class="dc-result">';
+    html += '<div class="dc-headline' + (r.comparable ? '' : ' is-warn') + '">' +
+      (r.comparable ? '✅ ' : '⚠️ ') + esc(r.headline) + '</div>';
+
+    if (r.rows && r.rows.length) {
+      html += '<div class="dc-table">' +
+        '<div class="dc-tr dc-th"><span>平台 / 商品</span><span>到手价</span><span>折合单价</span></div>';
+      r.rows.forEach(function (row, i) {
+        html += '<div class="dc-tr' + (i === 0 ? ' is-best' : '') + '">' +
+          '<span class="dc-td-plat"><b>' + esc(row.platform) + '</b>' +
+          (row.title ? '<small>' + esc(row.title) + '</small>' : '') +
+          (row.needQty > 1 ? '<em class="dc-need-tag">需买 ' + row.needQty + ' 件</em>' : '') +
+          '</span>' +
+          '<span class="dc-td-eff">¥' + DEALS.fmt(row.eff) + '</span>' +
+          '<span class="dc-td-per">' + esc(DEALS.perLabel(row)) + '</span>' +
+          '</div>';
+      });
+      html += '</div>';
+    }
+
+    if (r.budget) {
+      html += '<p class="dc-line ' + (r.budget.ok ? 'is-good' : 'is-bad') + '">💰 ' + esc(r.budget.text) + '</p>';
+    }
+    if (r.band) {
+      html += '<p class="dc-line">📊 这个价属于「' + esc(r.band.band) + '」的 <b>' + esc(r.band.label) + '</b> 档：' +
+        esc(r.band.text) + '。</p>';
+    }
+    if (r.timing && r.timing.text) {
+      html += '<p class="dc-line">⏰ ' + esc(r.timing.text) + '</p>';
+    }
+    if (r.sublines && r.sublines.length) {
+      html += '<ul class="dc-list">';
+      r.sublines.forEach(function (s) { html += '<li>' + esc(s) + '</li>'; });
+      html += '</ul>';
+    }
+    if (r.warnings && r.warnings.length) {
+      html += '<ul class="dc-list is-warn">';
+      r.warnings.forEach(function (s) { html += '<li>⚠ ' + esc(s) + '</li>'; });
+      html += '</ul>';
+    }
+    if (r.ok && r.best) {
+      html += '<div class="dcz-actions">' +
+        '<button class="btn-mini primary" type="button" data-deal-act="record">把这笔记进账本</button>' +
+        '<button class="btn-mini" type="button" data-deal-act="open-today">今天还有什么优惠</button>' +
+        '</div>' +
+        '<p class="deals-note">「记进账本」按最低到手 ¥' + DEALS.fmt(r.best.eff) +
+        ' 记一笔购物支出，记完可以给它打「值不值」。</p>';
+    }
+    html += '<p class="deals-note">以上价格来自你填写的报价；活动与折扣随时变动，请以下单页面为准。</p>';
+    html += '</div>';
+    return html;
+  }
+
+  function fillDealDemo() {
+    dealsForm.item = '充电宝 10000mAh';
+    dealsForm.budget = '100';
+    dealsForm.rows = [
+      { platform: '淘宝', price: '89', spec: '10000mAh', ship: '', coupon: '', need: '' },
+      { platform: '拼多多', price: '79', spec: '10000mAh', ship: '', coupon: '5', need: '' },
+      { platform: '京东', price: '99', spec: '10000mAh', ship: '', coupon: '', need: '2' }
+    ];
+    $('dealsPane').innerHTML = dealsCompareHtml(dealsNow());
+    runDealCompare();
+  }
+
+  function recordDealBill() {
+    if (!dealsLastResult || !dealsLastResult.ok || !dealsLastResult.best) { return; }
+    var res = dealsLastResult;
+    var amount = Math.round(res.best.eff * 100) / 100;
+    closeDealsSheet();
+    switchView('chat');
+    startFlow([{
+      date: ENG.formatDate(new Date()),
+      amount: amount,
+      category: '购物',
+      note: res.item || '购物',
+      motivation: '刚需',
+      want: false,
+      type: 'expense'
+    }]);
+  }
+
+  function dealsAboutHtml() {
+    return '<div class="deals-about">' +
+      '<div class="deals-sec">数据从哪来（三条路径，各自标注）</div>' +
+      '<div class="deal-item">' +
+      '<div class="di-head"><span class="di-emoji">🧮</span><b>路径三 · 真实日期算法</b><span class="di-tag">已实现</span></div>' +
+      '<p>疯狂星期四 = <code>weekday()==3</code>（周四）、麦当劳「13.9 元随心配」= 每周一、瑞幸 / 库迪 9.9 元 = 每周二、双11 = 11-11。' +
+      '日期全部由代码算出，指定任意日期都能算出下一次是哪天，不依赖网络、不会过期。</p>' +
+      '<p class="di-how">产出：14 天日历 + 「真实商家日历.csv」（可下载，Excel 直接打开）</p>' +
+      '</div>' +
+      '<div class="deal-item">' +
+      '<div class="di-head"><span class="di-emoji">🔌</span><b>路径二 · 比价 API</b><span class="di-tag">已实现</span></div>' +
+      '<p>本机有一套同口径引擎（前端 deals.js / 后端 deals_engine.py + deals_api.py），' +
+      '把「标价 + 运费 − 券 × 件数」算成到手价，再按规格折单价、判定可比性。' +
+      '大模型可以通过 HTTP 直接调这些接口，不用自己算数。</p>' +
+      '<p class="di-how">接口：<code>/api/deals/today</code> <code>/api/deals/calendar</code> ' +
+      '<code>/api/deals/compare</code> <code>/api/deals/quote</code> <code>/api/deals/ask</code></p>' +
+      '</div>' +
+      '<div class="deal-item">' +
+      '<div class="di-head"><span class="di-emoji">🤖</span><b>路径一 · 大模型 + 工具调用</b><span class="di-tag">已实现</span></div>' +
+      '<p>后端 <code>/api/deals/ask</code> 用 tool-calling 把「查日历、算比价」注册成工具，' +
+      '模型先调工具拿真实日期与计算结果，再组织成一句话——不是让模型凭记忆瞎说。' +
+      '没配大模型时自动降级为本地确定性回答。</p>' +
+      '<p class="di-how">没配 LLM_API_KEY 也能用；配了则模型自己决定查日历还是算比价</p>' +
+      '</div>' +
+      '<div class="deals-sec">我刻意不做的事</div>' +
+      '<ul class="dc-list">' +
+      '<li>不抓电商页面、不绕反爬：价格会过期，抓取也不合规；</li>' +
+      '<li>不编价格：没有真实报价时，只给价格带参考并告诉你还差什么；</li>' +
+      '<li>不硬下结论：规格口径对不上（比如「12 包」vs「6 提」）就明说比不了；</li>' +
+      '<li>不承诺最低价、不导流、不发店铺链接。</li>' +
+      '</ul>' +
+      '<p class="deals-note">想接真实价格？在 deals_api.py 的 .env 里配 PRICE_API_URL / PRICE_API_KEY / PRICE_FIELD_MAP，' +
+      '把官方接口的返回字段映射进来即可，比价引擎不用改一行。</p>' +
+      '</div>';
+  }
+
+  /** 看板上的省钱雷达小卡 */
+  function renderDealsMini() {
+    var box = $('dealsMini');
+    if (!box || !dealsReady()) { return; }
+    var d = dealsNow();
+    var list = DEALS.dealsOn(d).filter(function (x) { return x.type !== 'always'; });
+    var np = DEALS.nextPromo(d);
+    var kfc = DEALS.nextOf('kfc', d);
+    var html = '';
+    if (list.length) {
+      list.slice(0, 2).forEach(function (it) {
+        html += '<div class="dm-line"><span class="dm-dot"></span><b>' + esc(it.name) + '</b> ' +
+          esc(it.title) + '<em>' + esc(it.tag) + '</em></div>';
+      });
+    } else {
+      html += '<div class="dm-line"><span class="dm-dot"></span>今天没有固定限时活动，下一场是 <b>肯德基疯狂星期四 ' +
+        esc(DEALS.dateKey(kfc).slice(5)) + '</b>（' + DEALS.daysBetween(d, kfc) + ' 天后）</div>';
+    }
+    if (np) {
+      html += '<div class="dm-line dm-promo"><span class="dm-dot"></span>' + esc(np.promo.name) +
+        ' 还有 <b>' + np.days + '</b> 天 · ' + esc(np.promo.depth) + '</div>';
+    }
+    html += '<div class="dm-line dm-tip">💡 ' + esc(DEALS.timingAdvice(0, d).text) + '</div>';
+    box.innerHTML = html;
+  }
+
+  /** 聊天入口：今天有什么优惠 */
+  function showDealsTodayCard() {
+    switchView('chat');
+    if (!dealsReady()) { addAIMessage(aiBubble('省钱雷达没加载起来，刷新页面再试。')); return; }
+    addAIMessage(aiBubble(DEALS.todayCardHtml(dealsNow())));
+  }
+
+  /** 聊天入口：疯狂星期四 */
+  function showKfcDealsCard() {
+    switchView('chat');
+    if (!dealsReady()) { addAIMessage(aiBubble('省钱雷达没加载起来，刷新页面再试。')); return; }
+    addAIMessage(aiBubble(DEALS.kfcCardHtml(dealsNow())));
+  }
+
+  /** 聊天入口：比价（先从话里抽商品名与预算，再让用户填报价） */
+  function showDealCompareFromText(raw) {
+    switchView('chat');
+    if (!dealsReady()) { addAIMessage(aiBubble('省钱雷达没加载起来，刷新页面再试。')); return; }
+    var text = String(raw || '');
+    var budget = '';
+    var mb = text.match(/(\d+(?:\.\d+)?)\s*(?:块|元|rmb|RMB)/);
+    if (mb) { budget = mb[1]; }
+    var item = text
+      .replace(/我想买一个|我想买个|我想买|想买一个|想买个|想买|要买|打算买|准备买|入手/g, ' ')
+      .replace(/比个价|帮我比价|比价|帮忙|帮我|查一下|看一下|多少钱划算|多少钱|划算吗|划算不划算|划算|哪家便宜|哪里便宜|便宜|买一个|买个|买|一个|的|吗|呢|？|\?/g, ' ')
+      .replace(/\d+(?:\.\d+)?\s*(?:块|元|rmb|RMB)/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
+    if (item.length < 2) { item = '这个商品'; }
+    dealsForm.item = item;
+    if (budget) { dealsForm.budget = budget; }
+    addAIMessage(aiBubble(DEALS.compareIntroHtml(item, budget, dealsNow())));
+  }
+
+  /* ================================================================== */
   /* 消息路由                                                            */
   /* ================================================================== */
 
@@ -3306,6 +4151,34 @@
     if (compact.indexOf('账单分析') !== -1) { return openAnalysisSheet; }
     if (compact.indexOf('导入') !== -1 && compact.indexOf('账单') !== -1) { return openImportSheet; }
     if (compact.indexOf('截屏记账') !== -1 || compact.indexOf('截图记账') !== -1) { return openOcrModal; }
+    /* ---- 理财教练：省钱 / 赚钱 / 剁手冷静法 ---- */
+    if (compact.indexOf('剁手冷静法') !== -1 || compact.indexOf('冷静期') !== -1) { return showCoolingGuide; }
+    if (compact.indexOf('省钱') !== -1 && /(怎么|如何|怎样|方法|攻略|技巧|建议|教我)/.test(compact)) {
+      return showSaveMoneyGuide;
+    }
+    if (compact.indexOf('赚钱') !== -1 && /(怎么|如何|怎样|方法|路子|攻略|建议|教我)/.test(compact)) {
+      return showMakeMoneyGuide;
+    }
+    if (compact === '省钱' || compact === '省钱攻略' || compact === '省钱方法') { return showSaveMoneyGuide; }
+    if (compact === '搞钱' || compact === '搞钱路子' || compact === '赚钱方法') { return showMakeMoneyGuide; }
+    /* ---- 省钱雷达：活动日历 / 会员日 / 比价 ---- */
+    // 业务规则 1：句子里带金额的一律当成记账，不要被"肯德基""疯狂星期四"抢走去问优惠
+    // 例：「肯德基疯狂星期四 25」= 记一笔餐饮，而不是弹KFC活动卡
+    var hasAmount = /(\d+(\.\d+)?)\s*(元|块|块钱)?/.test(compact) &&
+      !/(多少钱|贵吗|便宜吗|什么时候|哪天|几天|多久|划算吗|比价|哪家便宜)/.test(compact);
+    if (hasAmount) { return null; }
+    if (/省钱雷达|优惠提醒|打折日|会员日|今日优惠|今天.*(优惠|特价|打折)|有什么优惠|有啥优惠|优惠活动/.test(compact)) {
+      return showDealsTodayCard;
+    }
+    if (compact.indexOf('疯狂星期四') !== -1 || compact.indexOf('肯德基') !== -1 ||
+      compact.indexOf('周四吃') !== -1) {
+      return showKfcDealsCard;
+    }
+    if (compact.indexOf('比价') !== -1 || compact.indexOf('哪家便宜') !== -1 ||
+      compact.indexOf('哪里便宜') !== -1 || compact.indexOf('多少钱划算') !== -1 ||
+      compact.indexOf('划算吗') !== -1 || compact.indexOf('划算不划算') !== -1) {
+      return function () { showDealCompareFromText(text); };
+    }
     return null;
   }
 
@@ -3369,8 +4242,8 @@
 
   function exportAllCsv() {
     var ov = getOverview();
-    // 前 6 列顺序保持与 v1 完全一致，只在末尾追加「收支」列，避免破坏既有消费方
-    var billsRows = [['id', '日期', '金额', '分类', '备注', '消费动机', '收支']];
+    // 前 6 列顺序保持与 v1 完全一致，只在末尾追加「收支」「商家」，避免破坏既有消费方
+    var billsRows = [['id', '日期', '金额', '分类', '备注', '消费动机', '收支', '商家']];
     var sorted = state.bills.slice().sort(function (a, b) {
       if (a.date !== b.date) { return a.date < b.date ? 1 : -1; }
       return (b.createdAt || 0) - (a.createdAt || 0);
@@ -3385,7 +4258,8 @@
         b.category,
         b.note,
         b.type === 'income' ? '收入' : b.motivation,
-        b.type === 'income' ? '收入' : '支出'
+        b.type === 'income' ? '收入' : '支出',
+        b.merchant || ''
       ]);
     }
 
@@ -3515,6 +4389,10 @@
     var localFn = localCommandName(raw);
     if (localFn) { localFn(); return; }
 
+    // 理财教练：「想买 XX」-> 先走剁手冷静法三步问答，而不是直接记账
+    var wantBuy = COACH.isWantBuy(raw);
+    if (wantBuy) { startCoolingFlow(wantBuy.item, wantBuy.price); return; }
+
     // 自由文本记账：本地 NLP 能解析出账单条目时直接本地处理（秒回、不出现「思考中」）。
     // 只有真正需要对话理解的问句才走云端，避免无谓的云端延迟。
     var parsed = NLP.parseBill(raw);
@@ -3625,13 +4503,18 @@
     if (!raw) { return; }
     addUserMessage(raw);
     $('chatInput').value = '';
+    // 快捷指令 chips：当前发出的指令高亮为激活态（绿底），与设计稿一致
+    var chips = DOC.querySelectorAll('#quickChips .chip');
+    for (var i = 0; i < chips.length; i++) {
+      chips[i].classList.toggle('active', chips[i].getAttribute('data-cmd') === raw);
+    }
     switchView('chat');
     // 改为请求后端；后端不可用或返回 fallback 时，sendToAssistant 内部回退到本地逻辑
     sendToAssistant(raw);
   }
 
   function switchView(view) {
-    if (view !== 'chat' && view !== 'dash' && view !== 'goals') { return; }
+    if (view !== 'chat' && view !== 'dash' && view !== 'goals' && view !== 'coach') { return; }
     DOC.body.setAttribute('data-view', view);
     var tabs = DOC.querySelectorAll('#tabbar .tab');
     var i;
@@ -3664,6 +4547,11 @@
     });
 
     chatListEl().addEventListener('click', function (e) {
+      var dealAct = e.target.closest ? e.target.closest('[data-deal-act]') : null;
+      if (dealAct) {
+        handleDealAct(dealAct.getAttribute('data-deal-act'));
+        return;
+      }
       var target = e.target.closest ? e.target.closest('[data-cmd]') : null;
       if (target) {
         handleSend(target.getAttribute('data-cmd'));
@@ -3692,11 +4580,21 @@
         return;
       }
       if (name === 'cooldown-buy') {
-        act.parentNode.innerHTML = '<span class="tag">已选择：坚持购买</span>';
+        act.parentNode.innerHTML = '<span class="tag">已选择：仍然记下这笔</span>';
         resolveCooldown(true);
       } else if (name === 'cooldown-skip') {
-        act.parentNode.innerHTML = '<span class="tag green">已选择：算了，不买了</span>';
+        act.parentNode.innerHTML = '<span class="tag green">已选择：先不买，省下了</span>';
         resolveCooldown(false);
+      } else if (name === 'cool-next') {
+        if (cooling) { renderCoolingQuestion(); }
+      } else if (name === 'cool-answer') {
+        coolingAnswer(act.getAttribute('data-val'), act);
+      } else if (name === 'cool-record') {
+        coolingRecord();
+      } else if (name === 'cool-skip') {
+        coolingSkip();
+      } else if (name === 'cool-start') {
+        startCoolingFlow('想买的东西', 0);
       }
     });
 
@@ -3736,18 +4634,100 @@
     $('btnCloseDrawer').addEventListener('click', closeDrawer);
     $('drawerMask').addEventListener('click', closeDrawer);
     $('btnSaveSettings').addEventListener('click', saveSettings);
-    $('btnExport').addEventListener('click', exportAllCsv);
-    $('btnReset').addEventListener('click', confirmReset);
     $('btnCycleReset').addEventListener('click', restorePaydayCycle);
     $('btnSaveOcr').addEventListener('click', saveOcrCredentials);
     $('btnClearOcr').addEventListener('click', clearOcrCredentials);
 
+    /* ---- 顶栏「＋ 记一笔」快捷记账 ---- */
+    $('btnQuickAdd').addEventListener('click', openQuickAddModal);
+
+    /* ---- 设置抽屉 · 数据管理 ---- */
+    $('btnDrawerExport').addEventListener('click', exportAllCsv);
+    $('btnDrawerImport').addEventListener('click', openImportSheet);
+    $('btnDrawerReset').addEventListener('click', confirmReset);
+
+    /* ---- 常驻预算条：点击/回车跳到看板预算焦点卡 ---- */
+    var budgetBar = $('budgetBar');
+    if (budgetBar) {
+      budgetBar.addEventListener('click', focusBudgetCard);
+      budgetBar.addEventListener('keydown', function (e) {
+        if (e.key === 'Enter' || e.keyCode === 13) {
+          e.preventDefault();
+          focusBudgetCard();
+        }
+      });
+    }
+
     /* ---- 完整设置界面 ---- */
     bindSettingsEvents();
 
-    /* ---- 顶部工具栏：截屏记账 / 账单分析 / 更多菜单 ---- */
+    /* ---- 顶部工具栏：截屏记账 / 账单分析 / 理财教练 / 更多菜单 ---- */
     $('btnOcr').addEventListener('click', openOcrModal);
     $('btnAnalysis').addEventListener('click', openAnalysisSheet);
+    $('btnCoach').addEventListener('click', function () { switchView('coach'); });
+    $('btnAskCoach').addEventListener('click', showAskCoachIntro);
+
+    /* ---- 省钱雷达：打开面板 / 切 tab / 比价计算 / 导出日历 ---- */
+    $('btnDeals').addEventListener('click', function () { openDealsSheet('today'); });
+    $('btnDealsCard').addEventListener('click', function () { openDealsSheet('today'); });
+    $('btnCloseDeals').addEventListener('click', closeDealsSheet);
+    $('dealsMask').addEventListener('click', function (e) {
+      if (e.target === $('dealsMask')) { closeDealsSheet(); }
+    });
+    $('dealsTabs').addEventListener('click', function (e) {
+      var tab = e.target.closest ? e.target.closest('[data-deal-tab]') : null;
+      if (!tab) { return; }
+      syncDealForm();
+      dealsTab = tab.getAttribute('data-deal-tab');
+      renderDealsSheet();
+    });
+    $('dealsPane').addEventListener('click', function (e) {
+      var del = e.target.closest ? e.target.closest('[data-del-row]') : null;
+      if (del) {
+        syncDealForm();
+        dealsForm.rows.splice(Number(del.getAttribute('data-del-row')), 1);
+        renderDealsSheet();
+        return;
+      }
+      var act = e.target.closest ? e.target.closest('[data-deal-act]') : null;
+      if (act) {
+        var before = dealsLastResult;
+        handleDealAct(act.getAttribute('data-deal-act'));
+        if (dealsLastResult !== before && dealsTab === 'compare') { renderDealsSheet(); }
+        return;
+      }
+      var target = e.target.id;
+      if (target === 'btnDealCalc') { runDealCompare(); }
+      else if (target === 'btnDealDemo') { fillDealDemo(); }
+      else if (target === 'btnDealAdd') {
+        syncDealForm();
+        if (dealsForm.rows.length >= 6) { showToast('最多比 6 个平台，够用了'); return; }
+        dealsForm.rows.push({
+          platform: '抖音',
+          price: '',
+          spec: dealsForm.rows[0] ? dealsForm.rows[0].spec : '',
+          ship: '', coupon: '', need: ''
+        });
+        renderDealsSheet();
+      }
+    });
+    $('btnDealsCsv').addEventListener('click', function () {
+      if (!dealsReady()) { return; }
+      var text = DEALS.calendarCsv(new Date(), 56);
+      downloadText('真实商家日历.csv', text, 'text/csv;charset=utf-8');
+      showToast('已生成未来 56 天日历（日期由代码算出）');
+    });
+    $('btnDealsAskKfc').addEventListener('click', function () {
+      closeDealsSheet();
+      showKfcDealsCard();
+    });
+    /* ---- 理财学院：折叠展开 ---- */
+    $('coachAcademy').addEventListener('click', function (e) {
+      var head = e.target.closest ? e.target.closest('.coach-lesson-head') : null;
+      if (!head) { return; }
+      var lesson = head.closest ? head.closest('.coach-lesson') : null;
+      if (lesson) { lesson.classList.toggle('open'); }
+    });
     $('btnUndo').addEventListener('click', undoLast);
     $('btnMore').addEventListener('click', function (e) {
       e.stopPropagation();
@@ -3762,6 +4742,7 @@
       if (!item) { return; }
       var act = item.getAttribute('data-act');
       if (act === 'export') { exportAllCsv(); }
+      if (act === 'import') { openImportSheet(); }
       if (act === 'reset') { confirmReset(); }
     });
     DOC.addEventListener('click', function (e) {
@@ -3818,7 +4799,6 @@
     $('btnAnalysisClear').addEventListener('click', clearAnalysis);
 
     /* ---- 导入账单 sheet ---- */
-    $('btnImport').addEventListener('click', openImportSheet);
     $('btnCloseImport').addEventListener('click', closeImportSheet);
     $('importMask').addEventListener('click', function (e) {
       if (e.target === $('importMask')) { closeImportSheet(); }
@@ -3971,6 +4951,7 @@
       if (e.key === 'Escape' || e.keyCode === 27) {
         closeModal();
         if (!$('analysisMask').hidden) { closeAnalysisSheet(); }
+        if (!$('dealsMask').hidden) { closeDealsSheet(); }
         if (!$('ocrMask').hidden) { closeOcrModal(); }
         if ($('settingsDrawer').classList.contains('open')) { closeDrawer(); }
         if ($('modalMask').hidden && !$('settingsMask').hidden) { closeSettingsPage(); }
@@ -3989,7 +4970,7 @@
 
   function addWelcome() {
     var ov = getOverview();
-    addAIMessage(aiBubble('你好呀，我是账小助 👋<br>一句话就能记账，试试「中午食堂 15」，或者直接点下面的快捷指令。'));
+    addAIMessage(aiBubble('你好呀，我是账小助 👋<br>一句话就能记账，试试「中午食堂 15」。<br>想省钱 / 搞钱，去底部「理财教练》找我，剁手前也可以先让我把把关。'));
     addAIMessage(aiBubble('当前周期 ' + esc(ov.cycle.start) + ' ~ ' + esc(ov.cycle.end) + '，总预算 ' +
       money(state.budget.total) + '，已花 ' + money(ov.cycleAgg.expense) + '。' + ov.sentence));
   }
@@ -3998,6 +4979,7 @@
     loadState();
     if (!storageOK) { showStorageTip(); }
     applyAppearance();
+    applyUiMode();
     var ring = $('ringBar');
     if (ring) {
       ring.style.strokeDasharray = RING_C + ' ' + RING_C;

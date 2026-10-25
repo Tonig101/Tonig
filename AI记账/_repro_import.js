@@ -52,9 +52,11 @@ dom.then(async (vdom) => {
 
   // ===== 路径 A：顶栏「导入账单」=====
   console.log('===== 路径 A：顶栏 导入账单 =====');
-  const btnImport = doc.getElementById('btnImport');
-  console.log('btnImport 存在:', !!btnImport);
-  btnImport.dispatchEvent(new win.Event('click'));
+  // 适配当前 UI：导入入口在「更多」菜单里（data-act=import）
+  doc.getElementById('btnMore').dispatchEvent(new win.Event('click', { bubbles: true }));
+  const btnImport = doc.querySelector('#moreMenu [data-act="import"]');
+  console.log('更多菜单-导入 存在:', !!btnImport);
+  btnImport.dispatchEvent(new win.Event('click', { bubbles: true }));
   await wait(50);
   const importMask = doc.getElementById('importMask');
   console.log('importMask 可见:', importMask && importMask.hidden === false);

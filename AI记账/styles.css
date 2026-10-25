@@ -4,23 +4,43 @@
    ========================================================= */
 
 :root {
+  /* ---- 品牌（微信绿） ---- */
   --green: #07C160;
   --green-dark: #06AD56;
+  --green-deep: #059748;
   --green-soft: #E8F8EF;
-  --orange: #FF8A3D;
-  --orange-soft: #FFF3E9;
-  --red: #EF5350;
-  --red-soft: #FDECEC;
-  --blue: #3D9CFF;
-  --bg: #F5F6F8;
+  --green-ink: #03703C;
+  /* ---- 语义色：预算三态全局语言（安全/紧张/超支） ---- */
+  --amber: #F59E0B;
+  --amber-deep: #B45309;
+  --amber-soft: #FEF3E2;
+  --danger: #EF4444;
+  --danger-deep: #B91C1C;
+  --danger-soft: #FEE2E2;
+  --success: #00C896;
+  /* ---- 旧名兼容（逐步迁移后可删） ---- */
+  --orange: #F59E0B;
+  --orange-soft: #FEF3E2;
+  --red: #EF4444;
+  --red-soft: #FEE2E2;
+  /* ---- 中性 ---- */
+  --bg: #F8F9FA;
+  --canvas: #F8F9FA;
   --card: #FFFFFF;
-  --text: #1F2430;
-  --text-2: #5A6472;
-  --text-3: #8A93A0;
-  --line: #EDF0F3;
-  --radius: 16px;
-  --shadow: 0 1px 2px rgba(16, 24, 40, 0.04), 0 6px 20px rgba(16, 24, 40, 0.06);
-  --font: -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", "Helvetica Neue", Arial, sans-serif;
+  --text: #0F172A;
+  --text-2: #64748B;
+  --text-3: #667085; /* 设计稿为 #98A2B3；为保证 11px 小字达到 WCAG AA（4.5:1）加深一档 */
+  --line: #E5E7EB;
+  --line-2: #F2F4F7;
+  /* ---- 圆角 ---- */
+  --radius: 20px;
+  --radius-sm: 12px;
+  --radius-modal: 28px;
+  /* ---- 字体 ---- */
+  --font: -apple-system, BlinkMacSystemFont, "PingFang SC", "Noto Sans SC", "Microsoft YaHei", "Helvetica Neue", Arial, sans-serif;
+  --mono: "JetBrains Mono", "SFMono-Regular", "SF Mono", Consolas, "PingFang SC", monospace;
+  /* ---- 阴影 ---- */
+  --shadow: 0 1px 2px rgba(15, 23, 42, 0.04), 0 6px 20px rgba(15, 23, 42, 0.06);
 }
 
 * {
@@ -3285,3 +3305,1337 @@ body.font-scale-xl .tabbar .tab { font-size: 15.5px; }
 body.font-scale-sm #chatInput { font-size: 12.5px; }
 body.font-scale-lg #chatInput { font-size: 15.5px; }
 body.font-scale-xl #chatInput { font-size: 17.5px; }
+
+/* =========================================================
+   v3 设计稿落地：常驻预算条 / 入口分级 / 看板层级 / 决策卡 / Toast
+   ========================================================= */
+
+/* ---------- 金额等宽字形（设计稿：JetBrains Mono 记账数字） ---------- */
+.mono,
+.ring-amount,
+.mini-stats b,
+.income-grid b,
+.bill-amount,
+.achieve-grid b,
+.bb-amount,
+.bb-mid b,
+.dc-amount,
+.goal-amount,
+.goal-bar-text {
+  font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.2px;
+}
+
+/* ---------- 常驻预算状态条（解决「聊天时看不到预算」） ---------- */
+.budget-bar {
+  position: relative;
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  height: 52px;
+  padding: 0 16px;
+  background: var(--card);
+  border-bottom: 1px solid var(--line);
+  cursor: pointer;
+  user-select: none;
+  transition: background 0.18s ease;
+}
+
+.budget-bar:hover {
+  background: #FBFCFD;
+}
+
+.budget-bar:focus-visible {
+  outline: 2px solid var(--green);
+  outline-offset: -2px;
+}
+
+.bb-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.bb-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--green);
+  flex: 0 0 auto;
+}
+
+.bb-label {
+  font-size: 12px;
+  color: var(--text-2);
+  white-space: nowrap;
+}
+
+.bb-amount {
+  font-size: 17px;
+  font-weight: 700;
+  color: var(--text);
+  white-space: nowrap;
+}
+
+.bb-mid {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-left: auto;
+  font-size: 12px;
+  color: var(--text-2);
+  white-space: nowrap;
+}
+
+.bb-mid b {
+  font-weight: 600;
+  color: var(--text);
+}
+
+.bb-status {
+  flex: 0 0 auto;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 3px 10px;
+  border-radius: 999px;
+  background: var(--green-soft);
+  color: var(--green-ink);
+  white-space: nowrap;
+}
+
+.bb-progress {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 3px;
+  background: var(--line-2);
+}
+
+.bb-progress i {
+  display: block;
+  height: 100%;
+  width: 0;
+  background: var(--green);
+  transition: width 0.35s ease, background 0.18s ease;
+}
+
+/* 三态：与设计稿一致的全局预算语言 */
+.budget-bar.state-tight .bb-dot,
+.budget-bar.state-tight .bb-progress i { background: var(--amber); }
+.budget-bar.state-tight .bb-status { background: var(--amber-soft); color: var(--amber-deep); }
+
+.budget-bar.state-danger .bb-dot,
+.budget-bar.state-danger .bb-progress i { background: var(--danger); }
+.budget-bar.state-danger .bb-status { background: var(--danger-soft); color: var(--danger-deep); }
+
+/* 点击预算条 → 看板预算卡高亮闪烁 */
+@keyframes cardFlash {
+  0%, 100% { box-shadow: var(--shadow); }
+  30% { box-shadow: 0 0 0 3px var(--green-soft), var(--shadow); }
+}
+
+.card.flash {
+  animation: cardFlash 1.2s ease;
+}
+
+/* ---------- 顶栏：入口分级 ---------- */
+.btn-quick-add {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 32px;
+  padding: 0 14px;
+  border-radius: 999px;
+  background: var(--green);
+  color: #fff;
+  font-size: 12.5px;
+  font-weight: 600;
+  white-space: nowrap;
+  transition: background 0.18s ease, transform 0.12s ease;
+}
+
+.btn-quick-add:hover { background: var(--green-dark); }
+.btn-quick-add:active { transform: scale(0.96); }
+.btn-quick-add svg { width: 12px; height: 12px; flex: 0 0 auto; }
+
+/* ---------- 看板：四级信息层级分区标签 ---------- */
+.dash-sec {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 4px 2px 0;
+}
+
+.dash-sec span {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 1px;
+  color: var(--text-3);
+  white-space: nowrap;
+}
+
+.dash-sec i {
+  flex: 1 1 auto;
+  height: 1px;
+  background: var(--line);
+}
+
+/* 预算焦点卡：状态芯片（与预算条同语言） */
+.badge.state-safe { background: var(--green-soft); color: var(--green-ink); }
+.badge.state-tight { background: var(--amber-soft); color: var(--amber-deep); }
+.badge.state-danger { background: var(--danger-soft); color: var(--danger-deep); }
+
+/* ---------- 快捷指令 chips：激活态 ---------- */
+.chip.active {
+  background: var(--green-soft);
+  color: var(--green-dark);
+  font-weight: 500;
+}
+
+/* ---------- 冷静期决策卡（P4 高保真同款） ---------- */
+.decision-card {
+  width: 100%;
+  max-width: 420px;
+  background: var(--card);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: 18px;
+}
+
+.dc-icon {
+  width: 44px;
+  height: 44px;
+  border-radius: 22px;
+  background: var(--amber-soft);
+  color: var(--amber-deep);
+  font-size: 22px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto 10px;
+}
+
+.dc-title {
+  font-size: 16px;
+  font-weight: 600;
+  text-align: center;
+  color: var(--text);
+}
+
+.dc-sub {
+  font-size: 12px;
+  color: var(--text-2);
+  text-align: center;
+  margin-top: 2px;
+}
+
+.dc-detail {
+  background: var(--canvas);
+  border-radius: 14px;
+  padding: 8px 12px;
+  margin-top: 14px;
+}
+
+.dc-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 12px;
+  padding: 5px 0;
+}
+
+.dc-row span:first-child { color: var(--text-3); flex: 0 0 auto; }
+.dc-row span:last-child { color: var(--text); text-align: right; }
+
+.dc-alert,
+.dc-suggest {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  border-radius: 14px;
+  padding: 10px 12px;
+  font-size: 11.5px;
+  line-height: 1.65;
+  margin-top: 10px;
+}
+
+.dc-alert { background: var(--amber-soft); color: var(--amber-deep); }
+.dc-suggest { background: var(--green-soft); color: var(--green-ink); }
+
+.dc-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 3px;
+  margin-top: 6px;
+  flex: 0 0 auto;
+}
+
+.dc-alert .dc-dot { background: var(--amber); }
+.dc-suggest .dc-dot { background: var(--green); }
+
+.dc-actions {
+  margin-top: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.dc-primary {
+  height: 44px;
+  border-radius: 999px;
+  background: var(--text);
+  color: #fff;
+  font-size: 14px;
+  font-weight: 600;
+  transition: background 0.18s ease, transform 0.12s ease;
+}
+
+.dc-primary:hover { background: #1E293B; }
+.dc-primary:active { transform: scale(0.98); }
+
+.dc-secondary {
+  height: 40px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: #fff;
+  color: #475467;
+  font-size: 13px;
+  font-weight: 500;
+  transition: background 0.18s ease;
+}
+
+.dc-secondary:hover { background: var(--canvas); }
+
+/* ---------- Toast 轻提示 ---------- */
+.toast-root {
+  position: fixed;
+  left: 50%;
+  bottom: 76px;
+  transform: translateX(-50%);
+  z-index: 999;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  align-items: center;
+  pointer-events: none;
+}
+
+.toast {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  max-width: 86vw;
+  height: 36px;
+  padding: 0 16px;
+  border-radius: 999px;
+  font-size: 12.5px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.16);
+  animation: toastIn 0.22s ease;
+}
+
+.toast.ok { background: var(--text); color: #fff; }
+.toast.warn { background: var(--amber-soft); color: var(--amber-deep); border: 1px solid var(--amber); }
+.toast.danger { background: var(--danger-soft); color: var(--danger-deep); border: 1px solid var(--danger); }
+
+.toast.leaving {
+  opacity: 0;
+  transform: translateY(6px);
+  transition: opacity 0.25s ease, transform 0.25s ease;
+}
+
+@keyframes toastIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: none; }
+}
+
+/* ---------- 设置抽屉：三分区 ---------- */
+.drawer-group {
+  padding: 16px 0 18px;
+  border-bottom: 1px solid var(--line);
+}
+
+.drawer-group:last-child {
+  border-bottom: none;
+  padding-bottom: 4px;
+}
+
+.drawer-group-title {
+  margin: 0 0 12px;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 1px;
+  color: var(--text-3);
+}
+
+.drawer-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+/* ---------- 快捷记账弹窗 ---------- */
+.modal select {
+  width: 100%;
+  height: 40px;
+  padding: 0 12px;
+  border-radius: 11px;
+  border: 1px solid var(--line);
+  background: #F7F8FA;
+  outline: none;
+  font-family: inherit;
+}
+
+.modal select:focus {
+  border-color: rgba(7, 193, 96, 0.55);
+  background: #fff;
+}
+
+/* ---------- 移动端适配 ---------- */
+@media (max-width: 859px) {
+  .budget-bar {
+    height: 48px;
+    gap: 10px;
+    padding: 0 12px;
+  }
+
+  .bb-label { display: none; }
+  .bb-amount { font-size: 15px; }
+  .bb-mid { gap: 8px; font-size: 11.5px; }
+  .bb-status { padding: 2px 8px; }
+
+  /* 目标视图只显示目标卡，分区标签一并隐藏 */
+  body[data-view="goals"] .dash-sec { display: none; }
+
+  .decision-card { max-width: none; }
+}
+
+@media (max-width: 380px) {
+  .bb-mid span:last-child { display: none; }
+}
+
+/* =========================================================
+   理财教练模式（coach.js / panelCoach / 剁手冷静法）
+   ========================================================= */
+
+/* ---------- 面板：桌面双栏时占位于看板列，移动端独占一屏 ---------- */
+.panel-coach {
+  min-height: 0;
+  display: none;
+}
+
+body[data-view="coach"] .panel-dash { display: none; }
+
+body[data-view="coach"] .panel-coach { display: flex; }
+
+/* 双 UI 类型：简洁版隐藏「完整版专属」元素（理财教练 Tab / 目标 Tab / 教练面板 / 恩格尔 / 省钱雷达 / 成就卡） */
+body[data-ui-mode="simple"] .ui-full-only { display: none !important; }
+
+.coach-scroll {
+  height: 100%;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding-right: 2px;
+  padding-bottom: 4px;
+}
+
+.coach-scroll::-webkit-scrollbar { width: 6px; }
+.coach-scroll::-webkit-scrollbar-thumb { background: #DCE1E7; border-radius: 3px; }
+.coach-scroll::-webkit-scrollbar-track { background: transparent; }
+
+/* ---------- 教练头部卡 ---------- */
+.coach-hero {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 16px;
+}
+
+.coach-hero-avatar {
+  width: 44px;
+  height: 44px;
+  border-radius: 22px;
+  background: var(--green-soft);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 22px;
+  flex: 0 0 auto;
+}
+
+.coach-hero-text { flex: 1 1 auto; min-width: 0; }
+
+.coach-hero-text b {
+  display: block;
+  font-size: 14.5px;
+  color: var(--text);
+}
+
+.coach-hero-text small {
+  display: block;
+  font-size: 11.5px;
+  color: var(--text-3);
+  margin-top: 1px;
+}
+
+/* ---------- 专属建议 ---------- */
+.coach-tips {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.coach-tip {
+  background: var(--card);
+  border-radius: var(--radius-sm);
+  box-shadow: var(--shadow);
+  padding: 12px 14px;
+  border-left: 3px solid var(--green);
+}
+
+.coach-tip.level-warn { border-left-color: var(--amber); }
+.coach-tip.level-stop { border-left-color: var(--danger); }
+.coach-tip.level-ok { border-left-color: var(--success); }
+
+.coach-tip-head {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 13px;
+  color: var(--text);
+}
+
+.coach-tip-ico { font-size: 15px; flex: 0 0 auto; }
+
+.coach-tip-text {
+  margin-top: 5px;
+  font-size: 12px;
+  line-height: 1.65;
+  color: var(--text-2);
+}
+
+/* ---------- 理财学院（折叠卡） ---------- */
+.coach-academy {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.coach-lesson {
+  background: var(--card);
+  border-radius: var(--radius-sm);
+  box-shadow: var(--shadow);
+  overflow: hidden;
+}
+
+.coach-lesson-head {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 12px 14px;
+  text-align: left;
+}
+
+.coach-lesson-ico { font-size: 16px; flex: 0 0 auto; }
+
+.coach-lesson-title {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text);
+}
+
+.coach-lesson-tag {
+  flex: 0 0 auto;
+  font-size: 10.5px;
+  color: var(--green-ink);
+  background: var(--green-soft);
+  border-radius: 999px;
+  padding: 2px 8px;
+}
+
+.coach-lesson-arrow {
+  flex: 0 0 auto;
+  color: var(--text-3);
+  font-size: 14px;
+  transition: transform 0.18s ease;
+}
+
+.coach-lesson.open .coach-lesson-arrow { transform: rotate(90deg); }
+
+.coach-lesson-body {
+  display: none;
+  padding: 0 14px 13px 39px;
+  font-size: 12px;
+  line-height: 1.75;
+  color: var(--text-2);
+}
+
+.coach-lesson.open .coach-lesson-body { display: block; }
+
+.coach-disclaimer {
+  margin: 2px 0 6px;
+  font-size: 10.5px;
+  color: var(--text-3);
+  text-align: center;
+}
+
+/* ---------- 聊天里的「💡 理财教练说」卡片 ---------- */
+.coach-say {
+  margin-top: 8px;
+  max-width: 420px;
+  background: var(--green-soft);
+  border: 1px solid rgba(7, 193, 96, 0.25);
+  border-radius: 14px;
+  padding: 10px 13px;
+}
+
+.coach-say-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--green-ink);
+}
+
+.coach-say-body {
+  margin-top: 4px;
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--text);
+}
+
+/* ---------- 教练问答气泡（省钱 / 赚钱 / 问教练） ---------- */
+.coach-bubble { max-width: 460px; }
+
+.coach-qa-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--green-ink);
+}
+
+.coach-qa-list {
+  margin: 8px 0 0;
+  padding-left: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.coach-qa-list li::marker { color: var(--green-dark); font-weight: 600; }
+
+.coach-qa-body {
+  margin-top: 8px;
+  font-size: 12.5px;
+  line-height: 1.75;
+  color: var(--text);
+}
+
+.coach-qa-foot {
+  margin-top: 8px;
+  font-size: 11.5px;
+  color: var(--text-3);
+}
+
+.coach-qa-foot.warn { color: var(--amber-deep); }
+
+.coach-qa-chips {
+  margin-top: 9px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+}
+
+.coach-qa-chips .chip { background: var(--green-soft); color: var(--green-ink); }
+
+.coach-qa-actions { margin-top: 10px; }
+
+/* ---------- 剁手冷静法 ---------- */
+.cool-card .dc-icon.cool {
+  background: var(--green-soft);
+  color: var(--green-ink);
+}
+
+.cool-opts {
+  margin-top: 14px;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.cool-opt {
+  min-height: 42px;
+  border-radius: 12px;
+  border: 1px solid var(--line);
+  background: #fff;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text);
+  transition: border-color 0.18s ease, background 0.18s ease, transform 0.12s ease;
+}
+
+.cool-opt:hover { border-color: var(--green); background: var(--green-soft); }
+.cool-opt:active { transform: scale(0.98); }
+
+.cool-opts .tag { justify-self: start; }
+
+.cool-note {
+  font-size: 12px;
+  color: var(--text-3);
+  text-align: center;
+  padding: 4px 0;
+}
+
+/* 三种结论的强调色 */
+.cool-card.verdict-ok { border-top: 3px solid var(--success); }
+.cool-card.verdict-warn { border-top: 3px solid var(--amber); }
+.cool-card.verdict-stop { border-top: 3px solid var(--danger); }
+
+.cool-card.verdict-ok .dc-icon.cool { background: rgba(0, 200, 150, 0.14); color: #067A5E; }
+.cool-card.verdict-warn .dc-icon.cool { background: var(--amber-soft); color: var(--amber-deep); }
+.cool-card.verdict-stop .dc-icon.cool { background: var(--danger-soft); color: var(--danger-deep); }
+
+/* ---------- 快捷 chips 的教练专属配色 ---------- */
+.chip.coach-chip { background: var(--green-soft); color: var(--green-ink); font-weight: 500; }
+
+.chip.coach-chip.active,
+.chip.coach-chip:hover { background: var(--green); color: #fff; }
+
+/* ---------- 深色模式适配 ---------- */
+[data-theme="dark"] .coach-say {
+  background: rgba(7, 193, 96, 0.12);
+  border-color: rgba(7, 193, 96, 0.3);
+}
+
+[data-theme="dark"] .coach-say-body { color: var(--text); }
+
+[data-theme="dark"] .cool-opt {
+  background: var(--raise, #232C3B);
+  border-color: var(--line);
+}
+
+[data-theme="dark"] .cool-opt:hover { background: rgba(7, 193, 96, 0.16); }
+
+[data-theme="dark"] .coach-qa-chips .chip,
+[data-theme="dark"] .chip.coach-chip { background: rgba(7, 193, 96, 0.18); color: #7BE3AE; }
+
+[data-theme="dark"] .coach-qa-chips .chip:hover,
+[data-theme="dark"] .chip.coach-chip:hover { background: var(--green); color: #fff; }
+
+[data-theme="dark"] .coach-lesson-tag { color: #7BE3AE; }
+
+[data-theme="dark"] .coach-scroll::-webkit-scrollbar-thumb { background: #2B3543; }
+
+[data-theme="dark"] .coach-tip { border-left-color: var(--green-dark); }
+[data-theme="dark"] .coach-tip.level-warn { border-left-color: var(--amber); }
+[data-theme="dark"] .coach-tip.level-stop { border-left-color: var(--danger); }
+
+/* ---------- 移动端：教练视图独占一屏 ---------- */
+@media (max-width: 859px) {
+  body[data-view="coach"] .panel-chat { display: none; }
+
+  body[data-view="coach"] .panel-coach { display: block; }
+}
+
+/* =========================================================
+   省钱雷达（活动日历 + 比价）
+   ========================================================= */
+
+.sheet-deals { max-width: 800px; }
+
+.deals-head-date {
+  margin-left: auto;
+  font-size: 12px;
+  color: var(--text-3);
+  font-variant-numeric: tabular-nums;
+  padding-right: 4px;
+}
+
+.deals-pane {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+/* ---------- 大促横幅 ---------- */
+.deals-promo-banner {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: linear-gradient(135deg, #FFF7E6, #FEF3E2);
+  border: 1px solid rgba(245, 158, 11, 0.32);
+}
+
+.deals-promo-banner b { font-size: 13.5px; color: var(--amber-deep); }
+.deals-promo-banner span { font-size: 12px; color: var(--amber-deep); opacity: 0.85; }
+
+/* ---------- 分区标题 ---------- */
+.deals-sec {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 2px;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text-2);
+}
+
+.deals-sec::after {
+  content: "";
+  flex: 1 1 auto;
+  height: 1px;
+  background: var(--line);
+}
+
+/* ---------- 活动卡 ---------- */
+.deal-item {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 10px 12px;
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+}
+
+.deal-item p {
+  margin: 0;
+  font-size: 12.5px;
+  line-height: 1.6;
+  color: var(--text-2);
+}
+
+.deals-card .deal-item + .deal-item { margin-top: 6px; }
+
+.di-head { display: flex; align-items: center; gap: 6px; }
+.di-head b { font-size: 13.5px; color: var(--text); }
+.di-emoji { font-size: 15px; line-height: 1; }
+
+.di-tag {
+  margin-left: auto;
+  padding: 1px 8px;
+  border-radius: 999px;
+  background: var(--green-soft);
+  color: var(--green-ink);
+  font-size: 11px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.di-how { color: var(--text) !important; }
+.di-tip { color: var(--amber-deep) !important; }
+
+.deals-empty {
+  padding: 12px;
+  border: 1px dashed var(--line);
+  border-radius: 12px;
+  background: #fff;
+  font-size: 12.5px;
+  line-height: 1.65;
+  color: var(--text-2);
+}
+
+.deals-pills { display: flex; flex-wrap: wrap; gap: 6px; }
+
+.deals-pill {
+  padding: 4px 9px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: #fff;
+  font-size: 11.5px;
+  color: var(--text-2);
+}
+
+.deals-note {
+  margin: 4px 0 0;
+  font-size: 11.5px;
+  line-height: 1.6;
+  color: var(--text-3);
+}
+
+/* ---------- 未来 7 天 ---------- */
+.deals-up { display: flex; flex-direction: column; gap: 6px; }
+
+.deals-up-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: #fff;
+}
+
+.du-date {
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  line-height: 1.25;
+  font-size: 12.5px;
+  font-weight: 700;
+}
+
+.du-date small { font-size: 11px; font-weight: 400; color: var(--text-3); }
+.du-text { font-size: 12.5px; color: var(--text-2); }
+
+/* ---------- 14 天日历 ---------- */
+.deals-cal { display: flex; flex-direction: column; gap: 3px; }
+
+.deals-cal-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 7px 8px;
+  border-radius: 10px;
+}
+
+.deals-cal-row.is-today { background: var(--green-soft); }
+
+.dc-day {
+  flex: 0 0 66px;
+  display: flex;
+  flex-direction: column;
+  line-height: 1.25;
+}
+
+.dc-day b { font-size: 12.5px; }
+.dc-day small { font-size: 11px; color: var(--text-3); }
+
+.dc-items { display: flex; flex-wrap: wrap; gap: 5px; }
+
+.dc-chip {
+  padding: 3px 8px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: #fff;
+  font-size: 11.5px;
+  color: var(--text-2);
+}
+
+.dc-chip.is-promo {
+  background: var(--amber-soft);
+  border-color: rgba(245, 158, 11, 0.35);
+  color: var(--amber-deep);
+}
+
+.dc-none { font-size: 12px; color: var(--text-3); }
+
+/* ---------- 比价表单 ---------- */
+.dc-grid {
+  display: grid;
+  grid-template-columns: 1.5fr 1fr;
+  gap: 10px;
+}
+
+.dc-field { display: flex; flex-direction: column; gap: 4px; }
+.dc-field span { font-size: 11.5px; color: var(--text-2); }
+
+.dc-field input,
+.dc-offer input,
+.dc-offer select {
+  height: 34px;
+  min-width: 0;
+  padding: 0 9px;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  background: #fff;
+  color: var(--text);
+  font-size: 13px;
+}
+
+.dc-field input:focus,
+.dc-offer input:focus,
+.dc-offer select:focus {
+  outline: none;
+  border-color: var(--green);
+  box-shadow: 0 0 0 3px rgba(7, 193, 96, 0.12);
+}
+
+.dc-offers { display: flex; flex-direction: column; gap: 8px; }
+
+.dc-offer {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 8px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: #fff;
+}
+
+.dco-main {
+  display: grid;
+  grid-template-columns: 92px 86px 1fr;
+  gap: 6px;
+}
+
+.dc-plat { font-weight: 600; }
+
+.dco-extra {
+  display: grid;
+  grid-template-columns: repeat(3, 78px) 1fr;
+  gap: 6px;
+  align-items: center;
+}
+
+.dco-extra input { height: 30px; font-size: 12px; }
+
+.dc-del {
+  justify-self: end;
+  width: 26px;
+  height: 26px;
+  border-radius: 8px;
+  background: var(--line-2);
+  color: var(--text-3);
+  font-size: 12px;
+  line-height: 1;
+}
+
+.dc-del:hover { background: var(--danger-soft); color: var(--danger-deep); }
+.dc-del-ph { display: block; }
+
+.dcz-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-top: 2px;
+}
+
+/* ---------- 比价结果 ---------- */
+.dcz-result { display: flex; flex-direction: column; gap: 8px; margin-top: 4px; }
+
+.dc-headline {
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: var(--green-soft);
+  color: var(--green-ink);
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.6;
+}
+
+.dc-headline.is-warn { background: var(--amber-soft); color: var(--amber-deep); }
+
+.dc-table {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  overflow: hidden;
+  background: #fff;
+}
+
+.dc-tr {
+  display: grid;
+  grid-template-columns: 1.7fr 92px 1fr;
+  gap: 8px;
+  align-items: center;
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--line-2);
+  font-size: 12.5px;
+}
+
+.dc-tr:last-child { border-bottom: none; }
+.dc-th { background: var(--line-2); color: var(--text-2); font-size: 11.5px; font-weight: 600; }
+.dc-tr.is-best { background: rgba(7, 193, 96, 0.07); }
+
+.dc-td-plat { display: flex; flex-wrap: wrap; align-items: center; gap: 5px; }
+.dc-td-plat small { width: 100%; font-size: 11px; color: var(--text-2); }
+
+.dc-need-tag {
+  padding: 1px 6px;
+  border-radius: 6px;
+  background: var(--amber-soft);
+  color: var(--amber-deep);
+  font-size: 10.5px;
+  font-style: normal;
+}
+
+.dc-td-eff { font-weight: 700; color: var(--text); }
+.dc-td-per { font-size: 11.5px; color: var(--text-2); }
+
+.dc-line { margin: 0; font-size: 12.5px; line-height: 1.6; color: var(--text-2); }
+.dc-line.is-good { color: var(--green-ink); }
+.dc-line.is-bad { color: var(--danger-deep); }
+
+.dc-list {
+  margin: 0;
+  padding-left: 18px;
+  font-size: 12px;
+  line-height: 1.65;
+  color: var(--text-2);
+}
+
+.dc-list.is-warn { color: var(--amber-deep); }
+
+.deals-foot-note {
+  margin-left: auto;
+  align-self: center;
+  font-size: 11px;
+  color: var(--text-3);
+}
+
+/* ---------- 看板小卡 ---------- */
+.card-deals .deals-mini { display: flex; flex-direction: column; gap: 6px; }
+
+.dm-line {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--text-2);
+}
+
+.dm-line em {
+  margin-left: auto;
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: var(--green-soft);
+  color: var(--green-ink);
+  font-size: 10.5px;
+  font-style: normal;
+  white-space: nowrap;
+}
+
+.dm-dot {
+  flex: 0 0 auto;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--green);
+}
+
+.dm-promo .dm-dot { background: var(--amber); }
+.dm-tip { font-size: 11.5px; color: var(--text-3); align-items: flex-start; }
+
+/* ---------- 聊天里的卡片 ---------- */
+.deals-card { display: flex; flex-direction: column; gap: 6px; }
+
+.deals-card-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 13.5px;
+}
+
+.deals-card-head span { font-size: 11px; color: var(--text-3); font-weight: 400; }
+
+.deals-promo {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 8px 10px;
+  border-radius: 10px;
+  background: var(--amber-soft);
+  color: var(--amber-deep);
+  font-size: 12.5px;
+  font-weight: 600;
+}
+
+.deals-promo small { font-weight: 400; font-size: 11.5px; opacity: 0.9; }
+
+.deals-hl { margin: 0; font-size: 12.5px; line-height: 1.6; }
+
+.deals-ul {
+  margin: 0;
+  padding-left: 18px;
+  font-size: 12.5px;
+  line-height: 1.7;
+  color: var(--text-2);
+}
+
+.deals-actions { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 2px; }
+
+.deals-always { display: flex; flex-wrap: wrap; gap: 5px; }
+
+.deals-timing {
+  margin: 0;
+  padding: 7px 10px;
+  border-radius: 10px;
+  background: var(--green-soft);
+  color: var(--green-ink);
+  font-size: 12px;
+  line-height: 1.55;
+}
+
+/* ---------- 深色模式 ---------- */
+[data-theme="dark"] .deal-item,
+[data-theme="dark"] .deals-empty,
+[data-theme="dark"] .deals-up-row,
+[data-theme="dark"] .deals-pill,
+[data-theme="dark"] .dc-chip,
+[data-theme="dark"] .dc-offer,
+[data-theme="dark"] .dc-table,
+[data-theme="dark"] .dc-field input,
+[data-theme="dark"] .dc-offer input,
+[data-theme="dark"] .dc-offer select {
+  background: var(--card);
+}
+
+[data-theme="dark"] .deals-promo-banner {
+  background: rgba(245, 158, 11, 0.14);
+  border-color: rgba(245, 158, 11, 0.35);
+}
+
+[data-theme="dark"] .deals-promo-banner b,
+[data-theme="dark"] .deals-promo-banner span,
+[data-theme="dark"] .deals-promo,
+[data-theme="dark"] .di-tip { color: #F5C26B; }
+
+[data-theme="dark"] .dc-headline { background: rgba(7, 193, 96, 0.16); color: #7BE3AE; }
+[data-theme="dark"] .dc-headline.is-warn { background: rgba(245, 158, 11, 0.16); color: #F5C26B; }
+[data-theme="dark"] .dc-tr.is-best { background: rgba(7, 193, 96, 0.12); }
+[data-theme="dark"] .dc-th { background: rgba(255, 255, 255, 0.04); }
+[data-theme="dark"] .deals-timing { background: rgba(7, 193, 96, 0.16); color: #7BE3AE; }
+[data-theme="dark"] .deals-cal-row.is-today { background: rgba(7, 193, 96, 0.12); }
+[data-theme="dark"] .dc-del { background: rgba(255, 255, 255, 0.06); }
+
+/* ---------- 响应式 ---------- */
+@media (max-width: 640px) {
+  .dc-grid { grid-template-columns: 1fr; }
+  .dco-main { grid-template-columns: 82px 1fr; }
+  .dc-spec { grid-column: 1 / -1; }
+  .dco-extra { grid-template-columns: repeat(3, 1fr) 30px; }
+  .dc-tr { grid-template-columns: 1.4fr 76px 1fr; font-size: 12px; }
+  .deals-foot-note { display: none; }
+  .dc-day { flex-basis: 58px; }
+}
+
+.du-tag {
+  margin-left: auto;
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: var(--green-soft);
+  color: var(--green-ink);
+  font-size: 10.5px;
+  white-space: nowrap;
+}
+
+/* 省钱雷达：切页签固定在顶部（比价结果较长时不会把页签顶走） */
+#dealsTabs {
+  position: sticky;
+  top: -14px;
+  z-index: 3;
+  margin: -14px 0 4px;
+  padding: 14px 0 8px;
+  background: var(--bg);
+}
+
+@media (max-width: 859px) {
+  #dealsTabs { top: -14px; }
+}
+
+/* 窄屏：四页签放得下（不让文字被裁） */
+@media (max-width: 520px) {
+  #dealsTabs { gap: 6px; }
+  #dealsTabs .atab {
+    flex: 1 1 0;
+    min-width: 0;
+    padding: 8px 4px;
+    font-size: 12px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+}
+
+/* =========================================================
+   业务规则落地：余额概览卡 / 商家标签 / 活动卡地点与教练建议
+   ========================================================= */
+
+.balance-card {
+  margin-top: 6px;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: #fff;
+}
+
+.bc-title {
+  font-size: 12.5px;
+  font-weight: 700;
+  color: var(--text-2);
+  margin-bottom: 8px;
+}
+
+.bc-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+}
+
+.bc-grid > div {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 6px 8px;
+  border-radius: 9px;
+  background: var(--line-2);
+}
+
+.bc-grid b {
+  font-size: 13.5px;
+  font-variant-numeric: tabular-nums;
+  color: var(--text);
+}
+
+.bc-grid b.expense { color: var(--danger-deep); }
+.bc-grid b.income { color: var(--green-ink); }
+
+.bc-grid small {
+  font-size: 10.5px;
+  color: var(--text-3);
+}
+
+.bc-sentence {
+  margin-top: 8px;
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--text-2);
+}
+
+.tag.gray { background: var(--line-2); color: var(--text-2); }
+
+.di-place {
+  font-size: 11.5px;
+  color: var(--text-3);
+}
+
+.di-coach {
+  margin: 0;
+  padding: 6px 8px;
+  border-radius: 8px;
+  background: var(--green-soft);
+  color: var(--green-ink);
+  font-size: 11.5px;
+  line-height: 1.55;
+}
+
+[data-theme="dark"] .balance-card { background: var(--card); }
+[data-theme="dark"] .bc-grid > div { background: rgba(255, 255, 255, 0.05); }
+[data-theme="dark"] .tag.gray { background: rgba(255, 255, 255, 0.08); }
+[data-theme="dark"] .di-coach { background: rgba(7, 193, 96, 0.14); color: #7BE3AE; }
+
+@media (max-width: 520px) {
+  .bc-grid { grid-template-columns: repeat(2, 1fr); }
+}

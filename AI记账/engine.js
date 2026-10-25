@@ -24,6 +24,11 @@
   var ALTERNATIVES = DATA.ALTERNATIVES;
   var CATEGORY_KEYS = DATA.CATEGORY_KEYS;
   var CATEGORY_KEYWORDS = DATA.CATEGORY_KEYWORDS;
+  var ALL_MERCHANTS = DATA.MERCHANTS;
+  var COOLDOWN_KEYWORDS = DATA.COOLDOWN_KEYWORDS;
+
+  /** 业务规则：餐饮支出占比超过 60% 触发恩格尔预警 */
+  var ENGEL_ALERT_RATIO = 0.6;
 
   var MS_PER_DAY = 24 * 60 * 60 * 1000;
 
@@ -362,7 +367,7 @@
       times: times,
       weeklySave: round2(save * times),
       unit: best.unit,
-      tip: best.timesText
+      tip: best.tip || best.timesText
     };
   }
 
@@ -421,7 +426,49 @@
     var total = num(totalExpense);
     var ratio = total > 0 ? food / total : 0;
     var percent = round2(ratio * 100);
-    return { ratio: ratio, percent: percent, alert: percent > 50 };
+    return { ratio: ratio, percent: percent, alert: percent > 60 };
+  }
+
+  /**
+   * 业务规则 1：从记账语句里提取「商家」（南海北区商家词典，最长词优先）。
+   * @param {string} text 原始语句 / 备注
+   * @return {string} 商家名，未命中返回 ''
+   */
+  function extractMerchant(text) {
+    var s = String(text || '');
+    if (!s) { return ''; }
+    var best = '';
+    var bestLen = 0;
+    for (var i = 0; i < ALL_MERCHANTS.length; i++) {
+      var m = ALL_MERCHANTS[i];
+      for (var j = 0; j < m.words.length; j++) {
+        var w = m.words[j];
+        if (s.indexOf(w) !== -1 && w.length > bestLen) {
+          best = m.key;
+          bestLen = w.length;
+        }
+      }
+    }
+    return best;
+  }
+
+  /**
+   * 业务规则：单笔非刚需支出（游戏充值、盲盒、潮玩、超出日常预算的聚会）命中关键词。
+   * @param {Object|string} billOrText
+   * @return {boolean}
+   */
+  function hitsCooldownKeyword(billOrText) {
+    var text = '';
+    if (typeof billOrText === 'string') {
+      text = billOrText;
+    } else if (billOrText) {
+      text = (billOrText.note || '') + ' ' + (billOrText.category || '');
+    }
+    if (!text) { return false; }
+    for (var i = 0; i < COOLDOWN_KEYWORDS.length; i++) {
+      if (text.indexOf(COOLDOWN_KEYWORDS[i]) !== -1) { return true; }
+    }
+    return false;
   }
 
   /**
@@ -529,6 +576,8 @@
     getAlternative: getAlternative,
     aggregate: aggregate,
     getEngel: getEngel,
+    extractMerchant: extractMerchant,
+    hitsCooldownKeyword: hitsCooldownKeyword,
     getIncomeStats: getIncomeStats,
     getGoalProjection: getGoalProjection
   };
