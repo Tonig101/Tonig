@@ -5,7 +5,7 @@
  *   data.js  -> window.AJ.data
  *   nlp.js   -> window.AJ.nlp
  *   engine.js-> window.AJ.engine
- *   coach.js -> window.AJ.coach（理财教练模式）
+ *   coach.js -> window.AJ.coach（理财专家模式）
  */
 (function (global) {
   'use strict';
@@ -18,10 +18,17 @@
   var OCR = global.AJ.ocr;
   var COACH = global.AJ.coach;
   var DEALS = global.AJ.deals;
+  var SAV = global.AJ.savings;
 
   /* 让 ocr.js 的云端识别走 WorkBuddy 云服务（视觉大模型），而非本地 detectCloud（浏览器直连腾讯云）。
      由 server.py 托管页面时 AJ_BACKEND_OCR 为真，ocr.js 的 detectBackend 会改调云服务。 */
   global.AJ_BACKEND_OCR = true;
+
+  /* 「理财课」聊天卡片最多直接列几条资源：2 个视频 + 1 门课程，正好 3 条，
+     再多会把聊天气泡撑得过长，其余统一引导到理财学院看。
+     learningResources() 已固定 video → course → up 排序，所以这 3 条永远是
+     视频 / 课程，UP 主主页只出现在理财学院与看板卡里。 */
+  var LEARN_INLINE_MAX = 3;
 
   /* WorkBuddy 云服务客户端与能力（由 initCloud() 异步填充）。免密钥，无需任何外部 Key。 */
   var cloudClient = null;        // WorkBuddyCloud 客户端实例
@@ -242,6 +249,11 @@
   var pendingBill = null;
   /** 撤回栈：按记账顺序记录每笔账单 id（仅内存，不持久化）。供「撤回上一步」使用 */
   var undoStack = [];
+  /** 轻量视图历史：记录进入子视图（专家/目标/看板）前的视图（仅内存，不持久化）。供「返回」按钮使用 */
+  var viewHistory = [];
+  /** 双 UI 视图集：完整版四视图 / 简洁版八屏（含 AI 对话记账屏 sai、省钱屏 ssave） */
+  var FULL_VIEWS = { chat: 1, dash: 1, goals: 1, coach: 1 };
+  var SIMPLE_VIEWS = { shome: 1, slist: 1, sbudget: 1, sprofile: 1, sai: 1, scoach: 1, sgoals: 1, ssave: 1 };
 
   /** 账单分析：最近一次导入的原始结果（默认不写入账本） */
   var analysisData = null;
@@ -520,6 +532,101 @@
     if (tip) { tip.hidden = false; }
   }
 
+  /* ------------------------------------------------------------------ */
+  /* 省钱图谱的打卡记录：独立存储键，绝不混进主账本                         */
+  /* ------------------------------------------------------------------ */
+
+  /**
+   * 为什么要单独一个键（而不是塞进 state）：
+   *   ① state 一动 normalizeState() 就要重跑全套账本回归，风险大；
+   *   ② 省钱记录损坏时只应重置自己，不能让用户丢掉真实账单；
+   *   ③ 省钱账是「动作打卡」，与「账单流水」语义不同，合并会让「买对省 X」
+   *      和冷静期「拦下 Y」混为一谈（两个数必须分开显示）。
+   */
+  var SAVINGS_KEY = 'ai_jizhang_savings_v1';
+  var SAVINGS_LOG_MAX = 2000;
+  /** 当前打卡库：{ v, logs:[{id,date,saved,manual,at}], updatedAt } */
+  var savingsDb = { v: 1, logs: [], updatedAt: 0 };
+  var savingsStorageOK = true;
+  /** 存档解析失败时置真，首次打开面板提示一次（只重置自己） */
+  var savingsRecovered = false;
+
+  /**
+   * 打卡记录归一化：任何一条不合法就丢弃那一条，而不是整个库作废。
+   * 规则：id 必须是非空字符串；date 必须是 YYYY-MM-DD；同一 (id,date) 只保留一条；
+   *      saved 非法按 0 处理（`none` 型条目本来就不计金额）。
+   */
+  function normalizeSavingsDb(obj) {
+    var o = (obj && typeof obj === 'object') ? obj : {};
+    var src = Array.isArray(o.logs) ? o.logs : [];
+    var out = [], seen = {}, i;
+    for (i = 0; i < src.length; i++) {
+      var r = src[i];
+      if (!r || typeof r !== 'object') { continue; }
+      var id = (typeof r.id === 'string') ? r.id : '';
+      if (!id) { continue; }
+      var date = (typeof r.date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(r.date)) ? r.date : '';
+      if (!date) { continue; }
+      var key = id + '@' + date;
+      if (seen[key]) { continue; }
+      seen[key] = 1;
+      var saved = Number(r.saved);
+      if (!isFinite(saved) || saved < 0) { saved = 0; }
+      out.push({
+        id: id,
+        date: date,
+        saved: ENG.round2(saved),
+        manual: !!r.manual,
+        at: isFinite(Number(r.at)) ? Number(r.at) : 0
+      });
+    }
+    if (out.length > SAVINGS_LOG_MAX) { out = out.slice(out.length - SAVINGS_LOG_MAX); }
+    return {
+      v: isFinite(Number(o.v)) ? Number(o.v) : 0,
+      logs: out,
+      updatedAt: isFinite(Number(o.updatedAt)) ? Number(o.updatedAt) : 0
+    };
+  }
+
+  function loadSavingsDb() {
+    var raw = null;
+    try {
+      raw = global.localStorage.getItem(SAVINGS_KEY);
+    } catch (e) {
+      savingsStorageOK = false;
+      raw = null;
+    }
+    if (!raw) { savingsDb = { v: 1, logs: [], updatedAt: 0 }; return; }
+
+    try {
+      savingsDb = normalizeSavingsDb(JSON.parse(raw));
+    } catch (e2) {
+      savingsDb = { v: 1, logs: [], updatedAt: 0 };
+      savingsRecovered = true;
+      return;
+    }
+    /* 数据版本变了（条目 id 可能重排）：只保留仍存在的 id，不做整库清空 */
+    var ver = (SAV && SAV.DATA && SAV.DATA.DATA_VERSION) || 1;
+    if (savingsDb.v !== ver) {
+      savingsDb.logs = savingsDb.logs.filter(function (r) { return !!(SAV && SAV.byId && SAV.byId(r.id)); });
+      savingsDb.v = ver;
+      saveSavingsDb();
+    }
+  }
+
+  function saveSavingsDb() {
+    savingsDb.updatedAt = Date.now();
+    if (!savingsStorageOK) { return false; }
+    try {
+      global.localStorage.setItem(SAVINGS_KEY, JSON.stringify(savingsDb));
+      return true;
+    } catch (e) {
+      savingsStorageOK = false;
+      showStorageTip();
+      return false;
+    }
+  }
+
   /* ================================================================== */
   /* 聊天渲染                                                            */
   /* ================================================================== */
@@ -575,12 +682,12 @@
   }
 
   /**
-   * 「💡 理财教练说」卡片（理财教练模式 · 核心格式）。
+   * 「💡 理财专家说」卡片（理财专家模式 · 核心格式）。
    * 记账结果之后触发：娱乐 / 冲动消费 / 高溢价品牌，一条 ≤50 字的建议。
    */
   function coachSayHtml(text) {
     return '<div class="coach-say">' +
-      '<div class="coach-say-head">💡 <b>理财教练说</b></div>' +
+      '<div class="coach-say-head">💡 <b>理财专家说</b></div>' +
       '<div class="coach-say-body">' + esc(text) + '</div>' +
       '</div>';
   }
@@ -778,7 +885,7 @@
     }
 
     var overview = getOverview();
-    // 业务规则 5：每笔都要给到【记账成功】卡片 + 【余额概览】+【理财教练一句话建议】
+    // 业务规则 5：每笔都要给到【记账成功】卡片 + 【余额概览】+【理财专家一句话建议】
     for (i = 0; i < list.length; i++) {
       var bill = list[i];
       var head;
@@ -894,7 +1001,7 @@
   }
 
   /* ================================================================== */
-  /* 理财教练 · 剁手冷静法                                                */
+  /* 理财专家 · 剁手冷静法                                                */
   /* ================================================================== */
 
   /** 剁手冷静法会话状态：{item, price, step, answers}；step 为 0 基索引 */
@@ -909,7 +1016,7 @@
   function renderCoolingIntro() {
     var html =
       '<div class="decision-card cool-card">' +
-      '  <div class="dc-icon cool">🛑</div>' +
+      '  <div class="dc-icon cool"><svg viewBox="0 0 24 24"><use href="#i-stop"/></svg></div>' +
       '  <div class="dc-title">剁手冷静法</div>' +
       '  <div class="dc-sub">想买：' + esc(cooling.item) + '</div>' +
       '  <div class="dc-detail">' + dcRow('方法', '回答 3 个问题，30 秒看清该不该买') + '</div>' +
@@ -930,7 +1037,7 @@
     }
     var html =
       '<div class="decision-card cool-card">' +
-      '  <div class="dc-icon cool">🤔</div>' +
+      '  <div class="dc-icon cool"><svg viewBox="0 0 24 24"><use href="#i-think"/></svg></div>' +
       '  <div class="dc-title">' + esc(stepDef.q) + '</div>' +
       '  <div class="dc-sub">想买：' + esc(cooling.item) + ' · 第 ' + (cooling.step + 1) + ' / 3 问</div>' +
       '  <div class="cool-opts">' + opts + '</div>' +
@@ -955,7 +1062,7 @@
       '  <div class="dc-icon cool">' + v.icon + '</div>' +
       '  <div class="dc-title">' + esc(v.title) + '</div>' +
       '  <div class="dc-sub">想买：' + esc(cooling.item) + '</div>' +
-      '  <div class="dc-detail">' + dcRow('教练判断', esc(v.text)) + '</div>' +
+      '  <div class="dc-detail">' + dcRow('专家判断', esc(v.text)) + '</div>' +
       '  <div class="dc-actions">' + actions + '</div>' +
       '</div>';
     addAIMessage(html);
@@ -1081,13 +1188,14 @@
     renderDashboard();
     renderGoals();
     renderCoachPanel();
+    renderSimple();
   }
 
   /* ================================================================== */
-  /* 理财教练面板渲染                                                     */
+  /* 理财专家面板渲染                                                     */
   /* ================================================================== */
 
-  /** 渲染「理财教练」Tab：专属建议 + 理财学院 */
+  /** 渲染「理财专家」Tab：专属建议 + 理财学院 */
   function renderCoachPanel() {
     renderCoachTips();
     renderCoachAcademy();
@@ -1111,6 +1219,62 @@
     box.innerHTML = html;
   }
 
+  /**
+   * 校验外链协议：只放行 http / https。
+   * 用于知识卡资源区，避免 javascript: / data: 之类可执行协议进入 href。
+   * @param {string} url 待校验地址
+   * @return {string} 合法时返回原地址，否则返回空串
+   */
+  function safeHttpUrl(url) {
+    if (typeof url !== 'string') { return ''; }
+    var v = url.replace(/^\s+|\s+$/g, '');
+    return /^https?:\/\//i.test(v) ? v : '';
+  }
+
+  /**
+   * 渲染单张知识卡的学习资源区（可选字段 resources）。
+   * 无 resources 或全部条目非法时返回空串，保证未挂资源的卡不报错。
+   * @param {Object} lesson 知识卡数据
+   * @return {string} 资源区 HTML 片段
+   */
+  function coachResHtml(lesson) {
+    if (!lesson || !lesson.resources || !lesson.resources.length) { return ''; }
+    var rows = '';
+    for (var i = 0; i < lesson.resources.length; i++) {
+      var r = lesson.resources[i];
+      if (!r || !r.label) { continue; }
+      var label = esc(r.label);
+      var desc = r.desc ? esc(r.desc) : '';
+      if (r.type === 'copy') {
+        var copyText = typeof r.copy === 'string' ? r.copy : '';
+        if (copyText === '') { continue; }
+        rows += '<div class="coach-res-item">' +
+          '<span class="coach-res-main">' +
+          '<span class="coach-res-label">' + label + '</span>' +
+          (desc ? '<span class="coach-res-desc">' + desc + '</span>' : '') +
+          '</span>' +
+          '<button type="button" class="coach-res-copy" data-copy="' + esc(copyText) + '">复制</button>' +
+          '</div>';
+        continue;
+      }
+      var href = safeHttpUrl(r.url);
+      if (href === '') { continue; }
+      rows += '<a class="coach-res-item" href="' + esc(href) + '" target="_blank" rel="noopener noreferrer">' +
+        '<span class="coach-res-main">' +
+        '<span class="coach-res-label">' + label + '</span>' +
+        (desc ? '<span class="coach-res-desc">' + desc + '</span>' : '') +
+        '</span>' +
+        '<span class="coach-res-go" aria-hidden="true">↗</span>' +
+        '</a>';
+    }
+    var note = lesson.resNote ? esc(lesson.resNote) : '';
+    if (rows === '' && note === '') { return ''; }
+    return '<div class="coach-res">' +
+      (rows !== '' ? '<div class="coach-res-title">学习资源</div>' + rows : '') +
+      (note !== '' ? '<div class="coach-res-note">' + note + '</div>' : '') +
+      '</div>';
+  }
+
   /** 理财学院：可折叠知识卡（COACH.ACADEMY） */
   function renderCoachAcademy() {
     var box = $('coachAcademy');
@@ -1125,29 +1289,109 @@
         '<span class="coach-lesson-tag">' + esc(l.tag) + '</span>' +
         '<span class="coach-lesson-arrow">›</span>' +
         '</button>' +
-        '<div class="coach-lesson-body">' + l.body.split('\n').map(esc).join('<br>') + '</div>' +
+        '<div class="coach-lesson-body">' +
+        l.body.split('\n').map(esc).join('<br>') +
+        coachResHtml(l) +
+        '</div>' +
         '</div>';
     }
     box.innerHTML = html;
   }
 
-  /** 教练问答入口：「怎么省钱」 */
+  /**
+   * 降级复制：临时 textarea + document.execCommand('copy')。
+   * 用于非 https 环境或浏览器不支持 Clipboard API 的情况。
+   * @param {string} text 要复制的文本
+   * @return {boolean} 是否复制成功
+   */
+  function coachLegacyCopy(text) {
+    if (!DOC || !DOC.body || typeof DOC.execCommand !== 'function') { return false; }
+    var ta = DOC.createElement('textarea');
+    var ok = false;
+    ta.value = text;
+    ta.setAttribute('readonly', 'readonly');
+    ta.style.position = 'fixed';
+    ta.style.top = '0';
+    ta.style.left = '-9999px';
+    ta.style.opacity = '0';
+    DOC.body.appendChild(ta);
+    try {
+      ta.focus();
+      ta.select();
+      if (typeof ta.setSelectionRange === 'function') { ta.setSelectionRange(0, text.length); }
+      ok = DOC.execCommand('copy') === true;
+    } catch (err) {
+      ok = false;
+    }
+    if (ta.parentNode) { ta.parentNode.removeChild(ta); }
+    return ok;
+  }
+
+  /**
+   * 复制文本：优先 Clipboard API，失败或不可用时降级。
+   * @param {string} text 要复制的文本
+   * @param {Function} done 回调，参数为是否成功（boolean）
+   */
+  function coachClipboardWrite(text, done) {
+    var nav = global.navigator;
+    if (nav && nav.clipboard && typeof nav.clipboard.writeText === 'function') {
+      try {
+        var p = nav.clipboard.writeText(text);
+        if (p && typeof p.then === 'function') {
+          p.then(function () { done(true); }, function () { done(coachLegacyCopy(text)); });
+          return;
+        }
+        done(true);
+        return;
+      } catch (err) {
+        /* 少数浏览器会同步抛错（非安全上下文），继续走降级 */
+      }
+    }
+    done(coachLegacyCopy(text));
+  }
+
+  /**
+   * 知识卡资源区「复制」按钮：复制 data-copy 文本并给出反馈。
+   * 成功后按钮文案短暂变为「已复制」，1.5s 后恢复；重复点击重新计时。
+   * @param {Element} btn 触发复制的按钮
+   */
+  function coachCopyResource(btn) {
+    var text = btn && btn.getAttribute ? (btn.getAttribute('data-copy') || '') : '';
+    if (text === '') { return; }
+    coachClipboardWrite(text, function (ok) {
+      if (!ok) {
+        showToast('复制失败，请手动记下「' + text + '」再去抖音搜索', 'warn');
+        return;
+      }
+      if (btn.__copyTimer) { clearTimeout(btn.__copyTimer); }
+      btn.textContent = '已复制';
+      btn.classList.add('is-done');
+      showToast('已复制「' + text + '」，打开抖音搜索即可', 'ok');
+      btn.__copyTimer = setTimeout(function () {
+        btn.textContent = '复制';
+        btn.classList.remove('is-done');
+        btn.__copyTimer = null;
+      }, 1500);
+    });
+  }
+
+  /** 专家问答入口：「怎么省钱」 */
   function showSaveMoneyGuide() {
     addAIMessage('<div class="bubble ai coach-bubble">' + COACH.saveMoneyAnswer() + '</div>');
   }
 
-  /** 教练问答入口：「怎么赚钱」 */
+  /** 专家问答入口：「怎么赚钱」 */
   function showMakeMoneyGuide() {
     addAIMessage('<div class="bubble ai coach-bubble">' + COACH.makeMoneyAnswer() + '</div>');
   }
 
-  /** 教练问答入口：「剁手冷静法」——方法说明 + 立即测试 */
+  /** 专家问答入口：「剁手冷静法」——方法说明 + 立即测试 */
   function showCoolingGuide() {
     var lesson = null;
     for (var i = 0; i < COACH.ACADEMY.length; i++) {
       if (COACH.ACADEMY[i].id === 'cooldown') { lesson = COACH.ACADEMY[i]; break; }
     }
-    var html = '<div class="coach-qa-title">🛑 剁手冷静法 · 48 小时法则</div>';
+    var html = '<div class="coach-qa-title"><svg class="cq-ico" viewBox="0 0 24 24"><use href="#i-stop"/></svg>剁手冷静法 · 48 小时法则</div>';
     if (lesson) {
       html += '<div class="coach-qa-body">' + lesson.body.split('\n').map(esc).join('<br>') + '</div>';
     }
@@ -1157,12 +1401,95 @@
     addAIMessage('<div class="bubble ai coach-bubble">' + html + '</div>');
   }
 
-  /** 教练面板「问教练」按钮：切回聊天，给出教练能回答的问题入口 */
+  /**
+   * 把「理财学院」区块滚到专家面板可视区顶部。
+   * 优先滚动专家面板自己的滚动容器（.coach-scroll），避免整页跳动；
+   * 找不到容器时降级为 scrollIntoView({block:'start'})，再降级到 scrollIntoView(true)。
+   */
+  function scrollAcademyIntoView() {
+    var box = $('coachAcademy');
+    if (!box) { return; }
+    var scroller = box.parentNode;
+    while (scroller && scroller !== DOC.body &&
+      !(scroller.classList && scroller.classList.contains('coach-scroll'))) {
+      scroller = scroller.parentNode;
+    }
+    var hasScroller = !!(scroller && scroller.classList &&
+      scroller.classList.contains('coach-scroll'));
+    if (hasScroller && typeof box.getBoundingClientRect === 'function' &&
+      typeof scroller.getBoundingClientRect === 'function') {
+      var delta = box.getBoundingClientRect().top - scroller.getBoundingClientRect().top;
+      var top = scroller.scrollTop + delta - 8;
+      scroller.scrollTop = top > 0 ? top : 0;
+      return;
+    }
+    if (typeof box.scrollIntoView === 'function') {
+      try {
+        box.scrollIntoView({ block: 'start' });
+      } catch (err) {
+        box.scrollIntoView(true);
+      }
+    }
+  }
+
+  /**
+   * 进入理财学院并定位到学院区。
+   * 视图映射交给 switchView（简洁版自动映射到 scoach），此处不硬编码视图名。
+   */
+  function openAcademy() {
+    switchView('coach');
+    scrollAcademyIntoView();
+  }
+
+  /**
+   * 聊天入口：「理财课」——直接列 3 条视频 / 课程资源 + 一键跳理财学院。
+   * 学习资源里排在后面的 UP 主主页不进气泡（LEARN_INLINE_MAX 上限不变），
+   * 只在底部小字里提示「另有 2 位省钱博主」，避免气泡被撑长。
+   * 不切视图，避免打断正在看聊天记录的用户；链接统一过 safeHttpUrl。
+   */
+  function showLearnGuide() {
+    var list = (COACH && typeof COACH.learningResources === 'function')
+      ? COACH.learningResources()
+      : [];
+    var rows = '';
+    var shown = 0;
+    for (var i = 0; i < list.length && shown < LEARN_INLINE_MAX; i++) {
+      var href = safeHttpUrl(list[i].url);
+      if (href === '') { continue; }
+      rows += '<a class="coach-res-item" href="' + esc(href) + '" target="_blank" rel="noopener noreferrer">' +
+        '<span class="coach-res-main">' +
+        '<span class="coach-res-label">' + esc(list[i].label) + '</span>' +
+        (list[i].desc ? '<span class="coach-res-desc">' + esc(list[i].desc) + '</span>' : '') +
+        '</span>' +
+        '<span class="coach-res-go" aria-hidden="true">↗</span>' +
+        '</a>';
+      shown++;
+    }
+
+    var html = '<div class="coach-qa-title">' +
+      '<svg class="cq-ico" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-cap"/></svg>' +
+      '理财课 · 视频学习</div>';
+    if (rows === '') {
+      html += '<div class="coach-qa-body">学习资源暂时没加载出来，刷新页面再试，' +
+        '或者去「理财学院」翻知识卡。</div>';
+    } else {
+      html += '<div class="coach-qa-body"><div class="coach-res">' + rows + '</div></div>';
+    }
+    html += '<div class="coach-qa-foot">' +
+      '视频源为公开 B 站内容、经镜像站转发（打不开就去 B 站搜同名标题）；课程为中国大学 MOOC 官方页面。' +
+      '另有 2 位 B 站省钱博主主页，在理财学院查看。</div>';
+    html += '<div class="coach-qa-actions">' +
+      '<button type="button" class="btn-mini primary" data-act="learn-all">去理财学院看全部（含 2 位省钱博主）›</button>' +
+      '</div>';
+    addAIMessage('<div class="bubble ai coach-bubble">' + html + '</div>');
+  }
+
+  /** 专家面板「问专家」按钮：切回聊天，给出专家能回答的问题入口 */
   function showAskCoachIntro() {
     switchView('chat');
     addAIMessage(
       '<div class="bubble ai coach-bubble">' +
-      '<div class="coach-qa-title">🎓 理财教练 · 可以这样问我</div>' +
+      '<div class="coach-qa-title"><svg class="cq-ico" viewBox="0 0 24 24"><use href="#i-cap"/></svg>理财专家 · 可以这样问我</div>' +
       '<div class="coach-qa-chips">' +
       '<button type="button" class="chip" data-cmd="怎么省钱">怎么省钱</button>' +
       '<button type="button" class="chip" data-cmd="怎么赚钱">怎么赚钱</button>' +
@@ -1202,6 +1529,37 @@
   }
 
   /**
+   * 看板「理财课 · 视频与博主」卡：把理财学院里的视频 / 课程 / B 站 UP 主主页
+   * 直接摊在看板上（不再截断，当前 3 条视频课程 + 2 位博主共 5 条）。
+   * 数据来自 COACH.learningResources()（单一数据源，不复制链接）；
+   * 一旦所有地址都不合法（safeHttpUrl 返回空串）就整卡隐藏，不留空壳。
+   */
+  function renderLearnCard() {
+    var card = $('learnCard');
+    var box = $('learnMini');
+    if (!card || !box) { return; }
+    var list = (COACH && typeof COACH.learningResources === 'function')
+      ? COACH.learningResources()
+      : [];
+    var rows = '';
+    for (var i = 0; i < list.length; i++) {
+      var r = list[i];
+      var href = safeHttpUrl(r.url);
+      if (href === '') { continue; }
+      rows += '<a class="learn-item" href="' + esc(href) + '" target="_blank" rel="noopener noreferrer">' +
+        '<span class="learn-main">' +
+        '<span class="learn-label">' + esc(r.label) + '</span>' +
+        (r.desc ? '<span class="learn-desc">' + esc(r.desc) + '</span>' : '') +
+        '</span>' +
+        (r.type === 'up' ? '<span class="learn-badge">主页</span>' : '') +
+        '<span class="learn-go" aria-hidden="true">↗</span>' +
+        '</a>';
+    }
+    box.innerHTML = rows;
+    card.hidden = (rows === '');
+  }
+
+  /**
    * 常驻预算状态条 + 看板预算卡状态芯片。
    * 与看板共用 getOverview()，任何视图（聊天/看板/目标）下都保持最新，
    * 解决原设计「聊天时看不到核心预算」的问题。
@@ -1236,6 +1594,7 @@
 
     renderBudgetBar(ov);
     renderDealsMini();
+    renderSavingsMini(ov);
 
     /* ---- 预算环 ---- */
     var ring = $('ringBar');
@@ -1264,6 +1623,9 @@
 
     /* ---- 收支概览 ---- */
     renderIncomeCard(ov);
+
+    /* ---- 理财课 · 视频（看板常驻入口） ---- */
+    renderLearnCard();
 
     /* ---- 恩格尔 ---- */
     var engelCard = $('engelCard');
@@ -1462,6 +1824,212 @@
   }
 
   /* ================================================================== */
+  /* 简洁版 · 日常型（单功能单屏）渲染                                     */
+  /* ================================================================== */
+
+  var SP_QUICK_CATS = ['餐饮', '交通', '购物', '其他'];
+  var SP_CAT_ICON = {
+    '餐饮': 'i-cat-food', '社交': 'i-cat-social', '购物': 'i-cat-shop', '学习': 'i-cat-study', '交通': 'i-cat-transit',
+    '娱乐': 'i-cat-fun', '居住': 'i-cat-home', '医疗': 'i-cat-med', '其他': 'i-cat-other', '收入': 'i-cat-income'
+  };
+  var simpleListYM = null; /* {y, m} 明细页当前月份 */
+
+  function spIsIncome(b) { return b.type === 'income'; }
+  function spCatIcon(cat) {
+    var k = SP_CAT_ICON[cat] || 'i-cat-other';
+    return '<svg class="cat-ico" viewBox="0 0 24 24"><use href="#' + k + '"/></svg>';
+  }
+  function spTimeOf(b) {
+    if (!b.createdAt) { return ''; }
+    var d = new Date(b.createdAt);
+    var h = d.getHours(), m = d.getMinutes();
+    return (h < 10 ? '0' : '') + h + ':' + (m < 10 ? '0' : '') + m;
+  }
+
+  /** 简洁版四屏统一渲染入口（与完整版共用同一套账单/预算数据） */
+  function renderSimple() {
+    renderSimpleHome();
+    renderSimpleList();
+    renderSimpleBudget();
+    renderSimpleProfile();
+    checkRadioGroup('spUiMode', getUiMode());
+    /* 停在「省钱」屏时，账本变化（入账 / 打卡）也要同步到面板，避免看到旧数字 */
+    if (DOC.body && DOC.body.getAttribute('data-view') === 'ssave') { renderSaveHubPanel(); }
+  }
+
+  function spBillListHtml(bills, emptyText) {
+    if (!bills.length) { return '<li class="sp-empty">' + esc(emptyText || '暂无记录') + '</li>'; }
+    var html = '';
+    var i;
+    for (i = 0; i < bills.length; i++) {
+      var b = bills[i];
+      var inc = spIsIncome(b);
+      var cat = inc ? '收入' : b.category;
+      var title = inc ? (b.source || b.note || '收入') : (b.note || b.category);
+      var time = spTimeOf(b);
+      html += '<li class="sp-bill">' +
+        '<span class="sp-bill-ico" style="background:' + (inc ? '#07C160' : categoryColor(b.category)) + '1f">' + spCatIcon(cat) + '</span>' +
+        '<span class="sp-bill-main"><b>' + esc(title) + '</b><small>' +
+        (time ? esc(time) + ' · ' : '') + esc(cat) + '</small></span>' +
+        '<span class="sp-bill-amt' + (inc ? ' inc' : '') + '">' + (inc ? '+' : '-') + money(b.amount) + '</span>' +
+        '</li>';
+    }
+    return html;
+  }
+
+  /** 记账（首页）：剩余金额 + 快捷分类 + 今日流水 */
+  function renderSimpleHome() {
+    var ov = getOverview();
+    var bs = ov.budgetState;
+    $('spRemain').textContent = money(bs.remaining);
+    $('spDaily').textContent = money(bs.dailyAllowance);
+    var d = ov.today;
+    var week = ['日', '一', '二', '三', '四', '五', '六'][d.getDay()];
+    $('spDateLine').textContent = (d.getMonth() + 1) + '月' + d.getDate() + '日 周' + week + ' · 今天想记点什么？';
+    var q = '';
+    var i;
+    for (i = 0; i < SP_QUICK_CATS.length; i++) {
+      var c = SP_QUICK_CATS[i];
+      q += '<button type="button" class="sp-q" data-cat="' + esc(c) + '">' +
+        '<span class="sp-q-ico" style="background:' + categoryColor(c) + '1f;color:' + categoryColor(c) + '">' + spCatIcon(c) + '</span>' +
+        esc(c) + '</button>';
+    }
+    $('spQuick').innerHTML = q;
+    var today = ov.todayStr;
+    var todays = state.bills.filter(function (b) { return b.date === today; })
+      .sort(function (a, b) { return (b.createdAt || 0) - (a.createdAt || 0); });
+    $('spTodayBills').innerHTML = spBillListHtml(todays, '今天还没有记账，点「记一笔」开始吧');
+  }
+
+  /** 明细：按月分组流水 + 收支汇总 */
+  function renderSimpleList() {
+    var now = new Date();
+    if (!simpleListYM) { simpleListYM = { y: now.getFullYear(), m: now.getMonth() }; }
+    var y = simpleListYM.y, m = simpleListYM.m;
+    $('spMonthLabel').textContent = y + '年' + (m + 1) + '月';
+    var prefix = y + '-' + (m + 1 < 10 ? '0' : '') + (m + 1) + '-';
+    var monthBills = state.bills.filter(function (b) { return b.date.indexOf(prefix) === 0; });
+    var exp = 0, inc = 0, i;
+    for (i = 0; i < monthBills.length; i++) {
+      if (spIsIncome(monthBills[i])) { inc += monthBills[i].amount; } else { exp += monthBills[i].amount; }
+    }
+    $('spMExpense').textContent = money(ENG.round2(exp));
+    $('spMIncome').textContent = money(ENG.round2(inc));
+    var byDate = {};
+    monthBills.forEach(function (b) { (byDate[b.date] = byDate[b.date] || []).push(b); });
+    var dates = Object.keys(byDate).sort().reverse();
+    if (!dates.length) {
+      $('spListBody').innerHTML = '<div class="sp-empty sp-empty-block">本月还没有记账，记一笔就会出现在这里</div>';
+      return;
+    }
+    var todayStr = ENG.formatDate(new Date());
+    var yestStr = ENG.formatDate(new Date(Date.now() - 86400000));
+    var html = '';
+    for (i = 0; i < dates.length; i++) {
+      var ds = dates[i];
+      var label = ds === todayStr ? '今天' : (ds === yestStr ? '昨天' : ds);
+      var de = 0, di = 0;
+      byDate[ds].forEach(function (b) { if (spIsIncome(b)) { di += b.amount; } else { de += b.amount; } });
+      var net = ENG.round2(di - de);
+      var sumTxt = (net >= 0 ? '+' : '-') + money(Math.abs(net));
+      html += '<div class="sp-day"><div class="sp-day-head"><b>' + esc(label) + '</b><span>' + sumTxt + '</span></div>' +
+        '<ul class="sp-bills">' + spBillListHtml(byDate[ds].sort(function (a, b) { return (b.createdAt || 0) - (a.createdAt || 0); })) + '</ul></div>';
+    }
+    $('spListBody').innerHTML = html;
+  }
+
+  /** 预算：环形图 + 分类占比 */
+  function renderSimpleBudget() {
+    var ov = getOverview();
+    var bs = ov.budgetState;
+    var total = state.budget.total;
+    var spent = ov.cycleAgg.expense;
+    var pct = total > 0 ? Math.min(100, Math.round(spent / total * 100)) : 0;
+    $('spRingPct').textContent = pct + '%';
+    $('spSpent').textContent = money(spent);
+    $('spTotal').textContent = money(total);
+    $('spBRemain').textContent = money(bs.remaining);
+    $('spBDaily').textContent = money(bs.dailyAllowance);
+    $('spBDays').textContent = ov.cycle.remainingDays + ' 天';
+    var ring = $('spRingBar');
+    var C = 2 * Math.PI * 58;
+    var ratio = total > 0 ? Math.max(0, Math.min(1, spent / total)) : 0;
+    if (ring) {
+      ring.style.strokeDasharray = C + ' ' + C;
+      ring.style.strokeDashoffset = String(C * (1 - ratio));
+      ring.style.stroke = pct >= 90 ? '#EF5350' : (pct >= 70 ? '#FF8A3D' : '#07C160');
+    }
+    var slices = getCategorySlices(ov.cycleAgg.byCategory);
+    var h = '';
+    if (!slices.length) { h = '<li class="sp-empty">本周期还没有支出记录</li>'; }
+    var i;
+    for (i = 0; i < slices.length; i++) {
+      var p = spent > 0 ? Math.round(slices[i].value / spent * 100) : 0;
+      h += '<li><span class="sp-cb-name"><i class="sp-cb-dot" style="background:' + slices[i].color + '"></i>' + esc(slices[i].key) + '</span>' +
+        '<span class="sp-cb-bar"><i style="width:' + p + '%;background:' + slices[i].color + '"></i></span>' +
+        '<span class="sp-cb-pct">' + p + '%</span></li>';
+    }
+    $('spCatBars').innerHTML = h;
+  }
+
+  /** 我的：资料卡 + 统计 + 界面风格切换 + 菜单 */
+  function renderSimpleProfile() {
+    var pf = getSettings().profile || {};
+    $('spPAva').textContent = pf.avatar || '我';
+    $('spPName').textContent = pf.nickname || '记账小助手';
+    var dates = {};
+    var i;
+    for (i = 0; i < state.bills.length; i++) { dates[state.bills[i].date] = 1; }
+    $('spStatDays').textContent = Object.keys(dates).length;
+    var now = new Date();
+    var prefix = now.getFullYear() + '-' + (now.getMonth() + 1 < 10 ? '0' : '') + (now.getMonth() + 1) + '-';
+    var cnt = 0;
+    for (i = 0; i < state.bills.length; i++) { if (state.bills[i].date.indexOf(prefix) === 0) { cnt++; } }
+    $('spStatCount').textContent = cnt;
+    $('spStatSaved').textContent = money(state.savedMoney || 0);
+  }
+
+  /** 简洁版各屏事件绑定（在 init 里调用一次） */
+  function bindSimpleEvents() {
+    $('tabbarSimple').addEventListener('click', function (e) {
+      /* 省钱已是普通视图（data-view="ssave"），这里只需处理 data-view，
+         不再有弹层分支：切换与高亮统一由 switchView 负责。 */
+      var tab = e.target.closest ? e.target.closest('.tab[data-view]') : null;
+      if (tab) { switchView(tab.getAttribute('data-view')); }
+    });
+    $('spBtnAdd').addEventListener('click', function () { openQuickAddModal(); });
+    $('spBtnAi').addEventListener('click', function () { switchView('sai'); });
+    $('spBtnMe').addEventListener('click', function () { switchView('sprofile'); });
+    $('spQuick').addEventListener('click', function (e) {
+      var q = e.target.closest ? e.target.closest('.sp-q[data-cat]') : null;
+      if (q) { openQuickAddModal(q.getAttribute('data-cat')); }
+    });
+    $('spMonthPrev').addEventListener('click', function () {
+      simpleListYM.m--; if (simpleListYM.m < 0) { simpleListYM.m = 11; simpleListYM.y--; }
+      renderSimpleList();
+    });
+    $('spMonthNext').addEventListener('click', function () {
+      simpleListYM.m++; if (simpleListYM.m > 11) { simpleListYM.m = 0; simpleListYM.y++; }
+      renderSimpleList();
+    });
+    $('spBtnBudget').addEventListener('click', openDrawer);
+    $('spMenuBudget').addEventListener('click', openDrawer);
+    $('spMenuCoach').addEventListener('click', function () { switchView('scoach'); });
+    $('spMenuGoals').addEventListener('click', function () { switchView('sgoals'); });
+    $('spGoalsBack').addEventListener('click', function () { goBackView(); });
+    $('spMenuExport').addEventListener('click', function () { exportAllCsv(); });
+    $('spMenuAi').addEventListener('click', function () { switchView('sai'); });
+    $('spMenuSaveHub').addEventListener('click', function () { switchView('ssave'); });
+    $('spMenuAbout').addEventListener('click', openTermsModal);
+    $('btnAiBack').addEventListener('click', function () { goBackView(); });
+    $('spUiSeg').addEventListener('change', function (e) {
+      var input = (e.target && e.target.closest) ? e.target.closest('input[name="spUiMode"]') : null;
+      if (!input) { return; }
+      setUiMode(input.value);
+    });
+  }
+
+  /* ================================================================== */
   /* 目标池                                                              */
   /* ================================================================== */
 
@@ -1502,7 +2070,7 @@
         '<span class="goal-name">' + esc(g.name) + '</span>' +
         '<span class="goal-actions">' +
         '<button type="button" class="btn-mini" data-goal-add="' + esc(g.id) + '">+ 存钱</button>' +
-        '<button type="button" class="goal-del" data-goal-del="' + esc(g.id) + '" title="删除目标">✕</button>' +
+        '<button type="button" class="goal-del" data-goal-del="' + esc(g.id) + '" title="删除目标"><svg viewBox="0 0 24 24"><use href="#i-trash"/></svg></button>' +
         '</span>' +
         '</div>' +
         '<div class="goal-bar"><i style="width:' + p.percent + '%"></i></div>' +
@@ -1563,7 +2131,7 @@
    * 快捷记账面板（顶栏「＋ 记一笔」）：金额 / 分类 / 备注 / 日期。
    * 直接走 commitBill 落账，提交后聊天空出回执、预算条即时刷新。
    */
-  function openQuickAddModal() {
+  function openQuickAddModal(presetCategory) {
     var todayStr = ENG.formatDate(new Date());
     var options = '';
     var i;
@@ -1605,6 +2173,10 @@
     setTimeout(function () {
       var amountInput = box.querySelector('#qaAmount');
       if (amountInput) { amountInput.focus(); }
+      if (presetCategory) {
+        var catSel = box.querySelector('#qaCategory');
+        if (catSel) { catSel.value = presetCategory; }
+      }
     }, 50);
   }
 
@@ -1886,13 +2458,53 @@
     return (state && state.uiMode === 'simple') ? 'simple' : 'full';
   }
 
-  /** 把 UI 类型应用到 <body data-ui-mode>，并处理不可见视图的回退 */
+  /** 把 UI 类型应用到 <body data-ui-mode>，并在两套界面间切换到合法默认视图 */
   function applyUiMode() {
     var mode = getUiMode();
     DOC.body.setAttribute('data-ui-mode', mode);
-    if (mode === 'simple') {
-      var v = DOC.body.getAttribute('data-view');
-      if (v === 'coach' || v === 'goals') { switchView('dash'); }
+    mountShellPanels();
+    var v = DOC.body.getAttribute('data-view');
+    var ok = (mode === 'simple') ? SIMPLE_VIEWS[v] : FULL_VIEWS[v];
+    if (!ok) { switchView(mode === 'simple' ? 'shome' : 'chat'); }
+    renderSimple();
+  }
+
+  /** 双 UI 挂载：简洁版把聊天面板、专家面板、省钱面板、目标卡移进简洁外壳
+   *  （分别作为 AI 对话记账 / 理财专家 / 省钱 / 攒钱目标四屏）；完整版移回双栏布局原位与弹层里。
+   *  节点移动不破坏其内部事件绑定与按 ID 的渲染。 */
+  function mountShellPanels() {
+    var simple = (getUiMode() === 'simple');
+    var chat = $('panelChat');
+    var coach = $('panelCoach');
+    var goal = $('goalCard');
+    var shell = $('simpleShell');
+    var layout = $('panelDash') && $('panelDash').parentNode;
+    var dashScroll = $('panelDash') && $('panelDash').querySelector('.dash-scroll');
+    var goalsBody = $('spGoalsBody');
+    var saveSheet = $('saveHubSheet');
+    var saveBody = $('spSaveBody');
+    var saveMask = $('saveHubMask');
+    if (simple && shell) {
+      if (chat && chat.parentNode !== shell) { shell.insertBefore(chat, $('tabbarSimple')); }
+      if (coach && coach.parentNode !== shell) { shell.insertBefore(coach, $('tabbarSimple')); }
+      if (goal && goalsBody && goal.parentNode !== goalsBody) { goalsBody.appendChild(goal); }
+      /* 省钱面板：简洁版是独立页面，整块搬进 #spSaveBody（不再是弹层）。
+         搬走后遮罩里就没有内容，必须强制收起，否则会留下空遮罩盖住页面。 */
+      if (saveSheet && saveBody) {
+        if (saveSheet.parentNode !== saveBody) { saveBody.appendChild(saveSheet); }
+        /* 作为普通区块时它不是模态对话框，避免读屏软件报「模态」 */
+        saveSheet.setAttribute('aria-modal', 'false');
+        if (saveMask) { saveMask.hidden = true; }
+      }
+    } else if (layout) {
+      if (chat && chat.parentNode !== layout) { layout.insertBefore(chat, $('panelDash')); }
+      if (coach && coach.parentNode !== layout) { layout.appendChild(coach); }
+      if (goal && dashScroll && goal.parentNode !== dashScroll) { dashScroll.appendChild(goal); }
+      /* 完整版：省钱面板回到遮罩里，恢复弹层语义 */
+      if (saveSheet) {
+        if (saveMask && saveSheet.parentNode !== saveMask) { saveMask.appendChild(saveSheet); }
+        saveSheet.setAttribute('aria-modal', 'true');
+      }
     }
   }
 
@@ -1901,6 +2513,8 @@
     if (mode !== 'simple' && mode !== 'full') { return; }
     if (!state) { return; }
     state.uiMode = mode;
+    // 两套界面的视图互不通用，清空历史避免「返回」落到另一套界面的视图上
+    viewHistory.length = 0;
     saveState();
     applyUiMode();
     showToast(mode === 'simple' ? '已切换到简洁版（日常型）' : '已切换到完整版（报表型）', 'ok');
@@ -2670,7 +3284,7 @@
         : '还没有解析出有效记录。';
     }
     return '<div class="parse-fail">' +
-      '<div class="pf-emoji">😕</div>' +
+      '<div class="pf-emoji"><svg viewBox="0 0 24 24"><use href="#i-sad"/></svg></div>' +
       '<div class="pf-title">这份文件没能解析出账单记录</div>' +
       lines +
       '<p class="pf-tip">常见原因：① 导出时选了 <b>PDF / Excel</b>，请改选 <b>CSV</b>；' +
@@ -3699,17 +4313,10 @@
     if (act === 'record') { recordDealBill(); return; }
   }
 
-  function openDealsSheet(tab) {
-    if (!dealsReady()) {
-      addAIMessage(aiBubble('省钱雷达模块没加载起来，刷新一下页面再试。'));
-      return;
-    }
-    dealsTab = tab || dealsTab || 'today';
-    $('dealsMask').hidden = false;
-    renderDealsSheet();
-  }
+  /* 省钱雷达入口已并入「省钱」面板：这里只做薄封装，调用点全部保持不变 */
+  function openDealsSheet(tab) { openSaveHub('radar', tab); }
 
-  function closeDealsSheet() { $('dealsMask').hidden = true; }
+  function closeDealsSheet() { closeSaveHub(); }
 
   function renderDealsSheet() {
     var d = dealsNow();
@@ -3868,7 +4475,7 @@
       '<input class="dc-ship" type="number" inputmode="decimal" placeholder="运费" value="' + esc(r.ship) + '" />' +
       '<input class="dc-coupon" type="number" inputmode="decimal" placeholder="券" value="' + esc(r.coupon) + '" />' +
       '<input class="dc-need" type="number" inputmode="numeric" placeholder="需买N件" value="' + esc(r.need) + '" />' +
-      (idx > 0 ? '<button class="dc-del" type="button" data-del-row="' + idx + '" aria-label="删除这行">✕</button>' : '<span class="dc-del-ph"></span>') +
+      (idx > 0 ? '<button class="dc-del" type="button" data-del-row="' + idx + '" aria-label="删除这行"><svg viewBox="0 0 24 24"><use href="#i-trash"/></svg></button>' : '<span class="dc-del-ph"></span>') +
       '</div></div>';
   }
 
@@ -4014,13 +4621,13 @@
     return '<div class="deals-about">' +
       '<div class="deals-sec">数据从哪来（三条路径，各自标注）</div>' +
       '<div class="deal-item">' +
-      '<div class="di-head"><span class="di-emoji">🧮</span><b>路径三 · 真实日期算法</b><span class="di-tag">已实现</span></div>' +
+      '<div class="di-head"><svg class="di-emoji" viewBox="0 0 24 24"><use href="#i-abacus"/></svg><b>路径三 · 真实日期算法</b><span class="di-tag">已实现</span></div>' +
       '<p>疯狂星期四 = <code>weekday()==3</code>（周四）、麦当劳「13.9 元随心配」= 每周一、瑞幸 / 库迪 9.9 元 = 每周二、双11 = 11-11。' +
       '日期全部由代码算出，指定任意日期都能算出下一次是哪天，不依赖网络、不会过期。</p>' +
       '<p class="di-how">产出：14 天日历 + 「真实商家日历.csv」（可下载，Excel 直接打开）</p>' +
       '</div>' +
       '<div class="deal-item">' +
-      '<div class="di-head"><span class="di-emoji">🔌</span><b>路径二 · 比价 API</b><span class="di-tag">已实现</span></div>' +
+      '<div class="di-head"><svg class="di-emoji" viewBox="0 0 24 24"><use href="#i-plug"/></svg><b>路径二 · 比价 API</b><span class="di-tag">已实现</span></div>' +
       '<p>本机有一套同口径引擎（前端 deals.js / 后端 deals_engine.py + deals_api.py），' +
       '把「标价 + 运费 − 券 × 件数」算成到手价，再按规格折单价、判定可比性。' +
       '大模型可以通过 HTTP 直接调这些接口，不用自己算数。</p>' +
@@ -4028,7 +4635,7 @@
       '<code>/api/deals/compare</code> <code>/api/deals/quote</code> <code>/api/deals/ask</code></p>' +
       '</div>' +
       '<div class="deal-item">' +
-      '<div class="di-head"><span class="di-emoji">🤖</span><b>路径一 · 大模型 + 工具调用</b><span class="di-tag">已实现</span></div>' +
+      '<div class="di-head"><svg class="di-emoji" viewBox="0 0 24 24"><use href="#i-robot"/></svg><b>路径一 · 大模型 + 工具调用</b><span class="di-tag">已实现</span></div>' +
       '<p>后端 <code>/api/deals/ask</code> 用 tool-calling 把「查日历、算比价」注册成工具，' +
       '模型先调工具拿真实日期与计算结果，再组织成一句话——不是让模型凭记忆瞎说。' +
       '没配大模型时自动降级为本地确定性回答。</p>' +
@@ -4107,6 +4714,726 @@
   }
 
   /* ================================================================== */
+  /* 省钱图谱：今日清单 / 100 条图谱 / 打卡省钱账                          */
+  /* ================================================================== */
+
+  var savingsTab = 'today';
+  var savingsCat = '';
+  var savingsQuery = '';
+  /** 图谱里已展开详情的条目 id（仅内存，不持久化） */
+  var savingsOpen = {};
+  /** 省钱账是否展开全部记录（默认只显示最近 12 条） */
+  var savingsBookAll = false;
+  /** 正在手改金额的那条记录 { id, date } | null —— 只影响渲染，不持久化 */
+  var savingsEdit = null;
+
+  function savingsReady() { return !!(SAV && SAV.READY); }
+
+  /**
+   * 今日清单的上下文：把账本信息翻译成引擎需要的打分条件。
+   * 这样「你 62% 的钱花在餐饮」才能反过来决定推哪几条动作。
+   */
+  function savingsCtx(ov) {
+    ov = ov || getOverview();
+    var byCat = ov.cycleAgg.byCategory || {};
+    var topCat = '', topVal = 0, k;
+    for (k in byCat) {
+      if (!Object.prototype.hasOwnProperty.call(byCat, k)) { continue; }
+      if (byCat[k] > topVal) { topVal = byCat[k]; topCat = k; }
+    }
+    return {
+      now: new Date(),
+      logs: savingsDb.logs,
+      topCat: topCat,
+      catSpend: byCat,
+      budgetStatus: ov.budgetState.status,
+      limit: 5
+    };
+  }
+
+  function savingsDay() { return SAV.dateKey(new Date()); }
+
+  /** 今天已打卡的记录（含条目对象，用于「今天已打卡」区和撤销） */
+  function savingsTodayDone() {
+    var day = savingsDay();
+    var out = [];
+    for (var i = 0; i < savingsDb.logs.length; i++) {
+      var r = savingsDb.logs[i];
+      if (r.date !== day) { continue; }
+      var e = SAV.byId(r.id);
+      if (e) { out.push({ entry: e, rec: r }); }
+    }
+    return out;
+  }
+
+  function savingsSumSummary() {
+    var ov = getOverview();
+    return SAV.summary(savingsDb.logs, { cycleStart: ov.cycle.start, cycleEnd: ov.cycle.end });
+  }
+
+  /* ---------------- 开关 ---------------- */
+
+  /**
+   * 省钱面板的一级视图：'radar'（省钱雷达）| 'graph'（省钱图谱）。
+   * 两个功能原本各占一个全屏 sheet，顶栏和「我的」菜单各有入口，占地且重复；
+   * 现在合并为一个面板，用一级分段控件（#saveHubSeg）切换，内部结构不变。
+   */
+  var saveHubView = 'radar';
+
+  /**
+   * 打开省钱面板，可直接指定落到哪一侧、以及该侧的二级 tab。
+   * 完整版：面板在 #saveHubMask 里，按弹层显示。
+   * 简洁版：面板已由 mountShellPanels 搬进 #spSaveBody（独立页面），
+   *         没有遮罩可弹，改为切到 ssave 屏，由 renderSaveHubPanel 统一重绘。
+   * @param {string} view 'radar' | 'graph'，非法值一律按 'radar'
+   * @param {string=} tab 二级 tab（today / calendar / compare / about …）
+   */
+  function openSaveHub(view, tab) {
+    var next = (view === 'graph') ? 'graph' : 'radar';
+    /* 先做就绪校验再落状态：否则提前 return 后 saveHubView 与画面会不一致 */
+    if (next === 'radar' && !dealsReady()) {
+      addAIMessage(aiBubble('省钱雷达模块没加载起来，刷新一下页面再试。'));
+      return;
+    }
+    if (next === 'graph' && !savingsReady()) {
+      degradeSavingsUi();
+      addAIMessage(aiBubble('省钱图谱模块没加载起来，刷新一下页面再试。'));
+      return;
+    }
+    saveHubView = next;
+    if (saveHubView === 'radar') { dealsTab = tab || dealsTab || 'today'; }
+    else { savingsTab = tab || savingsTab || 'today'; }
+    var sheet = $('saveHubSheet');
+    if (sheet) { sheet.setAttribute('data-hub', saveHubView); }
+    var segs = DOC.querySelectorAll('#saveHubSeg .shs');
+    for (var i = 0; i < segs.length; i++) {
+      var on = segs[i].getAttribute('data-hub') === saveHubView;
+      segs[i].classList.toggle('active', on);
+      segs[i].setAttribute('aria-selected', on ? 'true' : 'false');
+    }
+    var radarView = $('saveHubViewRadar');
+    var graphView = $('saveHubViewGraph');
+    if (radarView) { radarView.hidden = (saveHubView !== 'radar'); }
+    if (graphView) { graphView.hidden = (saveHubView !== 'graph'); }
+    if (getUiMode() === 'simple') {
+      /* 简洁版没有遮罩：切到「省钱」屏即可，内容由 switchView → renderSaveHubPanel 重绘。
+         绝不能把 #saveHubMask 打开 —— 面板不在里面，只会留下空遮罩盖住整页。 */
+      switchView('ssave');
+    } else {
+      $('saveHubMask').hidden = false;
+      if (saveHubView === 'radar') { renderDealsSheet(); } else { renderSavingsSheet(); }
+    }
+    if (saveHubView === 'graph' && savingsRecovered) {
+      savingsRecovered = false;
+      showToast('省钱打卡记录格式异常，已重置（账单数据没受影响）');
+    }
+  }
+
+  /**
+   * 简洁版「省钱」屏的内容渲染。
+   * 面板常驻在 #spSaveBody 内，这里只按当前一级视图（radar / graph）重绘，
+   * 不碰遮罩、不弹层 —— 与完整版的 openSaveHub 分开，避免两套语义互相污染。
+   */
+  function renderSaveHubPanel() {
+    if (saveHubView === 'graph') {
+      if (savingsReady()) { renderSavingsSheet(); }
+    } else if (dealsReady()) {
+      renderDealsSheet();
+    }
+  }
+
+  /**
+   * 一级分段控件切换。点当前已激活的那一侧不重绘，避免无谓的 DOM 重建。
+   * @param {string} view 'radar' | 'graph'
+   */
+  function switchSaveHub(view) {
+    if (view === saveHubView) { return; }
+    openSaveHub(view);
+  }
+
+  /** 关闭省钱面板（雷达/图谱共用同一个面板，关闭即整体收起） */
+  function closeSaveHub() {
+    $('saveHubMask').hidden = true;
+    /* 关面板就丢掉未保存的改金额状态，下次打开是干净的 */
+    savingsEdit = null;
+  }
+
+  /* 省钱图谱入口已并入「省钱」面板：同样只做薄封装，调用点保持不变 */
+  function openSavingsSheet(tab) { openSaveHub('graph', tab); }
+
+  function closeSavingsSheet() { closeSaveHub(); }
+
+  /**
+   * 降级：savings.js 没加载起来时，把纯图谱入口置灰，
+   * 而不是留一个点了没反应（或报错）的按钮。账本功能完全不受影响。
+   * 注意：#btnSaveHub / #spMenuSaveHub 同时承载省钱雷达，雷达模块正常时不该被拖死，故不在此列。
+   */
+  function degradeSavingsUi() {
+    var ids = ['btnSavingsCard'];
+    for (var i = 0; i < ids.length; i++) {
+      var el = $(ids[i]);
+      if (!el) { continue; }
+      el.disabled = true;
+      el.title = '省钱图谱模块未加载';
+      el.style.opacity = '0.45';
+      el.style.pointerEvents = 'none';
+    }
+    var mini = $('savingsMini');
+    if (mini) { mini.innerHTML = '<div class="dm-line">省钱图谱模块未加载，其他功能正常</div>'; }
+  }
+
+  function renderSavingsSheet() {
+    if (!savingsReady()) { return; }
+    var tabs = DOC.querySelectorAll('#savingsTabs .atab');
+    var i;
+    for (i = 0; i < tabs.length; i++) {
+      tabs[i].classList.toggle('active', tabs[i].getAttribute('data-sv-tab') === savingsTab);
+    }
+    var st = $('savingsHeadStat');
+    if (st) { st.textContent = savingsHeadStatText(); }
+
+    var pane = $('savingsPane');
+    if (!pane) { return; }
+    var body = pane.parentNode;
+    var keepTop = body ? body.scrollTop : 0;
+
+    if (savingsTab === 'map') { pane.innerHTML = savingsMapHtml(); }
+    else if (savingsTab === 'index') { pane.innerHTML = savingsIndexHtml(); }
+    else if (savingsTab === 'book') { pane.innerHTML = savingsBookHtml(); }
+    else if (savingsTab === 'about') { pane.innerHTML = savingsAboutHtml(); }
+    else { pane.innerHTML = savingsTodayHtml(); }
+
+    if (body) { body.scrollTop = keepTop; }
+  }
+
+  function savingsHeadStatText() {
+    var s = savingsSumSummary();
+    return '累计省下 ' + money(s.totalSaved) + ' · 打卡 ' + s.count + ' 次';
+  }
+
+  /**
+   * 单条记录的金额标签。
+   * 大促 / 年卡型条目金额记 0（总额不是「今天省了多少」），这里用「大促」「全年」
+   * 这种标签替代「—」，否则用户会以为打卡没生效。
+   */
+  function savingsAmountLabel(entry, saved) {
+    if (saved > 0) { return '¥' + SAV.fmt(saved); }
+    if (entry && entry.save && entry.save.once) {
+      var label = entry.save.onceLabel || '一次性省';
+      return label.replace(/可省$/, '').replace(/省$/, '') || '一次性';
+    }
+    return '—';
+  }
+
+  /* ---------------- 今天 ---------------- */
+
+  function savingsTodayHtml() {
+    var ctx = savingsCtx();
+    var sum = savingsSumSummary();
+    var done = savingsTodayDone();
+    var html = '';
+
+    html += '<div class="sv-hero">' +
+      '<div class="sv-hero-num"><b>' + money(sum.monthSaved) + '</b><small>本周期省下</small></div>' +
+      '<div class="sv-hero-num"><b>' + sum.monthCount + '</b><small>本周期打卡</small></div>' +
+      '<div class="sv-hero-num"><b>' + money(sum.totalSaved) + '</b><small>累计省下</small></div>' +
+      '</div>';
+
+    html += SAV.todayCardHtml(ctx);
+
+    if (done.length) {
+      var dSum = 0, i;
+      for (i = 0; i < done.length; i++) { dSum += (done[i].rec.saved || 0); }
+      html += '<div class="sv-sec">今天已打卡 ' + done.length + ' 条 · 约省 ' + money(dSum) + '</div>';
+      html += '<div class="sv-done-list">';
+      for (i = 0; i < done.length; i++) {
+        var m = SAV.catMeta(done[i].entry.cat);
+        html += '<div class="sv-done-row">' +
+          '<span class="sv-done-ico">' + esc(m.emoji) + '</span>' +
+          '<span class="sv-done-title">' + esc(done[i].entry.title) + '</span>' +
+          '<span class="sv-done-save">' + savingsAmountLabel(done[i].entry, done[i].rec.saved) + '</span>' +
+          '<button type="button" class="btn-mini" data-sv-act="toggle" data-sv-id="' + esc(done[i].entry.id) + '">撤销</button>' +
+          '</div>';
+      }
+      html += '</div>';
+    }
+
+    return html;
+  }
+
+  /* ---------------- 图谱 ---------------- */
+
+  function savingsFiltered() {
+    var list = savingsCat ? SAV.byCat(savingsCat) : SAV.ENTRIES;
+    if (savingsQuery) { return SAV.search(list, savingsQuery); }
+    return list;
+  }
+
+  function savingsMapHtml() {
+    var list = savingsFiltered();
+    var html = '';
+
+    html += '<div class="sv-filter">' +
+      '<input type="search" id="svSearch" class="sv-search" placeholder="搜「奶茶」「打印」「周四」…" value="' +
+      esc(savingsQuery) + '" autocomplete="off" />' +
+      '<span class="sv-count" id="svCount">' + list.length + ' 条</span>' +
+      '</div>';
+
+    html += '<div class="sv-chips" id="svChips">';
+    html += '<button type="button" class="sv-chip' + (savingsCat ? '' : ' active') + '" data-sv-cat="">全部 ' +
+      SAV.ENTRIES.length + '</button>';
+    SAV.CATS.forEach(function (c) {
+      html += '<button type="button" class="sv-chip' + (savingsCat === c.key ? ' active' : '') +
+        '" data-sv-cat="' + esc(c.key) + '">' + esc(c.emoji) + ' ' + esc(c.name) + '</button>';
+    });
+    html += '</div>';
+
+    html += '<div class="sv-list" id="svList">' + savingsListHtml() + '</div>';
+    return html;
+  }
+
+  function savingsListHtml() {
+    var list = savingsFiltered();
+    if (!list.length) {
+      return '<div class="sv-empty">没找到「' + esc(savingsQuery || '该分类') + '」相关的动作。<br>' +
+        '<span class="hint">换个说法试试，比如「奶茶」可以搜「茶饮」「瑞幸」「霸王茶姬」。</span></div>';
+    }
+    var day = savingsDay();
+    var html = '', i;
+    for (i = 0; i < list.length; i++) {
+      var e = list[i];
+      var chk = SAV.isChecked(savingsDb.logs, e.id, day);
+      html += SAV.entryCardHtml(e, { checked: chk, q: savingsQuery });
+      if (savingsOpen[e.id]) { html += savingsDetailHtml(e); }
+    }
+    return html;
+  }
+
+  /** 详情：把「怎么操作」拆成可核对的字段，避免用户被一句口号忽悠 */
+  function savingsDetailHtml(e) {
+    var day = savingsDay();
+    var hits = 0;
+    for (var i = 0; i < savingsDb.logs.length; i++) {
+      if (savingsDb.logs[i].id === e.id) { hits++; }
+    }
+    var rows = [
+      ['完整做法', e.action],
+      ['什么时候能用', SAV.triggerText(e)],
+      ['用在哪', SAV.sceneText(e)],
+      ['能省多少', SAV.saveRangeText(e)],
+      ['门槛', e.gate],
+      ['适合谁', e.who],
+      ['坑在哪', e.risk],
+      ['关联账本分类', (e.billCats || []).join(' / ') || '—'],
+      ['数据来源', e.source || '—'],
+      ['我的打卡', hits ? '共 ' + hits + ' 次' + (SAV.isChecked(savingsDb.logs, e.id, day) ? '（今天已打卡）' : '') : '还没打卡过']
+    ];
+    var html = '<div class="sv-detail">';
+    for (var k = 0; k < rows.length; k++) {
+      html += '<div class="sv-detail-row"><span class="sv-detail-k">' + esc(rows[k][0]) + '</span>' +
+        '<span class="sv-detail-v">' + esc(rows[k][1]) + '</span></div>';
+    }
+    html += '</div>';
+    return html;
+  }
+
+  /* ---------------- 所有省钱大全（速查索引） ---------------- */
+
+  /**
+   * 大全 = 100 条压成一张「一行一条」的速查表。
+   * 与「图谱」的分工：图谱是卡片（做法 / 门槛 / 坑，一条占一屏），
+   * 大全是索引（一眼扫完 100 条，点任意一条跳回图谱看详情）。
+   */
+  function savingsIndexHtml() {
+    var sum = savingsSumSummary();
+    var ctx = savingsCtx();
+    var today = SAV.rankToday(SAV.ENTRIES, ctx);
+    var day = savingsDay();
+    var html = '';
+
+    html += '<div class="sv-hero">' +
+      '<div class="sv-hero-num"><b>' + SAV.ENTRIES.length + '</b><small>条动作 · ' + SAV.CATS.length + ' 类</small></div>' +
+      '<div class="sv-hero-num"><b>' + today.length + '</b><small>今天能用</small></div>' +
+      '<div class="sv-hero-num"><b>' + sum.count + '</b><small>累计打卡</small></div>' +
+      '</div>';
+
+    html += '<div class="sv-idx-tools">' +
+      '<button type="button" class="btn-mini primary" data-sv-act="export-md">导出 Markdown</button>' +
+      '<button type="button" class="btn-mini" data-sv-act="export-csv">导出打卡 CSV</button>' +
+      '<span class="sv-count">点任意一条 → 跳到图谱看详情</span>' +
+      '</div>';
+
+    SAV.CATS.forEach(function (c) {
+      var list = SAV.byCat(c.key);
+      html += '<section class="sv-idx-cat">';
+      html += '<div class="sv-idx-head"><b>' + esc(c.emoji) + ' ' + esc(c.name) + '</b>' +
+        '<span class="sv-count">' + list.length + ' 条</span></div>';
+      html += '<div class="sv-idx-list">';
+      list.forEach(function (e) {
+        var chk = SAV.isChecked(savingsDb.logs, e.id, day);
+        html += '<button type="button" class="sv-idx-row' + (chk ? ' is-checked' : '') + '"' +
+          ' data-sv-act="jump" data-sv-id="' + esc(e.id) + '">' +
+          '<span class="sv-idx-t">' + esc(e.title) + '</span>' +
+          '<span class="sv-idx-s">' + esc(SAV.saveText(e)) + '</span>' +
+          '<span class="sv-idx-w">' + esc(SAV.triggerText(e)) + '</span>' +
+          '</button>';
+      });
+      html += '</div></section>';
+    });
+
+    html += '<p class="sv-note">这就是全部 ' + SAV.ENTRIES.length + ' 条，按 10 类排。' +
+      '「导出 Markdown」会带上你的打卡记录，可以直接贴进群聊或笔记。</p>';
+    return html;
+  }
+
+  /* ---------------- 省钱账 ---------------- */
+
+  function savingsBookHtml() {
+    var sum = savingsSumSummary();
+    if (!sum.count) {
+      return '<div class="sv-empty">还没有打卡记录。<br>' +
+        '<span class="hint">去「今天」点一条做过的动作，就开始记你的省钱账了。</span></div>';
+    }
+    var html = '';
+    html += '<div class="sv-hero">' +
+      '<div class="sv-hero-num"><b>' + money(sum.totalSaved) + '</b><small>累计省下（不清零）</small></div>' +
+      '<div class="sv-hero-num"><b>' + sum.count + '</b><small>总打卡次数</small></div>' +
+      '<div class="sv-hero-num"><b>' + sum.monthCount + '</b><small>本周期打卡</small></div>' +
+      '</div>';
+
+    /* 分类分布：只画有记录的，按金额降序（金额相同按条数） */
+    var rows = [];
+    for (var k in sum.byCat) {
+      if (!Object.prototype.hasOwnProperty.call(sum.byCat, k)) { continue; }
+      rows.push({ cat: k, count: sum.byCat[k].count, saved: sum.byCat[k].saved });
+    }
+    rows.sort(function (a, b) { return (b.saved - a.saved) || (b.count - a.count); });
+    var maxSaved = rows.length ? Math.max(rows[0].saved, 1) : 1;
+
+    html += '<div class="sv-sec">省在哪</div><div class="sv-bars">';
+    rows.forEach(function (r) {
+      var m = SAV.catMeta(r.cat);
+      var w = Math.max(2, Math.round(r.saved / maxSaved * 100));
+      html += '<div class="sv-bar-row">' +
+        '<span class="sv-bar-name">' + esc(m.emoji) + ' ' + esc(m.name) + '</span>' +
+        '<span class="sv-bar-track"><i style="width:' + w + '%"></i></span>' +
+        '<span class="sv-bar-val">' + money(r.saved) + '<small>' + r.count + ' 次</small></span>' +
+        '</div>';
+    });
+    html += '</div>';
+
+    /* 最近打卡：倒序；默认 12 条，可展开全部（全部时才可能翻到老记录改金额） */
+    var all = savingsDb.logs.slice().reverse();
+    var recent = savingsBookAll ? all : all.slice(0, 12);
+    html += '<div class="sv-sec">最近打卡' + (savingsBookAll ? '' : '（最近 ' + recent.length + ' 条）') + '</div>';
+    html += '<div class="sv-done-list">';
+    recent.forEach(function (r) {
+      var e = SAV.byId(r.id);
+      if (!e) { return; }
+      var m = SAV.catMeta(e.cat);
+      if (savingsEdit && savingsEdit.id === r.id && savingsEdit.date === r.date) {
+        html += savingsEditRowHtml(e, r);
+        return;
+      }
+      html += '<div class="sv-done-row">' +
+        '<span class="sv-done-ico">' + esc(m.emoji) + '</span>' +
+        '<span class="sv-done-title">' + esc(e.title) +
+        '<small class="sv-done-date">' + esc(r.date.slice(5)) + '</small></span>' +
+        '<span class="sv-done-save">' + savingsAmountLabel(e, r.saved) + '</span>' +
+        '<button type="button" class="btn-mini" data-sv-act="edit-amount" ' +
+        'data-sv-id="' + esc(r.id) + '" data-sv-date="' + esc(r.date) + '">改</button>' +
+        '</div>';
+    });
+    html += '</div>';
+
+    if (all.length > 12) {
+      html += '<button type="button" class="btn-mini sv-more" data-sv-act="toggle-all">' +
+        (savingsBookAll ? '收起，只看最近 12 条' : '展开全部 ' + all.length + ' 条') + '</button>';
+    }
+
+    var zeroCnt = 0;
+    savingsDb.logs.forEach(function (r) { if (!(r.saved > 0)) { zeroCnt++; } });
+    if (zeroCnt) {
+      html += '<p class="sv-note">其中 <b>' + zeroCnt + '</b> 条只计次数、不计金额：' +
+        '大促 / 年卡型（双 11、健身房年卡）省的是「整场活动 / 全年的总额」，' +
+        '记进来会让累计金额虚高；长期习惯型（保温杯、图书馆）本来就算不出钱数。</p>';
+    }
+
+    html += '<p class="sv-note">「累计省下」不会随预算周期清零；「本周期省下」跟着发钱日走。' +
+      '这两个数和冷静期「拦下多少钱」是分开记的——一个是本来就要买、买对了省下的，一个是想买但没买省下的。</p>';
+    return html;
+  }
+
+  /**
+   * 行内改金额的编辑行。
+   * 清空输入框 = 恢复引擎估算（不是「改成 0」），这样用户改错了能一键回到默认值。
+   */
+  function savingsEditRowHtml(e, r) {
+    var m = SAV.catMeta(e.cat);
+    var once = !!(e.save && e.save.once);
+    var est = SAV.estimateSave(e);
+    var hint;
+    if (once) { hint = '这类是整场 / 全年总额，默认不计金额；想记就自己填'; }
+    else if (est === null) { hint = '这条算不出金额，可以自己填一个'; }
+    else { hint = '引擎估算 ¥' + SAV.fmt(est) + '，可改；清空恢复估算'; }
+
+    return '<div class="sv-done-row sv-edit-row">' +
+      '<span class="sv-done-ico">' + esc(m.emoji) + '</span>' +
+      '<span class="sv-done-title">' + esc(e.title) +
+      '<small class="sv-edit-hint">' + esc(hint) + '</small></span>' +
+      '<input class="sv-edit-input" id="svEditInput" type="number" inputmode="decimal" min="0" step="0.5" placeholder="金额" ' +
+      'value="' + (r.saved > 0 ? SAV.fmt(r.saved) : '') + '" ' +
+      'data-sv-id="' + esc(r.id) + '" data-sv-date="' + esc(r.date) + '" />' +
+      '<button type="button" class="btn-mini primary" data-sv-act="save-amount">存</button>' +
+      '<button type="button" class="btn-mini" data-sv-act="cancel-amount">×</button>' +
+      '</div>';
+  }
+
+  /**
+   * 手改某条记录的金额。
+   * 边界：非数字 / 负数 / 过大的数一律拒绝并提示，不写库；
+   *      清空 = 恢复引擎估算（once 型回到 0 且 manual=false）。
+   */
+  function updateSavingsAmount(raw) {
+    var input = $('svEditInput');
+    var id = input ? input.getAttribute('data-sv-id') : '';
+    var date = input ? input.getAttribute('data-sv-date') : '';
+    var e = SAV.byId(id);
+    if (!e) { return false; }
+
+    var idx = -1, i;
+    for (i = 0; i < savingsDb.logs.length; i++) {
+      if (savingsDb.logs[i].id === id && savingsDb.logs[i].date === date) { idx = i; break; }
+    }
+    if (idx === -1) {
+      savingsEdit = null;
+      renderSavingsSheet();
+      showToast('这条记录找不到了，刷新一下再试');
+      return false;
+    }
+
+    var txt = String(raw === undefined || raw === null ? (input ? input.value : '') : raw).trim();
+    var next, manual;
+
+    if (txt === '') {
+      /* 恢复引擎估算：金额回到估算值，manual 必须是 false —— 这不是「用户手填的数」，
+         CSV 里要如实标「否」，否则统计会把估算当成手改过的数据。 */
+      var once = !!(e.save && e.save.once);
+      var est = SAV.estimateSave(e);
+      next = (est !== null && !once) ? est : 0;
+      manual = false;
+    } else {
+      var n = Number(txt.replace(/[^\d.]/g, ''));
+      if (txt.replace(/[^\d.]/g, '') !== txt || !isFinite(n) || n < 0) {
+        showToast('金额只能填 0 或正数');
+        return false;
+      }
+      if (n > 99999) {
+        showToast('金额太大了，是不是多打了个 0');
+        return false;
+      }
+      next = Math.round(n * 100) / 100;
+      manual = true;
+    }
+
+    savingsDb.logs[idx].saved = next;
+    savingsDb.logs[idx].manual = manual;
+    savingsDb.updatedAt = Date.now();
+    saveSavingsDb();
+    savingsEdit = null;
+    renderSavingsSheet();
+    renderSavingsMini();
+    showToast(txt === '' ? '已恢复引擎估算' : '已改成 ' + money(next));
+    return true;
+  }
+
+  /* ---------------- 口径说明 ---------------- */
+
+  function savingsAboutHtml() {
+    var sum = savingsSumSummary();
+    var html = '';
+    html += '<div class="sv-about">';
+    html += '<p><b>这 100 条从哪来？</b>来自《大学生全网省钱与防割韭菜图谱》100 条实操，按「连锁快餐 / 简餐外卖 / 校园食堂 / 茶饮咖啡 / 零食夜市 / 商超日用 / 娱乐社交 / 交通出行 / 学习考证 / 促销节点」10 类各 10 条整理。</p>';
+    html += '<p><b>金额怎么算的？</b>每条动作带一个估算方式：</p>' +
+      '<ul class="sv-ul">' +
+      '<li><b>固定省额</b>：原文给了明确差价，直接算。</li>' +
+      '<li><b>折扣比</b>：原文说「打几折」且能给到原价基准，才乘出金额；给不出基准就只显示折扣，不硬凑钱数。</li>' +
+      '<li><b>区间</b>：原文只说「省几十」这类，取区间中位数，界面上显示区间。</li>' +
+      '<li><b>无法量化</b>：保温杯、图书馆这类长期习惯，照样能打卡，但不进金额累计——否则等于编数字。</li>' +
+      '</ul>';
+    html += '<p><b>三个标签什么意思？</b></p>' +
+      '<ul class="sv-ul">' +
+      '<li><span class="sv-tag sv-tag-varies">力度常变</span> 会员日折扣、百亿补贴这类，力度每期不同，别拿旧价当承诺。</li>' +
+      '<li><span class="sv-tag sv-tag-local">以你学校为准</span> 依赖具体校区 / 门店（食堂档口、教师食堂、南城香），到店先确认。</li>' +
+      '<li>无标签 = 规则稳定，按日期算就行。</li>' +
+      '</ul>';
+    html += '<p><b>红线：</b>所有金额都是估算区间，不承诺最低价，不写死平台实时价。真下单前以商家当期页面为准。</p>';
+    html += '<p><b>活动日期</b>由本地日期算法推算（周几 / 每月几号 / 固定月日 / 时间区间），不联网抓取，所以离线也能用。</p>';
+    html += '<p class="sv-note">你现在的打卡库：' + sum.count + ' 条记录，累计 ' + money(sum.totalSaved) +
+      '；存放于浏览器本地，键名 <code>ai_jizhang_savings_v1</code>，与账单分开。清掉它不会影响你的账本。</p>';
+    html += '</div>';
+    return html;
+  }
+
+  /* ---------------- 打卡 ---------------- */
+
+  /**
+   * 打卡 / 撤销。同一条目同一自然日只保留一条记录，所以第二次点就是撤销（幂等）。
+   *
+   * ⚠️ 金额口径（踩过坑）：
+   *   `once` 型条目（双 11 / 年卡 / 报班）的 save 是**整场活动 / 全年的总额**，
+   *   不是「今天做这一下省了多少」。若直接拿 estimateSave 入库，点一次「双 11」
+   *   就会往省钱账里加 ¥300，累计金额瞬间失真、分类条形也被促销类霸榜。
+   *   所以 once 型只记打卡次数、金额记 0，并在提示里说清楚。
+   *   `none` 型（保温杯 / 图书馆）本来就算不出金额，同样记 0。
+   */
+  function toggleSavings(id) {
+    if (!savingsReady()) { return; }
+    var e = SAV.byId(id);
+    if (!e) { return; }
+    var day = savingsDay();
+    var est = SAV.estimateSave(e);
+    var once = !!(e.save && e.save.once);
+    /* 传 undefined 而不是 0：引擎估算不是「用户手动改的金额」，CSV 里要如实标「否」 */
+    var savedArg = (once || est === null) ? undefined : est;
+    var res = SAV.toggleCheck(savingsDb.logs, id, day, savedArg);
+    savingsDb.logs = res.logs;
+    saveSavingsDb();
+
+    if (res.action === 'add') {
+      if (once) {
+        showToast('已打卡：' + e.title + '（大促 / 年卡总额不计入省钱账）');
+      } else {
+        showToast('已打卡：' + e.title + (est ? ' · 记下约省 ' + money(est) : ''));
+      }
+    } else {
+      showToast('已撤销：' + e.title);
+    }
+    renderSavingsSheet();
+    renderSavingsMini();
+  }
+
+  function savingsExportCsv() {
+    if (!savingsDb.logs.length) { showToast('还没有打卡记录'); return; }
+    var rows = [['日期', '动作', '分类', '估算省下', '是否手动改过']];
+    savingsDb.logs.forEach(function (r) {
+      var e = SAV.byId(r.id);
+      rows.push([
+        r.date,
+        e ? e.title : r.id,
+        e ? SAV.catMeta(e.cat).name : '未知',
+        r.saved > 0 ? r.saved.toFixed(2) : '',
+        r.manual ? '是' : '否'
+      ]);
+    });
+    downloadCsv('我的省钱记录.csv', rows);
+    showToast('已导出 ' + savingsDb.logs.length + ' 条打卡记录');
+  }
+
+  /**
+   * 导出「所有省钱大全」Markdown：100 条全量 + 我的打卡次数。
+   * 为什么用 .md 而不是 .txt：能直接贴进群聊 / 飞书 / Notion，标题层级不丢。
+   */
+  function savingsExportMarkdown() {
+    if (!savingsReady()) { return; }
+    var md = SAV.toMarkdown({ logs: savingsDb.logs, now: new Date() });
+    var name = '所有省钱大全-' + SAV.dateKey(new Date()) + '.md';
+    if (downloadText(name, md, 'text/markdown;charset=utf-8')) {
+      showToast('已导出 ' + SAV.ENTRIES.length + ' 条 · ' + Math.round(md.length / 1024) + ' KB');
+    }
+  }
+
+  /* ---------------- 看板小卡 / 聊天入口 ---------------- */
+
+  function renderSavingsMini(ov) {
+    var box = $('savingsMini');
+    if (!box) { return; }
+    if (!savingsReady()) {
+      box.innerHTML = '<div class="dm-line">省钱图谱没加载起来，刷新页面再试</div>';
+      return;
+    }
+    var ctx = savingsCtx(ov);
+    var list = SAV.rankToday(SAV.ENTRIES, ctx);
+    var sum = savingsSumSummary();
+    var html = '', i;
+
+    if (!list.length) {
+      html += '<div class="dm-line">今天的动作都打完卡了 🎉</div>';
+    } else {
+      for (i = 0; i < list.length && i < 3; i++) {
+        html += '<div class="dm-line"><span class="dm-dot"></span><b>' +
+          esc(list[i].title) + '</b> <em>' + esc(SAV.saveText(list[i])) + '</em></div>';
+      }
+    }
+    html += '<div class="dm-line dm-tip">💡 本周期省下 ' + money(sum.monthSaved) +
+      ' · 累计打卡 ' + sum.count + ' 次</div>';
+    box.innerHTML = html;
+  }
+
+  /** 聊天入口：今天怎么省（文字版，不塞按钮，避免聊天区还要单独绑事件） */
+  function showSavingsTodayCard() {
+    switchView('chat');
+    if (!savingsReady()) {
+      addAIMessage(aiBubble('省钱图谱没加载起来，刷新页面再试。'));
+      return;
+    }
+    var ctx = savingsCtx();
+    var list = SAV.rankToday(SAV.ENTRIES, ctx);
+    if (!list.length) {
+      addAIMessage(aiBubble('今天的动作都打完卡了 🎉<br>点顶部「省钱」→「省钱图谱」分段，翻翻别的分类，或者明天再来。'));
+      return;
+    }
+    var hitN = 0, i;
+    for (i = 0; i < list.length; i++) {
+      if (list[i].trigger && SAV.matchTrigger(list[i], new Date())) { hitN++; }
+    }
+    var html = hitN
+      ? '今天命中 <b>' + hitN + '</b> 条踩点优惠，先看这几条：'
+      : '今天没有踩点的规则优惠，下面这几条随时都能用：';
+    html += '<div class="sv-chat-list">';
+    for (i = 0; i < list.length; i++) {
+      html += '<div class="sv-chat-row"><b>' + esc(list[i].title) + '</b>' +
+        '<span>' + esc(SAV.saveText(list[i])) + '</span>' +
+        '<i>' + esc(list[i].action) + '</i></div>';
+    }
+    html += '</div>';
+    html += '<span class="hint">点顶部「省钱」→「省钱图谱」，可以看全部 100 条，做过的动作点一下打卡，我帮你记省了多少。</span>';
+    addAIMessage(aiBubble(html));
+  }
+
+  /** 聊天入口：按关键词搜图谱 */
+  function showSavingsSearch(kw) {
+    switchView('chat');
+    if (!savingsReady()) {
+      addAIMessage(aiBubble('省钱图谱没加载起来，刷新页面再试。'));
+      return;
+    }
+    var q = String(kw || '').trim();
+    var list = SAV.search(SAV.ENTRIES, q);
+    if (!list.length) {
+      addAIMessage(aiBubble('图谱里没搜到「' + esc(q) + '」。<br>换个说法试试：奶茶 / 打印 / 食堂 / 外卖 / 健身房 / 高铁。'));
+      return;
+    }
+    var top = list.slice(0, 3);
+    var html = '「' + esc(q) + '」相关动作，最值得先看这 ' + top.length + ' 条：<div class="sv-chat-list">';
+    top.forEach(function (e) {
+      html += '<div class="sv-chat-row"><b>' + esc(e.title) + '</b>' +
+        '<span>' + esc(SAV.saveText(e)) + ' · ' + esc(SAV.triggerText(e)) + '</span>' +
+        '<i>' + esc(e.action) + '</i></div>';
+    });
+    html += '</div>';
+    if (list.length > top.length) {
+      html += '<span class="hint">还有 ' + (list.length - top.length) + ' 条，点顶部「省钱」→「省钱图谱」搜「' + esc(q) + '」看全部。</span>';
+    }
+    addAIMessage(aiBubble(html));
+  }
+
+  function showSavingsGraph() { openSavingsSheet('map'); }
+  function showSavingsIndex() { openSavingsSheet('index'); }
+  function showSavingsBook() { openSavingsSheet('book'); }
+  function showSavingsPanelToday() { openSavingsSheet('today'); }
+
+  /* ================================================================== */
   /* 消息路由                                                            */
   /* ================================================================== */
 
@@ -4125,6 +5452,14 @@
     '截图记账': openOcrModal,
     '我想攒钱': showGoalGuide,
     '我想攒钱买': showGoalGuide,
+    '省钱图谱': showSavingsGraph,
+    '省钱清单': showSavingsPanelToday,
+    '今天怎么省': showSavingsPanelToday,
+    '我的省钱账': showSavingsBook,
+    '所有省钱大全': showSavingsIndex,
+    '省钱大全': showSavingsIndex,
+    '理财课': showLearnGuide,
+    '理财学院': showLearnGuide,
     '设置': openSettingsPage,
     '设置预算': openDrawer
   };
@@ -4151,7 +5486,33 @@
     if (compact.indexOf('账单分析') !== -1) { return openAnalysisSheet; }
     if (compact.indexOf('导入') !== -1 && compact.indexOf('账单') !== -1) { return openImportSheet; }
     if (compact.indexOf('截屏记账') !== -1 || compact.indexOf('截图记账') !== -1) { return openOcrModal; }
-    /* ---- 理财教练：省钱 / 赚钱 / 剁手冷静法 ---- */
+    /* ---- 业务规则：句子里带金额的一律当成记账 ---- */
+    // 提到这里是因为下面每条「省钱 / 优惠」分支都必须先过它：
+    // 例「肯德基疯狂星期四 25」要记一笔餐饮，不能被活动卡或图谱抢走。
+    var hasAmount = /(\d+(\.\d+)?)\s*(元|块|块钱)?/.test(compact) &&
+      !/(多少钱|贵吗|便宜吗|什么时候|哪天|几天|多久|划算吗|比价|哪家便宜)/.test(compact);
+    /* ---- 省钱图谱：必须排在专家「省钱」分支之前，否则「省钱攻略 奶茶」会被专家抢走 ---- */
+    if (!hasAmount) {
+      var svIdx = compact.indexOf('省钱攻略');
+      if (svIdx !== -1 && compact.length > svIdx + 4) {
+        var svKw = compact.slice(svIdx + 4);
+        return function () { showSavingsSearch(svKw); };
+      }
+      if (compact.indexOf('所有省钱') !== -1 || compact.indexOf('省钱大全') !== -1 ||
+        compact.indexOf('省钱宝典') !== -1) {
+        return showSavingsIndex;
+      }
+      if (compact.indexOf('省钱图谱') !== -1) {
+        return showSavingsGraph;
+      }
+      if (compact.indexOf('省钱账') !== -1 || compact.indexOf('省了多少钱') !== -1 ||
+        compact.indexOf('省下多少') !== -1) {
+        return showSavingsBook;
+      }
+    }
+    /* ---- 理财专家：省钱 / 赚钱 / 剁手冷静法 ---- */
+    if (compact === '理财课' || compact === '理财学院' || compact === '看理财课' ||
+      compact === '视频学习') { return showLearnGuide; }
     if (compact.indexOf('剁手冷静法') !== -1 || compact.indexOf('冷静期') !== -1) { return showCoolingGuide; }
     if (compact.indexOf('省钱') !== -1 && /(怎么|如何|怎样|方法|攻略|技巧|建议|教我)/.test(compact)) {
       return showSaveMoneyGuide;
@@ -4162,10 +5523,6 @@
     if (compact === '省钱' || compact === '省钱攻略' || compact === '省钱方法') { return showSaveMoneyGuide; }
     if (compact === '搞钱' || compact === '搞钱路子' || compact === '赚钱方法') { return showMakeMoneyGuide; }
     /* ---- 省钱雷达：活动日历 / 会员日 / 比价 ---- */
-    // 业务规则 1：句子里带金额的一律当成记账，不要被"肯德基""疯狂星期四"抢走去问优惠
-    // 例：「肯德基疯狂星期四 25」= 记一笔餐饮，而不是弹KFC活动卡
-    var hasAmount = /(\d+(\.\d+)?)\s*(元|块|块钱)?/.test(compact) &&
-      !/(多少钱|贵吗|便宜吗|什么时候|哪天|几天|多久|划算吗|比价|哪家便宜)/.test(compact);
     if (hasAmount) { return null; }
     if (/省钱雷达|优惠提醒|打折日|会员日|今日优惠|今天.*(优惠|特价|打折)|有什么优惠|有啥优惠|优惠活动/.test(compact)) {
       return showDealsTodayCard;
@@ -4389,7 +5746,7 @@
     var localFn = localCommandName(raw);
     if (localFn) { localFn(); return; }
 
-    // 理财教练：「想买 XX」-> 先走剁手冷静法三步问答，而不是直接记账
+    // 理财专家：「想买 XX」-> 先走剁手冷静法三步问答，而不是直接记账
     var wantBuy = COACH.isWantBuy(raw);
     if (wantBuy) { startCoolingFlow(wantBuy.item, wantBuy.price); return; }
 
@@ -4513,18 +5870,40 @@
     sendToAssistant(raw);
   }
 
-  function switchView(view) {
-    if (view !== 'chat' && view !== 'dash' && view !== 'goals' && view !== 'coach') { return; }
+  function switchView(view, fromBack) {
+    if (!FULL_VIEWS[view] && !SIMPLE_VIEWS[view]) { return; }
+    // 双 UI 门控：把视图请求映射到当前 UI 类型下可见的等价屏幕，
+    // 避免代码路径（OCR / 指令 / 返回）把用户切到被隐藏的面板而留空白
+    if (getUiMode() === 'simple') {
+      if (!SIMPLE_VIEWS[view]) {
+        // 完整版视图 → 简洁版等价屏：聊天→AI 对话、看板→预算、目标→攒钱目标、专家→理财专家
+        view = ({ chat: 'sai', dash: 'sbudget', goals: 'sgoals', coach: 'scoach' })[view] || 'shome';
+      }
+    } else if (!FULL_VIEWS[view]) {
+      view = 'chat';
+    }
+    var prev = DOC.body.getAttribute('data-view');
+    // 记录进入子视图前的视图，供「返回」按钮使用（fromBack 为 true 时不重复入栈）
+    if (prev && prev !== view && !fromBack) {
+      viewHistory.push(prev);
+      if (viewHistory.length > 20) { viewHistory.shift(); }
+    }
     DOC.body.setAttribute('data-view', view);
-    var tabs = DOC.querySelectorAll('#tabbar .tab');
+    var tabs = DOC.querySelectorAll('#tabbar .tab, #tabbarSimple .tab');
     var i;
     for (i = 0; i < tabs.length; i++) {
-      if (tabs[i].getAttribute('data-view') === view) {
-        tabs[i].className = 'tab active';
-      } else {
-        tabs[i].className = 'tab';
-      }
+      // 用 classList.toggle 保留 tab 上的其他类（如 ui-full-only），避免整类名覆盖导致门控失效
+      tabs[i].classList.toggle('active', tabs[i].getAttribute('data-view') === view);
     }
+    /* 简洁版「省钱」屏：面板常驻在 #spSaveBody 内，切进来时补一次渲染，
+       保证首次进入与数据变更后看到的都是最新内容（不弹遮罩、不调 openSaveHub）。 */
+    if (view === 'ssave') { renderSaveHubPanel(); }
+  }
+
+  /** 「返回」按钮：回到进入当前子视图前的视图；没有历史时回当前 UI 类型的首页 */
+  function goBackView() {
+    var prev = viewHistory.pop() || (getUiMode() === 'simple' ? 'shome' : 'chat');
+    switchView(prev, true);
   }
 
   function bindEvents() {
@@ -4560,6 +5939,11 @@
       var act = e.target.closest ? e.target.closest('[data-act]') : null;
       if (!act) { return; }
       var name = act.getAttribute('data-act');
+      if (name === 'learn-all') {
+        /* 聊天气泡里的「去理财学院看全部」：视图映射交给 switchView（简洁版自动到 scoach） */
+        openAcademy();
+        return;
+      }
       if (name === 'undo') {
         deleteBill(act.getAttribute('data-bill'));
         return;
@@ -4661,19 +6045,30 @@
     /* ---- 完整设置界面 ---- */
     bindSettingsEvents();
 
-    /* ---- 顶部工具栏：截屏记账 / 账单分析 / 理财教练 / 更多菜单 ---- */
+    /* ---- 顶部工具栏：截屏记账 / 账单分析 / 理财专家 / 更多菜单 ---- */
     $('btnOcr').addEventListener('click', openOcrModal);
     $('btnAnalysis').addEventListener('click', openAnalysisSheet);
     $('btnCoach').addEventListener('click', function () { switchView('coach'); });
+    /* 看板「理财课 · 视频」卡的「全部 ›」：进理财学院并定位到学院区。
+       按钮是静态节点（不会被 innerHTML 重建），只绑一次，不存在重复绑定。 */
+    $('btnLearnAll').addEventListener('click', openAcademy);
     $('btnAskCoach').addEventListener('click', showAskCoachIntro);
+    /* 专家面板「‹ 返回」：桌面端无底部导航，靠它回到进入专家前的视图 */
+    $('btnCoachBack').addEventListener('click', goBackView);
 
-    /* ---- 省钱雷达：打开面板 / 切 tab / 比价计算 / 导出日历 ---- */
-    $('btnDeals').addEventListener('click', function () { openDealsSheet('today'); });
-    $('btnDealsCard').addEventListener('click', function () { openDealsSheet('today'); });
-    $('btnCloseDeals').addEventListener('click', closeDealsSheet);
-    $('dealsMask').addEventListener('click', function (e) {
-      if (e.target === $('dealsMask')) { closeDealsSheet(); }
+    /* ---- 省钱：一个入口 + 一级分段（雷达 / 图谱），两个功能共用一个面板 ---- */
+    $('btnSaveHub').addEventListener('click', function () { openSaveHub('radar'); });
+    $('btnCloseSaveHub').addEventListener('click', closeSaveHub);
+    $('saveHubSeg').addEventListener('click', function (e) {
+      var b = e.target.closest ? e.target.closest('[data-hub]') : null;
+      if (b) { switchSaveHub(b.getAttribute('data-hub')); }
     });
+    $('saveHubMask').addEventListener('click', function (e) {
+      if (e.target === $('saveHubMask')) { closeSaveHub(); }
+    });
+
+    /* ---- 省钱雷达：切 tab / 比价计算 / 导出日历 ---- */
+    $('btnDealsCard').addEventListener('click', function () { openSaveHub('radar'); });
     $('dealsTabs').addEventListener('click', function (e) {
       var tab = e.target.closest ? e.target.closest('[data-deal-tab]') : null;
       if (!tab) { return; }
@@ -4721,9 +6116,108 @@
       closeDealsSheet();
       showKfcDealsCard();
     });
-    /* ---- 理财学院：折叠展开 ---- */
+
+    /* ---- 省钱图谱：切 tab / 搜索 / 分类 / 打卡 / 导出（入口已并入省钱面板） ---- */
+    $('btnSavingsCard').addEventListener('click', function () { openSaveHub('graph'); });
+    $('savingsTabs').addEventListener('click', function (e) {
+      var tab = e.target.closest ? e.target.closest('[data-sv-tab]') : null;
+      if (!tab) { return; }
+      savingsTab = tab.getAttribute('data-sv-tab');
+      savingsEdit = null;
+      renderSavingsSheet();
+    });
+    $('savingsPane').addEventListener('click', function (e) {
+      /* 分类筛选：只重画 chips 与列表，不动搜索框，避免输入焦点丢失 */
+      var chip = e.target.closest ? e.target.closest('[data-sv-cat]') : null;
+      if (chip) {
+        savingsCat = chip.getAttribute('data-sv-cat') || '';
+        var chips = DOC.querySelectorAll('#svChips .sv-chip');
+        for (var ci = 0; ci < chips.length; ci++) {
+          chips[ci].classList.toggle('active', chips[ci].getAttribute('data-sv-cat') === savingsCat);
+        }
+        var l0 = $('svList');
+        if (l0) { l0.innerHTML = savingsListHtml(); }
+        var c0 = $('svCount');
+        if (c0) { c0.textContent = savingsFiltered().length + ' 条'; }
+        return;
+      }
+      var act = e.target.closest ? e.target.closest('[data-sv-act]') : null;
+      if (!act) { return; }
+      var id = act.getAttribute('data-sv-id');
+      var what = act.getAttribute('data-sv-act');
+      if (what === 'toggle') { toggleSavings(id); return; }
+      if (what === 'edit-amount') {
+        savingsEdit = { id: id, date: act.getAttribute('data-sv-date') };
+        renderSavingsSheet();
+        var inp = $('svEditInput');
+        if (inp) { inp.focus(); if (inp.select) { inp.select(); } }
+        return;
+      }
+      if (what === 'save-amount') { updateSavingsAmount(); return; }
+      if (what === 'cancel-amount') { savingsEdit = null; renderSavingsSheet(); return; }
+      if (what === 'toggle-all') { savingsBookAll = !savingsBookAll; renderSavingsSheet(); return; }
+      if (what === 'export-md') { savingsExportMarkdown(); return; }
+      if (what === 'export-csv') { savingsExportCsv(); return; }
+      if (what === 'jump') {
+        var target = SAV.byId(id);
+        if (!target) { return; }
+        savingsCat = target.cat;
+        savingsQuery = '';
+        savingsOpen[id] = true;
+        savingsTab = 'map';
+        renderSavingsSheet();
+        var card = DOC.querySelector('#svList .sv-card[data-sv-id="' + id + '"]');
+        if (card && card.scrollIntoView) { card.scrollIntoView({ block: 'start' }); }
+        return;
+      }
+      if (what === 'detail') {
+        savingsOpen[id] = !savingsOpen[id];
+        /* 只重画列表，保持滚动位置 */
+        var l1 = $('svList');
+        if (l1) {
+          var body = $('savingsPane').parentNode;
+          var keep = body ? body.scrollTop : 0;
+          l1.innerHTML = savingsListHtml();
+          if (body) { body.scrollTop = keep; }
+        }
+        return;
+      }
+    });
+    $('savingsPane').addEventListener('input', function (e) {
+      if (!e.target || e.target.id !== 'svSearch') { return; }
+      savingsQuery = e.target.value || '';
+      var l = $('svList');
+      if (l) { l.innerHTML = savingsListHtml(); }
+      var c = $('svCount');
+      if (c) { c.textContent = savingsFiltered().length + ' 条'; }
+    });
+    /* 改金额：回车保存、ESC 取消（ESC 要拦住，否则会把整个面板关掉） */
+    $('savingsPane').addEventListener('keydown', function (e) {
+      if (!e.target || e.target.id !== 'svEditInput') { return; }
+      if (e.key === 'Enter' || e.keyCode === 13) {
+        e.preventDefault();
+        updateSavingsAmount();
+      } else if (e.key === 'Escape' || e.keyCode === 27) {
+        if (e.stopPropagation) { e.stopPropagation(); }
+        savingsEdit = null;
+        renderSavingsSheet();
+      }
+    });
+    $('btnSavingsCsv').addEventListener('click', savingsExportCsv);
+    $('btnSavingsAsk').addEventListener('click', function () {
+      closeSavingsSheet();
+      showSavingsTodayCard();
+    });
+    /* ---- 理财学院：折叠展开 + 资源区复制 ---- */
     $('coachAcademy').addEventListener('click', function (e) {
-      var head = e.target.closest ? e.target.closest('.coach-lesson-head') : null;
+      var tgt = e.target;
+      var copyBtn = (tgt && tgt.closest) ? tgt.closest('[data-copy]') : null;
+      if (copyBtn) {
+        e.preventDefault();
+        coachCopyResource(copyBtn);
+        return;
+      }
+      var head = (tgt && tgt.closest) ? tgt.closest('.coach-lesson-head') : null;
       if (!head) { return; }
       var lesson = head.closest ? head.closest('.coach-lesson') : null;
       if (lesson) { lesson.classList.toggle('open'); }
@@ -4951,7 +6445,7 @@
       if (e.key === 'Escape' || e.keyCode === 27) {
         closeModal();
         if (!$('analysisMask').hidden) { closeAnalysisSheet(); }
-        if (!$('dealsMask').hidden) { closeDealsSheet(); }
+        if (!$('saveHubMask').hidden) { closeSaveHub(); }
         if (!$('ocrMask').hidden) { closeOcrModal(); }
         if ($('settingsDrawer').classList.contains('open')) { closeDrawer(); }
         if ($('modalMask').hidden && !$('settingsMask').hidden) { closeSettingsPage(); }
@@ -4970,13 +6464,15 @@
 
   function addWelcome() {
     var ov = getOverview();
-    addAIMessage(aiBubble('你好呀，我是账小助 👋<br>一句话就能记账，试试「中午食堂 15」。<br>想省钱 / 搞钱，去底部「理财教练》找我，剁手前也可以先让我把把关。'));
+    addAIMessage(aiBubble('你好呀，我是账小助 👋<br>一句话就能记账，试试「中午食堂 15」。<br>想省钱 / 搞钱，去底部「理财专家」找我，剁手前也可以先让我把把关。'));
     addAIMessage(aiBubble('当前周期 ' + esc(ov.cycle.start) + ' ~ ' + esc(ov.cycle.end) + '，总预算 ' +
       money(state.budget.total) + '，已花 ' + money(ov.cycleAgg.expense) + '。' + ov.sentence));
   }
 
   function init() {
     loadState();
+    loadSavingsDb();
+    if (!savingsReady()) { degradeSavingsUi(); }
     if (!storageOK) { showStorageTip(); }
     applyAppearance();
     applyUiMode();
@@ -4987,9 +6483,11 @@
     }
     setupVoice();
     bindEvents();
+    bindSimpleEvents();
     renderAll();
     addWelcome();
-    switchView('chat');
+    // 默认视图按 UI 类型分流：简洁版进「记账」首页，完整版进聊天（修复简洁版刷新后落空白）
+    switchView(getUiMode() === 'simple' ? 'shome' : 'chat');
     initCloud();
   }
 

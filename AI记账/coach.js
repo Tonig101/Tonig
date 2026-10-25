@@ -1,14 +1,14 @@
 /**
- * coach.js — 理财教练模式（核心附加能力）
+ * coach.js — 理财专家模式（核心附加能力）
  *
- * 定位：除了记账与预算预警之外的「校园理财教练」。
+ * 定位：除了记账与预算预警之外的「校园理财专家」。
  * 触发场景：
- *   1. 记录【娱乐 / 冲动消费 / 高溢价品牌】账单后，给出「💡 理财教练说」卡片（≤50 字）；
+ *   1. 记录【娱乐 / 冲动消费 / 高溢价品牌】账单后，给出「💡 理财专家说」卡片（≤50 字）；
  *   2. 用户问「怎么省钱 / 怎么赚钱」时，输出校园场景具体建议；
  *   3. 用户表达「想买 XX」时，引导走「剁手冷静法」三步问答。
  *
  * 对外 API（window.AJ.coach）：
- *   adviceForBill(bill, alt)   -> ?string  账单触发的一条教练建议（≤50 字，不触发返回 null）
+ *   adviceForBill(bill, alt)   -> ?string  账单触发的一条专家建议（≤50 字，不触发返回 null）
  *   saveMoneyAnswer()          -> string  「怎么省钱」结构化回答（HTML）
  *   makeMoneyAnswer()          -> string  「怎么赚钱」结构化回答（HTML）
  *   isWantBuy(text)            -> ?{item, price}  识别「想买 XX」意图
@@ -27,7 +27,7 @@
   var ALTERNATIVES = DATA.ALTERNATIVES;
   var CATEGORY_BUDGET_RATIO = DATA.CATEGORY_BUDGET_RATIO;
 
-  /** 教练建议硬性长度上限（用户规格：不超过 50 字） */
+  /** 专家建议硬性长度上限（用户规格：不超过 50 字） */
   var ADVICE_MAX_LEN = 50;
 
   /** 兜底裁剪：无论如何都不超过 50 字 */
@@ -62,7 +62,7 @@
   var adviceCursor = { impulse: 0, fun: 0 };
 
   /**
-   * 判断一笔支出是否触发教练建议，并返回建议文案。
+   * 判断一笔支出是否触发专家建议，并返回建议文案。
    * 触发优先级：高溢价品牌（有平替） > 冲动消费 > 娱乐类。
    * @param {Object} bill 归一化后的账单
    * @param {?Object} alt ENG.getAlternative(bill) 的结果（可不传，内部自算）
@@ -104,7 +104,7 @@
 
   function saveMoneyAnswer() {
     return '' +
-      '<div class="coach-qa-title">💡 理财教练说 · 校园省钱攻略</div>' +
+      '<div class="coach-qa-title">💡 理财专家说 · 校园省钱攻略</div>' +
       '<ol class="coach-qa-list">' +
       '<li><b>食堂平替外卖</b>：一荤一素 10 元上下，一周少点 3 次外卖立省 50+</li>' +
       '<li><b>拿铁因子</b>：奶茶咖啡改自泡茶包 / 食堂现磨，一周省 30+</li>' +
@@ -117,7 +117,7 @@
 
   function makeMoneyAnswer() {
     return '' +
-      '<div class="coach-qa-title">💰 理财教练说 · 校园搞钱路子</div>' +
+      '<div class="coach-qa-title">💰 理财专家说 · 校园搞钱路子</div>' +
       '<ol class="coach-qa-list">' +
       '<li><b>勤工俭学</b>：图书馆助理 / 实验室值班 / 助教，时薪 15-25，稳定靠谱</li>' +
       '<li><b>技能变现</b>：PPT 代做、约拍、家教，校园群 / 闲鱼接单，一单 50-300</li>' +
@@ -278,6 +278,44 @@
         '· 省下的不是饭钱，是资料费、考证费和旅行基金。'
     },
     {
+      id: 'infodiff',
+      icon: '📱',
+      title: '省钱信息差：先看别人怎么省',
+      tag: '节流实操',
+      body: '同一样东西有人 39 买、有人 89 买，差的往往不是钱，是信息。\n' +
+        '· 下单前先搜「关键词 + 省钱 / 测评 / 平替」，看别人踩过的坑；\n' +
+        '· 大促前先收藏原价，别被先涨后降的假折扣骗；\n' +
+        '· 信息差是零成本的：花 5 分钟搜索，常能省下一顿饭钱。',
+      resources: [{
+        type: 'copy',
+        label: '红米鸡（抖音省钱博主）',
+        desc: '没有固定主页链接，复制博主名去抖音搜索，看她日常怎么挑便宜货。',
+        copy: '红米鸡'
+      }]
+    },
+    {
+      id: 'bloggers',
+      icon: '📺',
+      title: '跟着博主学省钱（B 站）',
+      tag: '跟人学',
+      body: '省钱干货更新最快的地方在博主主页，不在文章里：\n' +
+        '· 信息差是即时更新的：这个月的奶茶价、这季度的打车券，上个月的攻略早就过期；\n' +
+        '· 看真实操作比看结论有用：同一件商品怎么比价、怎么凑单，跟着点一遍就会；\n' +
+        '· 关注 1-2 个就够，别刷成娱乐——看它是为了省钱，不是为了多一个刷手机的理由。',
+      resources: [{
+        type: 'up',
+        label: '天月遥',
+        desc: '消费主义克星 · 极简省钱｜《生活费不够花？给学生党的 10 条省钱建议》',
+        url: 'https://m.bilibili.com/space/1023335019'
+      }, {
+        type: 'up',
+        label: '先天省钱圣体',
+        desc: '19 万粉 · 极实操的薅羊毛信息差｜1.5 元喝奶茶、30 元以内半价、拼多多与打车省钱',
+        url: 'https://m.bilibili.com/space/366581522'
+      }],
+      resNote: '主页会持续更新，建议先看播放量高的入门合集再刷日常；UP 主观点不代表本应用立场，不构成投资建议。'
+    },
+    {
       id: 'budget',
       icon: '📊',
       title: '50/30/20 预算法（学生版）',
@@ -295,7 +333,35 @@
       body: '学生理财从「不亏」开始，不追高、不碰不懂的：\n' +
         '· 先攒 3 个月生活费做应急金（货币基金 / 活期）；\n' +
         '· 再用闲钱做小额定投宽基指数，练心态不看短期涨跌；\n' +
-        '· 收益率再香也先问自己：能放多久、亏 20% 慌不慌。'
+        '· 收益率再香也先问自己：能放多久、亏 20% 慌不慌。',
+      resources: [{
+        type: 'video',
+        label: '大学生理财扫盲（不推基金）',
+        desc: '给大学生做金融祛魅，不推基金不割韭菜，先建立正确的金钱观。',
+        url: 'https://www.snm0516.aisee.tv/video/BV1tj6wBDEXF/'
+      }, {
+        type: 'video',
+        label: '零基础理财入门课 · 第 1 集 + 第 5 集',
+        desc: '全 20 集短课（每集 20-30 分钟），课堂时间有限，只看第 1 集打底 + 第 5 集实操。',
+        url: 'https://www.snm0516.aisee.tv/video/BV1yAX5YQEAs/'
+      }],
+      resNote: '资源为公开 B 站视频，经镜像站转发以保证课堂网络环境可播放；镜像不可用时可在 B 站搜索同名标题。'
+    },
+    {
+      id: 'mooc',
+      icon: '🎓',
+      title: '中国大学 MOOC《个人理财》',
+      tag: '系统学习',
+      body: '想把理财学成体系，去跟一门完整课程：\n' +
+        '· 官方课程页，含「流动性管理工具——货币市场基金」「基金定投」等章节；\n' +
+        '· 先看这两节，能直接对上本页的应急金与定投建议；\n' +
+        '· 免费旁听即可，不必为了证书花钱。',
+      resources: [{
+        type: 'course',
+        label: '中国大学 MOOC《个人理财》课程页',
+        desc: '系统学习入口 · 含货币市场基金、基金定投等章节。',
+        url: 'https://www.icourse163.org/course/detail.htm?cid=1207124806'
+      }]
     },
     {
       id: 'loan',
@@ -328,6 +394,51 @@
         '· 刷单、跑分、出租账号 = 违法，给多少钱都不干。'
     }
   ];
+
+  /**
+   * 学习资源的类型顺序：视频 → 课程 → UP 主主页。
+   * 固定顺序是为了让看板卡与聊天气泡的「首屏内容」永远是 3 条视频 / 课程，
+   * 后加入的 UP 主主页排在后面，不会把原有视频挤下去。
+   */
+  var LEARN_TYPE_ORDER = ['video', 'course', 'up'];
+
+  /**
+   * 聚合理财学院里所有可学习资源，供看板卡与聊天卡片共用（单一数据源，
+   * 不复制任何链接，ACADEMY 内容变更后两处入口自动同步）。
+   *   · 只收 type 为 video / course / up 且带合法 url 的条目（copy 型没有外链，
+   *     放进来会渲染成点不动的空行，故跳过）；
+   *   · 返回顺序固定为 video → course → up，同类型内保持 ACADEMY 顺序；
+   *   · 每次调用返回全新数组与全新对象，外部修改不会污染 ACADEMY。
+   * @return {Array<Object>} 每项 {lessonId, tag, icon, type, label, desc, url, copy}
+   */
+  function learningResources() {
+    var out = [];
+    for (var t = 0; t < LEARN_TYPE_ORDER.length; t++) {
+      var want = LEARN_TYPE_ORDER[t];
+      for (var i = 0; i < ACADEMY.length; i++) {
+        var lesson = ACADEMY[i];
+        if (!lesson || !lesson.resources || !lesson.resources.length) { continue; }
+        for (var j = 0; j < lesson.resources.length; j++) {
+          var r = lesson.resources[j];
+          if (!r || !r.label) { continue; }
+          var type = typeof r.type === 'string' ? r.type : '';
+          if (type !== want) { continue; }
+          if (typeof r.url !== 'string' || r.url === '') { continue; }
+          out.push({
+            lessonId: lesson.id || '',
+            tag: lesson.tag || '',
+            icon: lesson.icon || '',
+            type: type,
+            label: r.label,
+            desc: r.desc || '',
+            url: r.url,
+            copy: typeof r.copy === 'string' ? r.copy : ''
+          });
+        }
+      }
+    }
+    return out;
+  }
 
   /* ================================================================== */
   /* 五、专属建议（基于账本数据动态生成）                                  */
@@ -446,7 +557,7 @@
   }
 
   /**
-   * 业务规则 5：每次记账回复都必须带一条「理财教练一句话建议」。
+   * 业务规则 5：每次记账回复都必须带一条「理财专家一句话建议」。
    * 地域绑定（业务规则 4）：优先使用《南海北区专属省钱平替库》里的点位与价格。
    * 即使这条账单没有命中平替，也必须给出兜底建议，保证「每次都有」。
    * @param {Object} bill
@@ -506,6 +617,7 @@
     COOLING_STEPS: COOLING_STEPS,
     coolingVerdict: coolingVerdict,
     ACADEMY: ACADEMY,
+    learningResources: learningResources,
     personalTips: personalTips
   };
 
