@@ -405,6 +405,43 @@ h3 {
   font-weight: 600;
 }
 
+/* ---- 行内线性小图标（替代 emoji）----
+   用在对话气泡首字、卡片小标题等「和文字同处一行」的位置。
+   尺寸跟着字号走（1em），但最小不低于 14px —— 14px 小字里 1em 会缩成 11px，
+   描边挤在一起就糊了。默认继承 currentColor，所以能自动跟随所属气泡 / 标题的颜色。 */
+.bico {
+  display: inline-block;
+  flex: 0 0 auto;
+  width: 1.05em;
+  height: 1.05em;
+  min-width: 14px;
+  min-height: 14px;
+  vertical-align: -0.16em;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.9;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  overflow: visible;
+}
+
+.bico-brand { color: var(--green); }
+.bico-warn { color: var(--amber-deep); }
+.bico-bad { color: var(--danger-deep); }
+.bico-mute { color: var(--text-2); }
+
+.bubble .bico { margin-right: 3px; }
+
+[data-theme="dark"] .bico-warn { color: var(--amber); }
+[data-theme="dark"] .bico-bad { color: var(--danger); }
+
+.bubble.me .bico-brand,
+.bubble.me .bico-warn,
+.bubble.me .bico-bad,
+.bubble.me .bico-mute {
+  color: #fff;
+}
+
 .bubble.me .hl {
   color: #fff;
 }
@@ -1330,6 +1367,220 @@ h3 {
   background: #fff;
 }
 
+/* ---------------------- 分类选择器（替代原生 select） ----------------------
+   原生下拉在手机上就是系统蓝色高亮条 + 系统滚动条，和这套皮肤完全两张脸。
+   这里改成「触发器 = 淡底方块 + 分类名」，点开原地展开 3 列分类网格：
+   每个选项复用明细列表同一套「淡底方块 + 深墨图标」，选中有绿描边 + 勾。
+   --sc / --sc-ink 由 JS 内联（见 app.js catPickerHtml）。 */
+
+.catpick {
+  position: relative;
+}
+
+.catpick-btn {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  width: 100%;
+  height: 44px;
+  padding: 0 10px 0 8px;
+  border: 1px solid var(--line);
+  border-radius: 11px;
+  background: #F7F8FA;
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 0.16s ease, background 0.16s ease, box-shadow 0.16s ease;
+}
+
+.catpick-btn:hover {
+  background: #fff;
+  border-color: #D8DDE5;
+}
+
+/* 展开态与键盘聚焦用同一套高亮，避免"打开着却看不出焦点在哪" */
+.catpick.open .catpick-btn,
+.catpick-btn:focus-visible {
+  background: #fff;
+  border-color: rgba(7, 193, 96, 0.55);
+  box-shadow: 0 0 0 3px rgba(7, 193, 96, 0.1);
+  outline: none;
+}
+
+.catpick-val {
+  width: 28px;
+  height: 28px;
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  border-radius: 9px;
+}
+
+.catpick-val .cat-ico {
+  width: 16px;
+  height: 16px;
+  color: var(--sc-ink, var(--green));
+  stroke-width: 2;
+}
+
+.catpick-cur {
+  flex: 1 1 auto;
+  font-size: 14.5px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.catpick-arrow {
+  width: 16px;
+  height: 16px;
+  flex: 0 0 auto;
+  color: var(--text-3);
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  transition: transform 0.18s ease;
+}
+
+.catpick.open .catpick-arrow {
+  transform: rotate(180deg);
+}
+
+/* 面板：原地展开（不用绝对定位，避免被弹窗的滚动容器裁掉） */
+.catpick-panel {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 5px;
+  margin-top: 7px;
+  padding: 7px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: #fff;
+  box-shadow: var(--shadow);
+  animation: catpick-in 0.16s ease;
+}
+
+.catpick-panel[hidden] {
+  display: none;
+}
+
+@keyframes catpick-in {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.catpick-opt {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 8px 2px 6px;
+  border: 1.5px solid transparent;
+  border-radius: 11px;
+  background: transparent;
+  cursor: pointer;
+  transition: background 0.14s ease, border-color 0.14s ease;
+}
+
+.catpick-opt:hover {
+  background: #F6F7F9;
+}
+
+.catpick-opt.on {
+  background: #F1FBF6;
+  border-color: rgba(7, 193, 96, 0.55);
+}
+
+.catpick-tile {
+  position: relative;
+  width: 32px;
+  height: 32px;
+  display: grid;
+  place-items: center;
+  border-radius: 11px;
+}
+
+.catpick-tile .cat-ico {
+  width: 19px;
+  height: 19px;
+  color: var(--sc-ink, var(--green));
+  stroke-width: 2;
+}
+
+.catpick-name {
+  font-size: 12px;
+  line-height: 1.2;
+  color: var(--text-2);
+}
+
+.catpick-opt.on .catpick-name {
+  color: var(--green-ink);
+  font-weight: 600;
+}
+
+/* 选中勾：贴在图标方块右上角，选中态不只靠颜色区分 */
+.catpick-check {
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  width: 14px;
+  height: 14px;
+  padding: 2px;
+  border-radius: 50%;
+  background: var(--green);
+  color: #fff;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 3;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  opacity: 0;
+  transform: scale(0.6);
+  transition: opacity 0.14s ease, transform 0.14s ease;
+}
+
+.catpick-opt.on .catpick-check {
+  opacity: 1;
+  transform: scale(1);
+}
+
+/* 深色模式：淡底压深，图标换回分类原色（深墨色会糊在深底上） */
+[data-theme="dark"] .catpick-btn {
+  background: rgba(255, 255, 255, 0.05);
+  border-color: var(--line);
+}
+
+[data-theme="dark"] .catpick-btn:hover,
+[data-theme="dark"] .catpick.open .catpick-btn,
+[data-theme="dark"] .catpick-btn:focus-visible {
+  background: rgba(255, 255, 255, 0.09);
+}
+
+[data-theme="dark"] .catpick-panel {
+  background: var(--raise);
+  border-color: var(--line);
+}
+
+[data-theme="dark"] .catpick-opt:hover {
+  background: rgba(255, 255, 255, 0.06);
+}
+
+[data-theme="dark"] .catpick-opt.on {
+  background: var(--green-soft);
+  border-color: rgba(7, 193, 96, 0.55);
+}
+
+[data-theme="dark"] .catpick-tile .cat-ico,
+[data-theme="dark"] .catpick-val .cat-ico {
+  color: var(--sc, var(--green));
+}
+
 .btn-primary {
   width: 100%;
   height: 42px;
@@ -1360,9 +1611,13 @@ h3 {
   inset: 0;
   background: rgba(16, 24, 40, 0.34);
   display: flex;
-  align-items: center;
+  /* 内容比屏幕高时要能滚到底：flex-start + 子元素 margin:auto 才是既有居中、又能滚动的组合，
+     用 align-items:center 会把顶部溢出部分顶到视口外且滚不到（小屏展开分类网格时必现） */
+  align-items: flex-start;
   justify-content: center;
   padding: 20px;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
   /* 必须高于 .sheet-mask(70)：从设置/分析/导入面板内打开的弹层（头像昵称、协议、注销确认等）
      才不会被子面板遮住 */
   z-index: 80;
@@ -1375,6 +1630,7 @@ h3 {
 .modal {
   width: 100%;
   max-width: 340px;
+  margin: auto;
   background: #fff;
   border-radius: 16px;
   padding: 18px;
@@ -3967,7 +4223,12 @@ body[data-ui-mode="simple"] .ui-full-only { display: none !important; }
   color: var(--text);
 }
 
-.coach-tip-ico { font-size: 15px; flex: 0 0 auto; }
+/* 图标位是行内 svg（.bico），不再依赖系统 emoji 字号；这里只给定色，不给字的外侧留白 */
+.coach-tip-ico { font-size: 15px; flex: 0 0 auto; color: var(--green); display: flex; }
+.coach-tip.level-warn .coach-tip-ico { color: var(--amber-deep); }
+.coach-tip.level-info .coach-tip-ico { color: var(--green); }
+
+[data-theme="dark"] .coach-tip.level-warn .coach-tip-ico { color: var(--amber); }
 
 .coach-tip-text {
   margin-top: 5px;
@@ -3999,7 +4260,7 @@ body[data-ui-mode="simple"] .ui-full-only { display: none !important; }
   text-align: left;
 }
 
-.coach-lesson-ico { font-size: 16px; flex: 0 0 auto; }
+.coach-lesson-ico { font-size: 16px; flex: 0 0 auto; color: var(--green); display: flex; }
 
 .coach-lesson-title {
   flex: 1 1 auto;
@@ -5270,6 +5531,13 @@ body[data-ui-mode="simple"] .chat-undo { margin-left: auto; }
 .sp-ai-main b { display: block; font-size: 14.5px; font-weight: 700; color: var(--sp-text); }
 .sp-ai-main small { display: block; margin-top: 2px; font-size: 12px; color: var(--sp-sub); }
 .sp-ai-go { color: var(--sp-sub); font-size: 20px; }
+/* 存钱罐快捷卡：橙色存钱罐图标，与 AI 卡区分 */
+.sp-piggy-entry .sp-ai-ico {
+  color: #fff;
+  background: linear-gradient(135deg, #FF9A5A, #FF7A45);
+  box-shadow: 0 4px 10px rgba(255, 122, 69, 0.3);
+}
+.sp-piggy-entry .sp-ai-ico svg { width: 20px; height: 20px; fill: currentColor; display: block; }
 
 /* 深色模式适配 */
 [data-theme="dark"] .chat-back { background: #2A2F37; color: #E6E9ED; }
@@ -6082,9 +6350,16 @@ body[data-ui-mode="simple"] #saveHubSheet .analysis-tabs .atab {
 /* 教练头像方块内的毕业帽图标 */
 .cap-ico { width: 26px; height: 26px; color: var(--green-ink); }
 
-/* 分类图标：置于带底色的小方块内 */
-.sp-q-ico .cat-ico { width: 24px; height: 24px; }
-.sp-bill-ico .cat-ico { width: 20px; height: 20px; color: #fff; }
+/* 分类图标：置于带底色的小方块内。
+   --sc / --sc-ink 由 JS 按分类内联（见 app.js spCatTileStyle）。
+   浅色分类（餐饮绿 / 交通青）用原色画在自家淡底上只有 2:1，看着像"没画上去"，
+   这里统一换成同色系深墨色（实测 4.5:1 以上），线宽 1.8→2，小尺寸更抓眼。 */
+.sp-q-ico .cat-ico { width: 24px; height: 24px; color: var(--sc-ink, var(--green)); stroke-width: 2; }
+.sp-bill-ico .cat-ico { width: 20px; height: 20px; color: var(--sc-ink, var(--green)); stroke-width: 2; }
+
+/* 深色模式：淡底在深色卡片上变深底，深墨色会糊掉，换回分类原色 */
+[data-theme="dark"] .sp-q-ico .cat-ico,
+[data-theme="dark"] .sp-bill-ico .cat-ico { color: var(--sc, var(--green)); }
 
 /* 深色模式：图标在深色卡片上仍保持品牌绿可读 */
 [data-theme="dark"] .title-ico,
@@ -6124,3 +6399,494 @@ span.set-ico {
   height: auto;
   color: inherit;
 }
+
+
+/* =========================================================
+   存钱罐（v1.1 新增 · .piggy-*）
+   设计约束：
+     ① 只用本项目已有的 CSS 变量，自带深浅色跟随，不新增主题分支；
+     ② 完整版是弹层（#piggyMask）、简洁版是整页（#panelSimplePiggy），
+        两边复用同一段 HTML，所以所有块都用 --card 做面，落在灰底上；
+     ③ 金额统一等宽字体，保证「¥8.00」和「¥12.50」右对齐不错位。
+   ========================================================= */
+
+/* ---- 看板小卡 ---- */
+.card-piggy .piggy-mini { display: flex; flex-direction: column; gap: 8px; }
+.piggy-mini-top { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
+.piggy-mini-amt {
+  font-family: var(--mono);
+  font-size: 22px; font-weight: 700; color: var(--green-ink);
+  font-variant-numeric: tabular-nums;
+}
+.piggy-mini-meta { font-size: 12px; color: var(--text-3); }
+.piggy-mini-bar {
+  height: 6px; border-radius: 999px; background: var(--line-2); overflow: hidden;
+}
+.piggy-mini-bar > i {
+  display: block; height: 100%; border-radius: 999px;
+  background: linear-gradient(90deg, var(--green), #0bb968);
+  transition: width 0.25s ease;
+}
+.piggy-mini-note { font-size: 11px; color: var(--text-3); line-height: 1.5; }
+
+/* ---- 弹层本体：比通用 sheet 窄一点，小面板不需要 860px ---- */
+.sheet-piggy { max-width: 480px; }
+.sheet-piggy .sheet-body > * { flex: 0 0 auto; }
+.piggy-foot-note { font-size: 11px; color: var(--text-3); line-height: 1.5; }
+
+/* ---- 头部大数 ---- */
+.piggy-hero {
+  display: flex; align-items: center; gap: 14px;
+  background: linear-gradient(135deg, #07C160, #0bb968);
+  border-radius: 18px; padding: 18px 16px; color: #fff;
+  box-shadow: 0 8px 24px rgba(7, 193, 96, 0.24);
+}
+.piggy-hero .ph-ico {
+  flex: 0 0 auto;
+  width: 46px; height: 46px; border-radius: 14px;
+  background: rgba(255, 255, 255, 0.18);
+  display: flex; align-items: center; justify-content: center;
+}
+.piggy-hero .ph-ico svg { width: 26px; height: 26px; fill: none; stroke: #fff; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
+.piggy-hero .ph-main { min-width: 0; }
+.piggy-hero .ph-amt {
+  font-family: var(--mono); font-size: 28px; font-weight: 700; line-height: 1.2;
+  font-variant-numeric: tabular-nums; word-break: break-all;
+}
+.piggy-hero .ph-sub { font-size: 12px; opacity: 0.92; margin-top: 2px; }
+
+/* ---- 可用余额行 ---- */
+.piggy-avail {
+  display: flex; align-items: center; justify-content: space-between; gap: 8px;
+  background: var(--card); border: 1px solid var(--line);
+  border-radius: 14px; padding: 10px 14px;
+  font-size: 12px; color: var(--text-2);
+}
+.piggy-avail b { font-family: var(--mono); font-size: 15px; color: var(--text); font-variant-numeric: tabular-nums; }
+.piggy-avail span { font-size: 11px; color: var(--text-3); }
+
+/* ---- 金额输入 ---- */
+.piggy-input {
+  display: flex; align-items: center; gap: 8px;
+  background: var(--card); border: 1px solid var(--line);
+  border-radius: 14px; padding: 0 14px; height: 52px;
+}
+.piggy-input:focus-within { border-color: var(--green); box-shadow: 0 0 0 3px var(--green-soft); }
+.piggy-input .pi-unit { font-size: 18px; color: var(--text-3); flex: 0 0 auto; }
+.piggy-input input {
+  flex: 1 1 auto; min-width: 0; height: 100%;
+  border: none; outline: none; background: transparent;
+  font-family: var(--mono); font-size: 20px; font-weight: 700; color: var(--text);
+  font-variant-numeric: tabular-nums;
+}
+.piggy-input input::placeholder { font-family: var(--font); font-size: 14px; font-weight: 400; color: var(--text-3); }
+
+/* ---- 快捷金额 ---- */
+.piggy-quick { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
+.piggy-q {
+  min-width: 52px; height: 34px; padding: 0 12px;
+  border-radius: 999px; border: 1px solid var(--line);
+  background: var(--card); color: var(--text);
+  font-family: var(--mono); font-size: 13px; font-weight: 600;
+}
+.piggy-q:hover { border-color: var(--green); color: var(--green-ink); background: var(--green-soft); }
+.piggy-q:disabled { opacity: 0.4; cursor: not-allowed; }
+.pq-tip { font-size: 11px; color: var(--text-3); margin-left: 2px; }
+
+/* ---- 校验提示 ---- */
+.piggy-err {
+  background: var(--danger-soft); color: var(--danger-deep);
+  border-radius: 12px; padding: 9px 12px; font-size: 12px; line-height: 1.5;
+}
+
+/* ---- 主操作 ---- */
+.piggy-actions { display: flex; gap: 10px; }
+.piggy-btn {
+  flex: 1 1 auto; height: 46px; border-radius: 14px;
+  border: 1px solid var(--line); background: var(--card); color: var(--text);
+  font-size: 14px; font-weight: 600;
+}
+.piggy-btn:hover { background: var(--line-2); }
+.piggy-btn.primary {
+  flex: 2 1 auto; border: none; background: var(--green); color: #fff;
+  box-shadow: 0 6px 18px rgba(7, 193, 96, 0.24);
+}
+.piggy-btn.primary:hover { background: var(--green-dark); }
+.piggy-btn:disabled { opacity: 0.45; cursor: not-allowed; box-shadow: none; }
+
+/* ---- 全部取出：次要、虚线、弱提示，明确区别于「取出」(按金额) ---- */
+.piggy-btn-all {
+  flex: 1 1 auto; height: 42px; margin-top: 2px; border-radius: 12px;
+  border: 1px dashed var(--line); background: transparent; color: var(--text-2);
+  font-size: 13px; font-weight: 600;
+}
+.piggy-btn-all:hover { border-color: var(--green); color: var(--green-ink); background: var(--green-soft); }
+
+/* ---- 鼓励话术卡 ---- */
+.piggy-cheer {
+  display: flex; align-items: flex-start; gap: 10px;
+  background: var(--green-soft); border: 1px solid rgba(7, 193, 96, 0.35);
+  border-radius: 14px; padding: 12px 12px 12px 14px;
+  animation: piggy-pop 0.28s cubic-bezier(0.22, 1.2, 0.36, 1);
+}
+.piggy-cheer .pc-emoji { flex: 0 0 auto; font-size: 24px; line-height: 1.2; color: var(--green); }
+.piggy-cheer .pc-body { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+.piggy-cheer .pc-body b { font-size: 14px; color: var(--green-ink); }
+.piggy-cheer .pc-body span { font-size: 12px; color: var(--text-2); line-height: 1.55; overflow-wrap: anywhere; }
+.piggy-cheer .pc-close {
+  flex: 0 0 auto; width: 22px; height: 22px; border-radius: 50%;
+  color: var(--text-3); font-size: 12px; line-height: 1;
+}
+.piggy-cheer .pc-close:hover { background: rgba(15, 23, 42, 0.08); }
+@keyframes piggy-pop {
+  from { opacity: 0; transform: translateY(8px) scale(0.98); }
+  to { opacity: 1; transform: none; }
+}
+
+/* ---- 记录列表 ---- */
+.piggy-sec {
+  display: flex; align-items: baseline; justify-content: space-between;
+  font-size: 14px; font-weight: 700; color: var(--text); margin-top: 4px;
+}
+.piggy-sec-sub { font-size: 11px; font-weight: 400; color: var(--text-3); }
+.piggy-logs {
+  background: var(--card); border: 1px solid var(--line); border-radius: 14px; overflow: hidden;
+}
+.piggy-logs .piggy-log {
+  display: flex; align-items: center; gap: 10px;
+  padding: 10px 14px; border-top: 1px solid var(--line-2);
+}
+.piggy-logs .piggy-log:first-child { border-top: none; }
+.pl-date { flex: 0 0 auto; font-size: 11px; color: var(--text-3); font-variant-numeric: tabular-nums; }
+.pl-main { flex: 1 1 auto; min-width: 0; font-size: 13px; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pl-amt {
+  flex: 0 0 auto; font-family: var(--mono); font-size: 13px; font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+.pl-amt.in { color: var(--green-ink); }
+.pl-amt.out { color: var(--text-2); }
+.piggy-logs .piggy-empty { padding: 16px 14px; font-size: 12px; color: var(--text-3); text-align: center; }
+
+.piggy-note { margin: 0; font-size: 11px; color: var(--text-3); line-height: 1.6; }
+
+/* ---- 简洁版：存钱罐屏 ---- */
+body[data-view="spiggy"] #panelSimplePiggy { display: flex; }
+.sp-piggy { padding: 0 14px 10px; }
+#spPiggyBody {
+  display: flex; flex-direction: column; gap: 10px;
+  padding-top: 4px;
+}
+#spPiggyBody > .piggy-sec { color: var(--sp-text); margin-top: 8px; }
+#spPiggyBody .piggy-avail,
+#spPiggyBody .piggy-input,
+#spPiggyBody .piggy-q,
+/* 注意：必须排除 .primary。本段选择器带 #spPiggyBody（ID），优先级高于 .piggy-btn.primary，
+   若不排除会把主按钮刷成白底，而主按钮文字是白色 → 白字白底，按钮文字看不见。 */
+#spPiggyBody .piggy-btn:not(.primary),
+#spPiggyBody .piggy-logs { background: var(--sp-card); border-color: var(--sp-line); }
+#spPiggyBody .piggy-input:focus-within { border-color: var(--green); }
+#spPiggyBody .piggy-note { color: var(--sp-sub); }
+.sp-ring-piggy { font-size: 12px; color: var(--text-3); }
+
+/* ---- 深色：绿色渐变大卡在深底上压得太亮，降一档饱和度 ---- */
+[data-theme="dark"] .piggy-hero {
+  background: linear-gradient(135deg, #059748, #0A8F55);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+}
+[data-theme="dark"] .piggy-cheer { border-color: rgba(59, 217, 138, 0.35); }
+[data-theme="dark"] #spPiggyBody .piggy-q { color: var(--sp-text); }
+
+/* =========================================================
+   心愿单 · 消费诊断 · 期末预测 · 说话风格（v1.2 新增）
+   ---------------------------------------------------------
+   设计约束：
+     ① 只用本项目已有的 CSS 变量，不出现任何裸色值（#fff / rgba() 一律不许），
+        深浅色因此自动跟随，不需要为每一条规则再写一遍深色分支；
+     ② 等级表达只用「左色条 + 软底」，正文一律 --text / --text-2，
+        不靠文字颜色传达严重度（--danger / --amber 在深色下未提亮）；
+     ③ 窄屏（390 / 360）不许横向溢出：grid 列写 minmax(0,1fr)，
+        长文本 min-width:0 + overflow-wrap:anywhere。
+   ========================================================= */
+
+/* ---- 看板小卡：心愿单 ---- */
+.card-wish .wish-mini { display: flex; flex-direction: column; gap: 8px; }
+.wish-mini-top { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
+.wish-mini-amt {
+  font-family: var(--mono);
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--green-ink);
+  font-variant-numeric: tabular-nums;
+}
+.wish-mini-meta { font-size: 12px; color: var(--text-3); min-width: 0; overflow-wrap: anywhere; }
+.wish-mini-bar { height: 6px; border-radius: 999px; background: var(--line-2); overflow: hidden; }
+.wish-mini-bar > i {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+  background: var(--green);
+  transition: width 0.25s ease;
+}
+.wish-mini-note { font-size: 11px; color: var(--text-3); line-height: 1.5; word-break: break-word; }
+
+/* ---- 弹层本体 ---- */
+.sheet-wish { max-width: 480px; }
+.sheet-wish .sheet-body > * { flex: 0 0 auto; }
+
+.wish-tabs {
+  display: flex;
+  gap: 8px;
+  max-width: 100%;
+  overflow-x: auto;
+  padding: 2px 2px 8px;
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior-x: contain;
+}
+.wish-tabs::-webkit-scrollbar { display: none; }
+.wish-tab {
+  flex: 0 0 auto;
+  min-height: 40px;
+  padding: 0 14px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: var(--card);
+  color: var(--text-2);
+  font-size: 13px;
+  font-weight: 600;
+}
+.wish-tab.active { background: var(--green-soft); border-color: var(--green-soft); color: var(--green-ink); }
+
+.wish-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
+.wish-item {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--card);
+}
+.wish-item-main { min-width: 0; display: flex; flex-direction: column; gap: 4px; }
+.wish-item-title {
+  min-width: 0;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text);
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+.wish-item-note {
+  min-width: 0;
+  font-size: 12px;
+  color: var(--text-2);
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+.wish-item-meta { font-size: 11px; color: var(--text-3); font-variant-numeric: tabular-nums; }
+.wish-overdue {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: var(--danger-soft);
+  color: var(--text-2);
+  font-size: 10px;
+  font-weight: 600;
+  vertical-align: 1px;
+}
+.wish-bar { height: 5px; border-radius: 999px; background: var(--line-2); overflow: hidden; }
+.wish-bar > i { display: block; height: 100%; border-radius: 999px; background: var(--green); transition: width 0.25s ease; }
+
+.wish-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.wish-btn {
+  flex: 0 0 auto;
+  min-height: 40px;
+  min-width: 40px;
+  padding: 0 14px;
+  border-radius: 10px;
+  font-size: 13px;
+  font-weight: 600;
+  border: 1px solid var(--line);
+  background: var(--card);
+  color: var(--text-2);
+}
+.wish-btn--primary { background: var(--green); border-color: var(--green); color: var(--card); }
+.wish-btn--ghost { background: var(--card); color: var(--text-2); }
+.wish-btn--danger { background: var(--danger-soft); border-color: var(--danger-soft); color: var(--text-2); }
+.wish-btn:disabled { opacity: 0.45; }
+.wish-btn:focus-visible, .wish-tab:focus-visible { outline: 2px solid var(--green); outline-offset: 2px; }
+
+.wish-empty {
+  list-style: none;
+  padding: 22px 12px;
+  text-align: center;
+  font-size: 12.5px;
+  color: var(--text-3);
+  line-height: 1.6;
+}
+.wish-sec { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; margin-top: 2px; }
+.wish-stat { font-size: 13px; font-weight: 700; color: var(--text); }
+.wish-stat b { font-family: var(--mono); color: var(--green-ink); font-variant-numeric: tabular-nums; }
+.wish-foot-note { margin: 0; font-size: 11px; color: var(--text-3); line-height: 1.6; }
+.wish-extra { display: flex; justify-content: flex-end; }
+
+/* ---- 消费诊断卡 ---- */
+.diag-list { display: flex; flex-direction: column; gap: 10px; }
+.diag-item {
+  display: grid;
+  /* 4px 色条 + 内容：色条单独一列，不靠 border 撑，窄屏也不会挤出容器 */
+  grid-template-columns: 4px minmax(0, 1fr);
+  gap: 10px;
+  padding: 10px 12px 10px 0;
+  border-radius: 12px;
+  background: var(--card);
+}
+.diag-item.is-high { background: var(--danger-soft); }
+.diag-item.is-mid { background: var(--amber-soft); }
+.diag-item.is-low { background: var(--green-soft); }
+.diag-bar { display: block; width: 4px; border-radius: 999px; background: var(--line); }
+.diag-bar.is-high { background: var(--danger); }
+.diag-bar.is-mid { background: var(--amber); }
+.diag-bar.is-low { background: var(--green); }
+.diag-main { min-width: 0; display: flex; flex-direction: column; gap: 4px; }
+.diag-head { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.diag-title {
+  min-width: 0;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text);
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+.diag-evidence { font-size: 12.5px; color: var(--text); line-height: 1.55; overflow-wrap: anywhere; }
+.diag-action { font-size: 11px; color: var(--text-2); line-height: 1.5; overflow-wrap: anywhere; }
+.diag-empty { padding: 10px 2px; font-size: 12.5px; color: var(--text-2); line-height: 1.6; }
+
+/* ---- 期末预测 KPI（完整版预算卡内） ---- */
+.forecast-kpi {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-top: 10px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: var(--line-2);
+}
+.fk-label { font-size: 11px; color: var(--text-3); }
+.fk-value {
+  font-family: var(--mono);
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+}
+/* 唯一允许用文字色表达强弱的地方：超支数字本身 */
+.fk-value.is-over { color: var(--danger-deep); }
+.fk-note { font-size: 11px; color: var(--text-2); line-height: 1.5; overflow-wrap: anywhere; }
+
+/* ---- 设置页：单日上限输入 ---- */
+.set-cap-input {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+  padding: 6px 10px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--card);
+}
+.sci-unit { font-size: 13px; color: var(--text-3); }
+.set-cap-input input {
+  width: 96px;
+  min-width: 0;
+  border: none;
+  outline: none;
+  background: transparent;
+  color: var(--text);
+  font-family: var(--mono);
+  font-size: 14px;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+/* ---- 设置页：说话风格三张卡（竖排） ---- */
+.set-tone-card {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 4px;
+  margin-top: 8px;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--card);
+  cursor: pointer;
+}
+.set-tone-card input { position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
+.set-tone-card.active { border-color: var(--green); background: var(--green-soft); }
+.set-tone-card:focus-within { outline: 2px solid var(--green); outline-offset: 2px; }
+.stc-main { display: flex; align-items: baseline; gap: 8px; min-width: 0; }
+.stc-main b { font-size: 13.5px; font-weight: 700; color: var(--text); }
+.stc-main small { font-size: 11.5px; color: var(--text-2); min-width: 0; overflow-wrap: anywhere; }
+.stc-sample { font-size: 12px; color: var(--text-2); line-height: 1.55; overflow-wrap: anywhere; }
+
+/* ---- 简洁版：心愿单小卡 ---- */
+.sp-wishcard {
+  display: block;
+  width: 100%;
+  margin: 14px 0 0;
+  padding: 12px 14px;
+  border: none;
+  border-radius: var(--sp-radius);
+  background: var(--sp-card);
+  box-shadow: var(--sp-shadow);
+  text-align: left;
+  cursor: pointer;
+}
+.sp-wish-row { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
+.sp-wish-label { font-size: 13px; font-weight: 700; color: var(--sp-text); }
+.sp-wish-count { font-size: 12px; font-weight: 600; color: var(--sp-sub); }
+.sp-wish-bar { height: 5px; margin: 8px 0 6px; border-radius: 999px; background: var(--sp-line); overflow: hidden; }
+.sp-wish-bar > i { display: block; height: 100%; border-radius: 999px; background: var(--sp-green); }
+.sp-wish-note { font-size: 11.5px; color: var(--sp-sub); line-height: 1.5; overflow-wrap: anywhere; }
+
+/* ---- 简洁版：期末预测 ---- */
+.sp-forecast {
+  margin: 10px 0 0;
+  padding: 10px 12px;
+  border-radius: var(--sp-radius);
+  background: var(--sp-card);
+  box-shadow: var(--sp-shadow);
+  font-size: 12.5px;
+  color: var(--sp-sub);
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+}
+.sp-forecast b { color: var(--sp-text); font-family: var(--mono); font-variant-numeric: tabular-nums; }
+.sp-forecast b.is-over { color: var(--danger-deep); }
+.sp-forecast small { display: block; margin-top: 2px; font-size: 11.5px; color: var(--sp-sub); }
+
+/* ---- 简洁版：消费诊断 ---- */
+.sp-diag { display: flex; flex-direction: column; gap: 8px; margin-top: 10px; }
+.sp-diag-item {
+  padding: 10px 12px;
+  border-left: 3px solid var(--sp-line);
+  border-radius: 10px;
+  background: var(--sp-card);
+  box-shadow: var(--sp-shadow);
+}
+/* 等级只用左色条：high 红、mid 琥珀、low 绿（都是变量，不是裸色值） */
+.sp-diag-item.is-high { border-left-color: var(--sp-red); }
+.sp-diag-item.is-mid { border-left-color: var(--amber); }
+.sp-diag-item.is-low { border-left-color: var(--sp-green); }
+.sp-diag-head { display: flex; align-items: baseline; gap: 8px; min-width: 0; }
+.sp-diag-title { font-size: 13px; font-weight: 700; color: var(--sp-text); }
+.sp-diag-text { margin-top: 2px; font-size: 12px; color: var(--sp-sub); line-height: 1.55; overflow-wrap: anywhere; }
+
+/* ---- 深色：只补必要的面/条覆盖 ---- */
+[data-theme="dark"] .wish-bar { background: var(--raise); }
+[data-theme="dark"] .wish-mini-bar { background: var(--raise); }
+[data-theme="dark"] .forecast-kpi { background: var(--raise); }
+[data-theme="dark"] .wish-tab { background: var(--card); }
+[data-theme="dark"] .set-tone-card { background: var(--card); }

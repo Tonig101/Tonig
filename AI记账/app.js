@@ -17,8 +17,120 @@
   var ANA = global.AJ.analysis;
   var OCR = global.AJ.ocr;
   var COACH = global.AJ.coach;
+  var INTENT = global.AJ.intent;
   var DEALS = global.AJ.deals;
   var SAV = global.AJ.savings;
+
+  /**
+   * 说话风格模块（tone.js）。
+   * 只提供「一句话」，缺文件时统一返回空串 —— 调用方拿到空串就不显示那句话，
+   * 不会因为少一条文案把卡片弄坏。
+   */
+  var TONE = (function () {
+    var m = (global.AJ && global.AJ.tone) || null;
+    if (m && typeof m.t === 'function' && typeof m.set === 'function') { return m; }
+    return {
+      missing: true,
+      TONES: [
+        { key: 'gentle', name: '温柔学姐', desc: '先接住情绪，再给建议' },
+        { key: 'strict', name: '铁面教练', desc: '不哄你，只说问题' },
+        { key: 'rational', name: '理性分析官', desc: '只讲数据和结论' }
+      ],
+      DEFAULT_TONE: 'gentle',
+      normalize: function () { return 'gentle'; },
+      set: function () { return 'gentle'; },
+      get: function () { return 'gentle'; },
+      t: function () { return ''; },
+      has: function () { return false; }
+    };
+  })();
+
+  /**
+   * 心愿单模块（wishlist.js）。
+   * 独立存储键，主账本对它的依赖只有「省下的钱」一个数。缺文件时入口自动隐藏。
+   */
+  var WISH = (function () {
+    var m = (global.AJ && global.AJ.wishlist) || null;
+    if (m && typeof m.add === 'function' && typeof m.dueItems === 'function') { return m; }
+    var emptyStats = {
+      cooling: 0, bought: 0, dropped: 0,
+      coolingAmount: 0, droppedAmount: 0, boughtAmount: 0, savedAmount: 0
+    };
+    return {
+      missing: true,
+      MAX_ITEMS: 0,
+      COOL_DAYS_DEFAULT: 2,
+      EXTEND_MAX: 2,
+      EXTEND_DAYS: 3,
+      isReady: function () { return false; },
+      load: function () {},
+      reset: function () { return false; },
+      add: function () { return { ok: false, item: null, reason: 'store' }; },
+      list: function () { return []; },
+      listCooling: function () { return []; },
+      get: function () { return null; },
+      progress: function () { return { remainingDays: 0, elapsedDays: 0, pct: 0, overdue: false }; },
+      dueItems: function () { return []; },
+      decide: function () { return { ok: false, item: null, reason: 'store' }; },
+      extend: function () { return { ok: false, item: null, reason: 'store' }; },
+      remove: function () { return { ok: false, item: null, reason: 'store' }; },
+      stats: function () { return emptyStats; },
+      dateKey: function () { return ENG.formatDate(new Date()); },
+      addDays: function (k) { return k; }
+    };
+  })();
+
+  /**
+   * 消费诊断模块（diagnose.js）。
+   * 纯函数：给账单和设置，回「哪里花得不对」+「期末会怎样」。缺文件时诊断卡整块隐藏。
+   */
+  var DIAG = (function () {
+    var m = (global.AJ && global.AJ.diagnose) || null;
+    if (m && typeof m.build === 'function' && typeof m.forecast === 'function') { return m; }
+    return {
+      missing: true,
+      MAX_ITEMS: 3,
+      build: function () { return []; },
+      forecast: function () {
+        return { projected: 0, remainingAtEnd: 0, overBudgetBy: 0, level: 'safe', dailyAvg: 0 };
+      },
+      maxSeverity: function () { return ''; }
+    };
+  })();
+
+  /**
+   * 存钱罐模块（piggy.js）。
+   * 主账本对它的依赖只有一个数：getBalance()（罐内余额，元）。
+   * 这里做了一个「空罐子」替身：piggy.js 缺失 / 加载失败时全部返回空值，
+   * 存钱罐入口自动隐藏，其它功能一行都不受影响。
+   */
+  var PIGGY = (function () {
+    var p = (global.AJ && global.AJ.piggy) || null;
+    if (p && typeof p.getBalance === 'function' && typeof p.deposit === 'function') { return p; }
+    var emptyStats = {
+      balanceCents: 0, count: 0, depositCount: 0, days: 0,
+      streak: 0, todayCents: 0, biggestCents: 0, firstDate: '', lastDate: ''
+    };
+    return {
+      missing: true,
+      isReady: function () { return false; },
+      isRecovered: function () { return false; },
+      load: function () {},
+      reset: function () { return false; },
+      getBalanceCents: function () { return 0; },
+      getBalance: function () { return 0; },
+      deposit: function () { return { ok: false, log: null, balanceCents: 0, reason: 'store' }; },
+      withdraw: function () { return { ok: false, log: null, balanceCents: 0, reason: 'store' }; },
+      listLogs: function () { return []; },
+      stats: function () { return emptyStats; },
+      cheer: function () { return { emoji: '', title: '', text: '' }; },
+      parseAmount: function () { return null; },
+      fmtCents: function (c) { return money((c || 0) / 100); },
+      nextStepCents: function () { return 0; },
+      dateKey: function () { return ''; },
+      MAX_CENTS: 0
+    };
+  })();
 
   /* 让 ocr.js 的云端识别走 WorkBuddy 云服务（视觉大模型），而非本地 detectCloud（浏览器直连腾讯云）。
      由 server.py 托管页面时 AJ_BACKEND_OCR 为真，ocr.js 的 detectBackend 会改调云服务。 */
@@ -69,14 +181,21 @@
         resolve({ reply: null, actions: [], fallback: true, reason: '云服务未就绪' });
         return;
       }
-      var system = '你是"账小助"，一个面向大学生的校园记账 AI 助手。帮用户一句话记账、查余额、' +
-        '看消费分析、定攒钱目标。用简洁、口语化、带一点鼓励的中文回复。' +
-        '若用户给了消费信息，在 actions 里返回 add_bill；若用户想看余额/饼图/记收入/截屏记账/' +
-        '账单分析/攒钱目标/设置预算，在 actions 里返回对应 command。' +
-        '只返回一个 JSON 对象、不要其它文字：' +
-        '{"reply":"<中文回复>","actions":[' +
+      /* C11：system prompt 增加「intent」输出字段与「clarify」动作，
+         口径与 intent.js 的 7 个枚举完全一致，便于本地直接合并（mergeVerdict）。
+         关键约束：疑问句不是 record；record 缺金额必须 clarify，禁止编造金额。 */
+      var system = '你是"账小助"，面向大学生的校园记账 AI 助手。' +
+        '先判断用户这句话的意图，再决定动作。意图只能是这 7 个之一：' +
+        'record(记账) / query(查询) / howto(问怎么做) / advice(求建议) / dataop(改删撤) / chitchat(闲聊) / unknown。' +
+        '关键规则：① 疑问句（怎么办 / 怎么 / 吗 / 多少）一律不是 record；' +
+        '② 只有 record 且已知金额才返回 add_bill；record 缺金额必须返回 clarify 问金额，禁止编造金额；' +
+        '③ 未来计划（明天 / 打算 / 约）属于 record，可在 reply 里提醒"还没发生"；' +
+        '④ 如果给了【本地分类器初判】，只允许在其 candidates 之内裁决，越界视为无效。' +
+        '用简洁、口语化、带一点鼓励的中文回复。只返回一个 JSON 对象、不要其它文字：' +
+        '{"intent":"<7选1>","confidence":<0~1>,"reply":"<中文回复>","actions":[' +
         '{"type":"add_bill","amount":<number>,"category":<"餐饮"|"交通"|"购物"|"娱乐"|"学习"|"居住"|"医疗"|"社交"|"其他">,"note":<string>,"date":<"YYYY-MM-DD"|null>,"motivation":<"刚需"|"情绪">,"want":<bool>},' +
-        '{"type":"command","name":<"balance"|"pie"|"income"|"ocr"|"analysis"|"goals"|"settings">}]}';
+        '{"type":"command","name":<"balance"|"pie"|"income"|"ocr"|"analysis"|"goals"|"settings"|"undo">},' +
+        '{"type":"clarify","missing":<"amount"|"queryKind"|"target">,"hint":<string>}]}';
       var userContent = String(messageText || '');
       if (context && typeof context === 'object') {
         userContent = '【用户当前情况】\n' + JSON.stringify(context) + '\n\n【用户消息】\n' + userContent;
@@ -98,12 +217,25 @@
         clearTimeout(timeoutTimer);
         var parsed = parseCloudJson(full);
         if (!parsed) {
-          resolve({ reply: full || null, actions: [], fallback: false, reason: '' });
+          resolve({ reply: full || null, actions: [], intent: null, clarify: null, fallback: false, reason: '' });
           return;
+        }
+        /* C11：把 intent / clarify 一并回传，供 intent.js 的 mergeVerdict 在本地 top2 内裁决 */
+        var clarify = null;
+        var acts = Array.isArray(parsed.actions) ? parsed.actions : [];
+        var i;
+        for (i = 0; i < acts.length; i++) {
+          if (acts[i] && acts[i].type === 'clarify') {
+            clarify = acts[i].missing || null;
+            break;
+          }
         }
         resolve({
           reply: parsed.reply || null,
-          actions: Array.isArray(parsed.actions) ? parsed.actions : [],
+          actions: acts,
+          intent: parsed.intent || null,
+          confidence: (typeof parsed.confidence === 'number') ? parsed.confidence : null,
+          clarify: clarify,
           fallback: false,
           reason: ''
         });
@@ -249,11 +381,13 @@
   var pendingBill = null;
   /** 撤回栈：按记账顺序记录每笔账单 id（仅内存，不持久化）。供「撤回上一步」使用 */
   var undoStack = [];
+  /** 纠错待补金额：上一轮问「要改成多少」后置位，下一句纯数字直接改这一笔（不新增账单） */
+  var correctionPending = null;
   /** 轻量视图历史：记录进入子视图（专家/目标/看板）前的视图（仅内存，不持久化）。供「返回」按钮使用 */
   var viewHistory = [];
   /** 双 UI 视图集：完整版四视图 / 简洁版八屏（含 AI 对话记账屏 sai、省钱屏 ssave） */
   var FULL_VIEWS = { chat: 1, dash: 1, goals: 1, coach: 1 };
-  var SIMPLE_VIEWS = { shome: 1, slist: 1, sbudget: 1, sprofile: 1, sai: 1, scoach: 1, sgoals: 1, ssave: 1 };
+  var SIMPLE_VIEWS = { shome: 1, slist: 1, sbudget: 1, sprofile: 1, sai: 1, scoach: 1, sgoals: 1, ssave: 1, spiggy: 1 };
 
   /** 账单分析：最近一次导入的原始结果（默认不写入账本） */
   var analysisData = null;
@@ -270,6 +404,16 @@
 
   function $(id) {
     return DOC.getElementById(id);
+  }
+
+  /** 行内小图标简写：ic('bulb') → <svg class="bico">…#i-bulb</svg>（替代 emoji） */
+  function ic(name, cls, label) {
+    return DATA.inlineIcon('i-' + name, cls, label);
+  }
+
+  /** 条目小图标：优先线性 svg（it.icon），没有才用 emoji（商户 / 品类插画，如 🍗 肯德基） */
+  function itemIcon(it, cls) {
+    return it && it.icon ? ic(it.icon, cls, null) : esc(it && it.emoji ? it.emoji : '');
   }
 
   function esc(text) {
@@ -307,6 +451,17 @@
 
   function categoryColor(key) {
     return DATA.getCategoryColor(key);
+  }
+
+  /** 分类"深墨色"：淡底方块里的图标描边色，与 categoryColor 同色系但更深 */
+  function categoryInk(key) {
+    return DATA.getCategoryInk(key);
+  }
+
+  /** 淡底小方块的内联样式：底色用 12% 淡色，图标色用深墨色（对比度 ≥4.5:1） */
+  function spCatTileStyle(key) {
+    return '--sc:' + categoryColor(key) + ';--sc-ink:' + categoryInk(key) +
+      ';background:' + categoryColor(key) + '1f';
   }
 
   /* ================================================================== */
@@ -385,7 +540,20 @@
       privacy: {
         album: privacy.album !== false,
         clipboard: privacy.clipboard !== false
-      }
+      },
+      /* ---- 本轮新增（每项都在这里兜底，否则 persistSettings 会把它们抹掉） ---- */
+      // 单日支出上限（元）；0 = 关闭「单日超支」这条诊断规则
+      dailyCap: clampNumber(s.dailyCap, 0, 99999, 60),
+      // 非必需消费占比阈值（本轮不做 UI，固定默认 0.8；保留字段是为了以后调参不用改结构）
+      alertRatio: clampNumber(s.alertRatio, 0.3, 1, 0.8),
+      // 说话风格：温柔学姐 / 铁面教练 / 理性分析官
+      tone: (s.tone === 'strict' || s.tone === 'rational') ? s.tone : 'gentle',
+      // 诊断卡主动提示去重：存「已提示过的周期起点」，一个周期只提示一次
+      hintCycle: (typeof s.hintCycle === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(s.hintCycle))
+        ? s.hintCycle : '',
+      // 心愿单到期回访去重：存「已回访过的日期」，同一天只提醒一次
+      wishReviewDate: (typeof s.wishReviewDate === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(s.wishReviewDate))
+        ? s.wishReviewDate : ''
     };
   }
 
@@ -687,7 +855,7 @@
    */
   function coachSayHtml(text) {
     return '<div class="coach-say">' +
-      '<div class="coach-say-head">💡 <b>理财专家说</b></div>' +
+      '<div class="coach-say-head">' + ic('bulb', 'bico-brand', '理财专家说') + '<b>理财专家说</b></div>' +
       '<div class="coach-say-body">' + esc(text) + '</div>' +
       '</div>';
   }
@@ -793,7 +961,7 @@
       if (row && row.parentNode) { row.parentNode.removeChild(row); }
     }
     renderAll();
-    addAIMessage(aiBubble('↩️ 已撤回「' + esc(b.note) + '」' +
+    addAIMessage(aiBubble(ic('update', 'bico-mute', '撤回') + '已撤回「' + esc(b.note) + '」' +
       (b.type === 'income' ? '（收入 ' : '（支出 ') + money(b.amount) + '），已恢复。'));
   }
 
@@ -864,6 +1032,8 @@
       }
       flow.committed.push(commitBill(draft));
     }
+    /* 上一笔还在冷静期待决时，先不汇总：否则 finishFlow 会把 pendingBill 静默清空，那笔钱就丢了 */
+    if (pendingBill) { return; }
     finishFlow();
   }
 
@@ -890,11 +1060,11 @@
       var bill = list[i];
       var head;
       if (bill.type === 'income') {
-        head = aiBubble('💰 <b>【记账成功】</b>这是一笔收入（' + esc(bill.source || '其他') + '），已经加进本周期，不计入支出统计。');
+        head = aiBubble(ic('receipt', 'bico-brand', '记账成功') + '<b>【记账成功】</b>这是一笔收入（' + esc(bill.source || '其他') + '），已经加进本周期，不计入支出统计。');
       } else {
-        head = aiBubble('<b>【记账成功】</b>记好啦～归类为 <span class="hl">' + esc(bill.category) + '</span>' +
-          (bill.merchant ? '，商家 <span class="hl">' + esc(bill.merchant) + '</span>' : '') +
-          (bill.motivation === '情绪' ? '（情绪消费，我盯着你呢）' : '') + '。');
+        head = aiBubble('<b>【记账成功】</b>记好啦～归到 <span class="hl">' + esc(bill.category) + '</span>' +
+          (bill.merchant ? '，商家 <span class="hl">' + esc(bill.merchant) + '</span>' : '') + '。' +
+          (bill.motivation === '情绪' ? '<br>今天是不是有点累？偶尔买点开心没事，别让它变成习惯就行。' : ''));
       }
       var html = head + billCardHtml(bill, true);
       html += balanceOverviewHtml(overview);
@@ -913,14 +1083,16 @@
     var sentence = overview.sentence || '';
     return '' +
       '<div class="balance-card">' +
-      '  <div class="bc-title">📊 【余额概览】</div>' +
+      '  <div class="bc-title">' + ic('wallet', 'bico-brand', '余额概览') + '【余额概览】</div>' +
       '  <div class="bc-grid">' +
       '    <div><b>' + money(st.income) + '</b><small>本周期收入</small></div>' +
       '    <div><b>' + money(st.expense) + '</b><small>本周期支出</small></div>' +
       '    <div><b class="' + (bs.remaining < 0 ? 'expense' : 'income') + '">' + money(bs.remaining) + '</b><small>剩余额度</small></div>' +
       '    <div><b>' + money(Math.max(0, bs.dailyAllowance)) + '</b><small>剩余每天可花</small></div>' +
       '  </div>' +
-      '  <div class="bc-sentence">' + esc(sentence) + '</div>' +
+      /* sentence 内含行内图标 html（内部生成，不含用户输入），不能再 esc，否则会把
+         <svg> 当纯文本画出来 */
+      '  <div class="bc-sentence">' + sentence + '</div>' +
       '</div>';
   }
 
@@ -941,7 +1113,7 @@
       ratioText = '这笔占你南海北区生活费的 ' + Math.round(draft.amount / totalBudget * 1000) / 10 + '%。';
     }
     var cooldownNotice = ratioText +
-      '这笔消费占你南海北区生活费的比例偏高。建议加入购物车冷静 24 小时。如果买了它，接下来几天的食堂伙食预算会受影响。';
+      '先别急着下单，把它丢进购物车晾 24 小时，明天还想要我再帮你记上。不过说真的，这几天食堂伙食预算会被它吃掉不少，你心里得有数。';
 
     var rows = '' +
       dcRow('商品', esc(draft.note || draft.category || '未命名')) +
@@ -952,7 +1124,7 @@
       '<div class="decision-card">' +
       '  <div class="dc-icon">!</div>' +
       '  <div class="dc-title">冷静期提醒</div>' +
-      '  <div class="dc-sub">检测到一笔 ' + money(draft.amount) + ' 的冲动消费</div>' +
+      '  <div class="dc-sub">停一下！' + money(draft.amount) + ' 块，够吃好几顿食堂了</div>' +
       '  <div class="dc-detail">' + rows + '</div>' +
       '  <div class="dc-alert"><span class="dc-dot"></span><span>' + esc(cooldownNotice) + ' ' + esc(sim.message) + '</span></div>' +
       (alt
@@ -986,14 +1158,14 @@
       var bill = commitBill(draft);
       flow.committed.push(bill);
       var line = PUSH_BACK_LINES[Math.floor(Math.random() * PUSH_BACK_LINES.length)];
-      addAIMessage(aiBubble(esc(line) + '<br>这笔 ' + money(bill.amount) + ' 已标记为「情绪消费」。'));
+      addAIMessage(aiBubble(esc(line) + '<br>这笔 ' + money(bill.amount) + ' 我按「情绪消费」记下了。今天是不是压力有点大？偶尔买点开心没关系，但别让它变成习惯哦～'));
       showToast('已记下这笔，并标记为冲动消费', 'warn');
     } else {
       state.savedMoney = ENG.round2(state.savedMoney + draft.amount);
       state.blockedCount = ENG.round2(state.blockedCount + 1);
       saveState();
       addAIMessage(aiBubble('这波省下 ' + money(draft.amount) + '，已记进你的「省下的钱」成就（累计 ' +
-        money(state.savedMoney) + '）。👏'));
+        money(state.savedMoney) + '）。'));
       showToast('已为你省下 ' + money(draft.amount), 'ok');
       renderAll();
     }
@@ -1009,7 +1181,16 @@
 
   /** 启动剁手冷静法（用户表达「想买 XX」时由 sendToAssistant 调用） */
   function startCoolingFlow(item, price) {
-    cooling = { item: String(item || '想买的东西'), price: Number(price) || 0, step: 0, answers: [] };
+    /* coolDays = 默认冷静期天数；wishId = 本条若走「放进心愿单」后拿到的条目 id，
+       结论卡选「还是要买」时用它把心愿单条目翻成 bought（含 savedMoney 精确回退）。 */
+    cooling = {
+      item: String(item || '想买的东西'),
+      price: Number(price) || 0,
+      step: 0,
+      answers: [],
+      coolDays: 2,
+      wishId: ''
+    };
     renderCoolingIntro();
   }
 
@@ -1051,15 +1232,16 @@
     if (cooling.price > 0) {
       actions += '<button type="button" class="dc-primary" data-act="cool-record">还是要买，帮我记下 ' +
         money(cooling.price) + '</button>';
-      actions += '<button type="button" class="dc-secondary" data-act="cool-skip">先不买了，省下 ' +
-        money(cooling.price) + '</button>';
+      /* 有价格分支：这句话现在同时承担「省下钱 + 进心愿单」两件事，
+         所以按钮字改成「放进心愿单」——只说「省下」会让用户以为东西丢了。 */
+      actions += '<button type="button" class="dc-secondary" data-act="cool-skip">先不买了，放进心愿单</button>';
     } else {
       actions += '<div class="cool-note">告诉我它的价格，我帮你记上这笔。</div>';
       actions += '<button type="button" class="dc-secondary" data-act="cool-skip">先不买了</button>';
     }
     var html =
       '<div class="decision-card cool-card verdict-' + v.level + '">' +
-      '  <div class="dc-icon cool">' + v.icon + '</div>' +
+      '  <div class="dc-icon cool">' + ic(v.icon, null, v.level === 'ok' ? '可以买' : '提醒') + '</div>' +
       '  <div class="dc-title">' + esc(v.title) + '</div>' +
       '  <div class="dc-sub">想买：' + esc(cooling.item) + '</div>' +
       '  <div class="dc-detail">' + dcRow('专家判断', esc(v.text)) + '</div>' +
@@ -1094,6 +1276,28 @@
     }
   }
 
+  /**
+   * 用三步问答的选项文案拼一句「为什么想买」，作为心愿单备注。
+   * 目的：48 小时后回访时，让用户看到当时的自己是怎么想的。
+   * @return {string} 不超过 60 字（wishlist.note 的上限，超了会被截断）
+   */
+  function coolingReason() {
+    if (!cooling || !Array.isArray(cooling.answers) || !cooling.answers.length) { return ''; }
+    var parts = [];
+    var steps = COACH.COOLING_STEPS || [];
+    for (var i = 0; i < cooling.answers.length; i++) {
+      var step = steps[i];
+      if (!step || !step.options) { continue; }
+      for (var j = 0; j < step.options.length; j++) {
+        if (step.options[j].val === cooling.answers[i]) {
+          parts.push(step.options[j].label);
+          break;
+        }
+      }
+    }
+    return parts.join(' · ').slice(0, 60);
+  }
+
   /** 结论后选择「仍然购买」：直接入账（已走完冷静流程，不再二次弹冷静期） */
   function coolingRecord() {
     if (!cooling) { return; }
@@ -1107,12 +1311,28 @@
       type: 'expense'
     };
     var bill = commitBill(draft);
+    /* 这笔当初可能是从心愿单里点「还是要买」进来的：
+       ① 把心愿单条目翻成 bought 并记下账单 id（对账用）；
+       ② 入清单时已把金额计入 savedMoney，现在真买了就必须精确回退，
+          blockedCount 同步减 1（且不小于 0），否则「省下的钱」会凭空多一笔。 */
+    if (cooling.wishId) {
+      var it = WISH.get(cooling.wishId);
+      var counted = !!(it && it.savedCounted);
+      WISH.decide(cooling.wishId, 'bought', { billId: bill.id });
+      if (counted) {
+        state.savedMoney = ENG.round2(Math.max(0, state.savedMoney - it.amount));
+        state.blockedCount = Math.max(0, Math.round(state.blockedCount) - 1);
+        saveState();
+      }
+      var boughtLine = toneLine('cool.bought', { title: cooling.item, amount: money(bill.amount) });
+      if (boughtLine) { addAIMessage(aiBubble(esc(boughtLine))); }
+    }
     cooling = null;
     renderAll();
     reportCommitted([bill]);
   }
 
-  /** 结论后选择「先不买」：金额计入「省下的钱」成就 */
+  /** 结论后选择「先不买」：金额计入「省下的钱」成就，并落一条心愿单 */
   function coolingSkip() {
     if (!cooling) { return; }
     var amount = cooling.price;
@@ -1120,9 +1340,23 @@
       state.savedMoney = ENG.round2(state.savedMoney + amount);
       state.blockedCount = ENG.round2(state.blockedCount + 1);
       saveState();
-      addAIMessage(aiBubble('漂亮！这波省下 ' + money(amount) +
-        '，已记进「省下的钱」（累计 ' + money(state.savedMoney) + '）。👏'));
-      showToast('已为你省下 ' + money(amount), 'ok');
+      /* 入清单失败（写盘满 / 存储不可用）不能连累「省下的钱」：
+         钱已经省下来了这件事仍然成立，只是这次没留下清单条目。 */
+      var added = WISH.add({
+        title: cooling.item,
+        amount: amount,
+        note: coolingReason(),
+        coolDays: 2,
+        source: 'cooling'
+      });
+      if (added && added.ok) { cooling.wishId = added.item.id; }
+      var coolLine = toneLine('cool.added', { title: cooling.item });
+      var savedLine = '这波省下 ' + money(amount) + '，已记进「省下的钱」（累计 ' +
+        money(state.savedMoney) + '）。';
+      addAIMessage(aiBubble((coolLine ? esc(coolLine) + '<br>' : '') + savedLine));
+      showToast(added && added.ok
+        ? '已放进心愿单，48 小时后我再来问你'
+        : '已为你省下 ' + money(amount), 'ok');
       renderAll();
     } else {
       addAIMessage(aiBubble('好，那先不买。把它加进购物车晾 48 小时，还想要再来找我。'));
@@ -1141,9 +1375,13 @@
     var cycleAgg = ENG.aggregate(state.bills, cycle.start, cycle.end);
     var allAgg = ENG.aggregate(state.bills, null, null);
     var todaySpent = ENG.round2(cycleAgg.dailyMap[todayStr] || 0);
+    /* 存钱罐占用：钱挪进罐子后就不在「可花的钱」里了，所以计入已占用额度。
+       注意只影响预算口径（剩余额度 / 日均可用），不写账单、不动消费统计，
+       因此分类占比、恩格尔系数、近 7 日趋势全部保持原样。 */
+    var piggyBalance = ENG.round2(PIGGY.getBalance() || 0);
     var budgetState = ENG.getBudgetState({
       total: state.budget.total,
-      spent: cycleAgg.expense,
+      spent: ENG.round2(cycleAgg.expense + piggyBalance),
       remainingDays: cycle.remainingDays,
       todaySpent: todaySpent
     });
@@ -1154,16 +1392,16 @@
       : 0;
     var sentence;
     if (budgetState.isOver) {
-      sentence = '📉 本周期已经超支 ' + money(budgetState.overBy) + '，接下来 ' +
+      sentence = ic('alert', 'bico-bad', '超支') + '本周期已经超支 ' + money(budgetState.overBy) + '，接下来 ' +
         cycle.remainingDays + ' 天建议只吃食堂，先把窟窿补上。';
     } else if (budgetState.status === 'danger') {
-      sentence = '📉 本周期还剩 ' + money(budgetState.remaining) + '，日均可用只有 ' +
+      sentence = ic('alert', 'bico-bad', '吃土预警') + '本周期还剩 ' + money(budgetState.remaining) + '，日均可用只有 ' +
         money(budgetState.dailyAllowance) + '，进入吃土预警状态。';
     } else if (budgetState.status === 'tight') {
-      sentence = '📊 本周期还剩 ' + money(budgetState.remaining) + '，日均可用 ' +
+      sentence = ic('bar', 'bico-warn', '预算偏紧') + '本周期还剩 ' + money(budgetState.remaining) + '，日均可用 ' +
         money(budgetState.dailyAllowance) + '，稍微收着点花。';
     } else {
-      sentence = '📊 本周期还剩 ' + money(budgetState.remaining) + '，日均可用 ' +
+      sentence = ic('wallet', 'bico-brand', '预算正常') + '本周期还剩 ' + money(budgetState.remaining) + '，日均可用 ' +
         money(budgetState.dailyAllowance) + '，节奏还不错，继续保持。';
     }
     return {
@@ -1172,6 +1410,7 @@
       cycle: cycle,
       cycleAgg: cycleAgg,
       allAgg: allAgg,
+      piggyBalance: piggyBalance,
       budgetState: budgetState,
       engel: engel,
       incomeStats: incomeStats,
@@ -1211,7 +1450,7 @@
     for (var i = 0; i < tips.length; i++) {
       var t = tips[i];
       html += '<div class="coach-tip level-' + esc(t.level) + '">' +
-        '<div class="coach-tip-head"><span class="coach-tip-ico">' + esc(t.icon) + '</span>' +
+        '<div class="coach-tip-head"><span class="coach-tip-ico">' + ic(t.icon, null, null) + '</span>' +
         '<b>' + esc(t.title) + '</b></div>' +
         '<div class="coach-tip-text">' + esc(t.text) + '</div>' +
         '</div>';
@@ -1284,7 +1523,7 @@
       var l = COACH.ACADEMY[i];
       html += '<div class="coach-lesson" data-lesson="' + esc(l.id) + '">' +
         '<button type="button" class="coach-lesson-head">' +
-        '<span class="coach-lesson-ico">' + esc(l.icon) + '</span>' +
+        '<span class="coach-lesson-ico">' + ic(l.icon, null, null) + '</span>' +
         '<span class="coach-lesson-title">' + esc(l.title) + '</span>' +
         '<span class="coach-lesson-tag">' + esc(l.tag) + '</span>' +
         '<span class="coach-lesson-arrow">›</span>' +
@@ -1593,8 +1832,11 @@
     var total = state.budget.total;
 
     renderBudgetBar(ov);
+    renderForecastKpi(ov);
     renderDealsMini();
     renderSavingsMini(ov);
+    /* 心愿单卡：放在「今天怎么省」之后、「分类占比」之前，属于 L3 消费洞察区 */
+    renderWishCard(ov);
 
     /* ---- 预算环 ---- */
     var ring = $('ringBar');
@@ -1616,13 +1858,17 @@
     $('statDays').textContent = ov.cycle.remainingDays + ' 天';
     $('budgetCycle').textContent = '周期 ' + ov.cycle.start + ' ~ ' + ov.cycle.end +
       (ov.cycle.isCustom ? '（自定义起点）' : '') +
-      ' · 总预算 ' + money(total) + ' · 已花 ' + money(ov.cycleAgg.expense);
+      ' · 总预算 ' + money(total) + ' · 已花 ' + money(ov.cycleAgg.expense) +
+      (Number(ov.piggyBalance) > 0 ? ' · 存钱罐 ' + money(ov.piggyBalance) : '');
     $('cycleBadge').title = ov.cycle.isCustom
       ? '当前周期从 ' + ov.cycle.start + ' 起算（生活费到账日）'
       : '按发钱日 ' + state.budget.payday + ' 号计算的周期';
 
     /* ---- 收支概览 ---- */
     renderIncomeCard(ov);
+
+    /* ---- 存钱罐（独立模块，看板只显示一个入口卡） ---- */
+    renderPiggyCard(ov);
 
     /* ---- 理财课 · 视频（看板常驻入口） ---- */
     renderLearnCard();
@@ -1646,6 +1892,9 @@
         ? '餐饮占比 ' + engelPercent + '%，还在健康区间。囤一点食堂早餐券，能把这个数字再压下去。'
         : '本周期还没有支出记录，先记一笔试试？';
     }
+
+    /* ---- 消费诊断（基于 CATEGORIES.essential + 设置里的单日上限） ---- */
+    renderDiagCard(ov);
 
     /* ---- 分类占比 ---- */
     renderDonut(ov);
@@ -1672,13 +1921,13 @@
     if (total <= 0) { return ''; }
     var parts = [];
     var offset = 0;
-    parts.push('<circle cx="' + cx + '" cy="' + cy + '" r="' + r + '" stroke="#EEF1F4" stroke-width="' + strokeWidth + '"></circle>');
+    parts.push('<circle cx="' + cx + '" cy="' + cy + '" r="' + r + '" fill="none" stroke="#EEF1F4" stroke-width="' + strokeWidth + '"></circle>');
     for (i = 0; i < slices.length; i++) {
       var len = slices[i].value / total * c;
       if (len <= 0) { continue; }
       var opacity = 1;
       if (highlightCategory && slices[i].key && slices[i].key !== highlightCategory) { opacity = 0.22; }
-      parts.push('<circle cx="' + cx + '" cy="' + cy + '" r="' + r + '" stroke="' + slices[i].color +
+      parts.push('<circle cx="' + cx + '" cy="' + cy + '" r="' + r + '" fill="none" stroke="' + slices[i].color +
         '" stroke-width="' + strokeWidth + '" stroke-dasharray="' + len + ' ' + (c - len) +
         '" stroke-dashoffset="' + (-offset) + '" opacity="' + opacity + '"></circle>');
       offset += len;
@@ -1852,6 +2101,7 @@
     renderSimpleList();
     renderSimpleBudget();
     renderSimpleProfile();
+    renderSimplePiggy();
     checkRadioGroup('spUiMode', getUiMode());
     /* 停在「省钱」屏时，账本变化（入账 / 打卡）也要同步到面板，避免看到旧数字 */
     if (DOC.body && DOC.body.getAttribute('data-view') === 'ssave') { renderSaveHubPanel(); }
@@ -1868,7 +2118,7 @@
       var title = inc ? (b.source || b.note || '收入') : (b.note || b.category);
       var time = spTimeOf(b);
       html += '<li class="sp-bill">' +
-        '<span class="sp-bill-ico" style="background:' + (inc ? '#07C160' : categoryColor(b.category)) + '1f">' + spCatIcon(cat) + '</span>' +
+        '<span class="sp-bill-ico" style="' + (inc ? ('--sc:#07C160;--sc-ink:#047A3E;background:#07C1601f') : spCatTileStyle(b.category)) + '">' + spCatIcon(cat) + '</span>' +
         '<span class="sp-bill-main"><b>' + esc(title) + '</b><small>' +
         (time ? esc(time) + ' · ' : '') + esc(cat) + '</small></span>' +
         '<span class="sp-bill-amt' + (inc ? ' inc' : '') + '">' + (inc ? '+' : '-') + money(b.amount) + '</span>' +
@@ -1891,7 +2141,7 @@
     for (i = 0; i < SP_QUICK_CATS.length; i++) {
       var c = SP_QUICK_CATS[i];
       q += '<button type="button" class="sp-q" data-cat="' + esc(c) + '">' +
-        '<span class="sp-q-ico" style="background:' + categoryColor(c) + '1f;color:' + categoryColor(c) + '">' + spCatIcon(c) + '</span>' +
+        '<span class="sp-q-ico" style="' + spCatTileStyle(c) + '">' + spCatIcon(c) + '</span>' +
         esc(c) + '</button>';
     }
     $('spQuick').innerHTML = q;
@@ -1899,6 +2149,7 @@
     var todays = state.bills.filter(function (b) { return b.date === today; })
       .sort(function (a, b) { return (b.createdAt || 0) - (a.createdAt || 0); });
     $('spTodayBills').innerHTML = spBillListHtml(todays, '今天还没有记账，点「记一笔」开始吧');
+    renderSimpleWish(ov);
   }
 
   /** 明细：按月分组流水 + 收支汇总 */
@@ -1944,7 +2195,10 @@
     var bs = ov.budgetState;
     var total = state.budget.total;
     var spent = ov.cycleAgg.expense;
-    var pct = total > 0 ? Math.min(100, Math.round(spent / total * 100)) : 0;
+    /* 环图按「已占用 = 消费 + 存钱罐」算，才能和「剩余」对得上；
+       分类占比仍用纯消费口径，存钱不该被算进餐饮 / 购物里。 */
+    var used = ENG.round2(spent + (ov.piggyBalance || 0));
+    var pct = total > 0 ? Math.min(100, Math.round(used / total * 100)) : 0;
     $('spRingPct').textContent = pct + '%';
     $('spSpent').textContent = money(spent);
     $('spTotal').textContent = money(total);
@@ -1953,7 +2207,7 @@
     $('spBDays').textContent = ov.cycle.remainingDays + ' 天';
     var ring = $('spRingBar');
     var C = 2 * Math.PI * 58;
-    var ratio = total > 0 ? Math.max(0, Math.min(1, spent / total)) : 0;
+    var ratio = total > 0 ? Math.max(0, Math.min(1, used / total)) : 0;
     if (ring) {
       ring.style.strokeDasharray = C + ' ' + C;
       ring.style.strokeDashoffset = String(C * (1 - ratio));
@@ -1970,6 +2224,18 @@
         '<span class="sp-cb-pct">' + p + '%</span></li>';
     }
     $('spCatBars').innerHTML = h;
+    var piggyNote = $('spPiggyNote');
+    if (piggyNote) {
+      if (Number(ov.piggyBalance) > 0) {
+        piggyNote.hidden = false;
+        piggyNote.textContent = ' · 存钱罐 ' + money(ov.piggyBalance);
+      } else {
+        piggyNote.hidden = true;
+        piggyNote.textContent = '';
+      }
+    }
+    renderSimpleForecast(ov);
+    renderSimpleDiag(ov);
   }
 
   /** 我的：资料卡 + 统计 + 界面风格切换 + 菜单 */
@@ -2017,6 +2283,15 @@
     $('spMenuCoach').addEventListener('click', function () { switchView('scoach'); });
     $('spMenuGoals').addEventListener('click', function () { switchView('sgoals'); });
     $('spGoalsBack').addEventListener('click', function () { goBackView(); });
+    $('spMenuPiggy').addEventListener('click', function () { switchView('spiggy'); });
+    $('spMenuWish').addEventListener('click', openWishSheet);
+    $('spBtnPiggyQuick').addEventListener('click', function () { switchView('spiggy'); });
+    $('spPiggyBack').addEventListener('click', function () { goBackView(); });
+    /* 存钱罐面板：完整版弹层与简洁版整页共用同一套 data-act 分发 */
+    ['piggyBody', 'spPiggyBody'].forEach(function (id) {
+      var host = $(id);
+      if (host) { host.addEventListener('click', piggyPanelClick); }
+    });
     $('spMenuExport').addEventListener('click', function () { exportAllCsv(); });
     $('spMenuAi').addEventListener('click', function () { switchView('sai'); });
     $('spMenuSaveHub').addEventListener('click', function () { switchView('ssave'); });
@@ -2027,6 +2302,900 @@
       if (!input) { return; }
       setUiMode(input.value);
     });
+  }
+
+  /* ================================================================== */
+  /* 存钱罐（v1.1 新增 · 独立模块）                                       */
+  /* ------------------------------------------------------------------ */
+  /* 边界：只通过 PIGGY（piggy.js）存取自己的独立存储，不写 state.bills、   */
+  /*      不改分类/恩格尔/趋势；对主账本的唯一影响是「可用余额少了一块」    */
+  /*      （getOverview 里把罐内余额计入已占用额度）。                     */
+  /* ================================================================== */
+
+  /** 最近一次存入的鼓励话术（仅内存，刷新即消失） */
+  var piggyCheer = null;
+  /** 最近一次校验失败提示（仅内存） */
+  var piggyError = '';
+  /** 校验失败时保留的输入原文：重绘会重建输入框，不回填就把用户刚打的金额吃掉了 */
+  var piggyDraft = '';
+  /** 快捷金额（元） */
+  var PIGGY_QUICK = [10, 20, 50, 100];
+
+  /** 存钱罐是否可用：模块存在 + 存储可写 */
+  function piggyReady() {
+    return !!(PIGGY && !PIGGY.missing && PIGGY.isReady && PIGGY.isReady());
+  }
+
+  function piggyFmt(cents) {
+    return ENG.fmtMoney((Number(cents) || 0) / 100);
+  }
+
+  /**
+   * 取当前面板的金额输入框。
+   * 完整版弹层（#piggyBody）与简洁版页面（#spPiggyBody）共用同一段 HTML，
+   * 两处都会渲染出输入框；若用固定 id 查询，getElementById 只会返回 DOM 里
+   * 靠前的那个（简洁版），于是桌面弹层里输入的金额会被读成空值。
+   * 统一按「宿主作用域」取输入框，谁触发就取谁的。
+   */
+  function piggyInput(host) {
+    var box = host || $('piggyBody');
+    if (box && box.querySelector) {
+      var el = box.querySelector('.piggy-amt-input');
+      if (el) { return el; }
+    }
+    var list = DOC.querySelectorAll('.piggy-amt-input');
+    for (var i = 0; i < list.length; i++) {
+      if (list[i].offsetParent !== null) { return list[i]; }
+    }
+    return list[0] || null;
+  }
+
+  /** 看板小卡：罐内余额 + 「存一笔」入口 */
+  function renderPiggyCard(ov) {
+    var card = $('piggyCard');
+    var box = $('piggyMini');
+    if (!card || !box) { return; }
+    if (!piggyReady()) { card.hidden = true; return; }
+    card.hidden = false;
+    var o = ov || getOverview();
+    var st = PIGGY.stats();
+    // 总预算在 state 上，不在 getOverview() 的返回值里（ov 只有 budgetState）
+    var total = Number(state.budget.total) || 0;
+    var pct = total > 0
+      ? Math.min(100, Math.round((st.balanceCents / 100) / total * 100)) : 0;
+    box.innerHTML =
+      '<div class="piggy-mini-top">' +
+      '  <span class="piggy-mini-amt">' + piggyFmt(st.balanceCents) + '</span>' +
+      '  <span class="piggy-mini-meta">已存 ' + st.count + ' 笔' +
+      (st.streak >= 2 ? ' · 连续 ' + st.streak + ' 天' : '') + '</span>' +
+      '</div>' +
+      '<div class="piggy-mini-bar"><i style="width:' + pct + '%"></i></div>' +
+      '<div class="piggy-mini-note">占本月生活费 ' + pct + '% · 点「存一笔」把钱锁进罐子</div>';
+  }
+
+  /** 面板主体 HTML：完整版弹层与简洁版整页共用同一段，保证两套 UI 行为一致 */
+  function piggyPanelHtml() {
+    var st = PIGGY.stats();
+    var o = getOverview();
+    // 可存上限 = 当前账面可用余额（分）；已经不含罐内余额（getOverview 已扣过）
+    var remainCents = Math.round((o.budgetState.remaining || 0) * 100);
+    var maxCents = Math.max(0, remainCents);
+
+    var quick = '';
+    var i;
+    for (i = 0; i < PIGGY_QUICK.length; i++) {
+      var q = PIGGY_QUICK[i] * 100;
+      quick += '<button type="button" class="piggy-q" data-act="piggy-quick" data-cents="' + q + '"' +
+        (q > maxCents ? ' disabled' : '') + '>' + PIGGY_QUICK[i] + '</button>';
+    }
+
+    var logs = PIGGY.listLogs(8);
+    var logHtml = '';
+    if (!logs.length) {
+      logHtml = '<li class="piggy-empty">还没有存过钱，先存一笔试试～</li>';
+    } else {
+      for (i = 0; i < logs.length; i++) {
+        var l = logs[i];
+        var isIn = l.type === 'in';
+        logHtml += '<li class="piggy-log">' +
+          '<span class="pl-date">' + esc(l.date) + '</span>' +
+          '<span class="pl-main"><b>' + esc(l.note || (isIn ? '存入' : '取出')) + '</b></span>' +
+          '<span class="pl-amt ' + (isIn ? 'in' : 'out') + '">' + (isIn ? '+' : '-') + piggyFmt(l.cents) + '</span>' +
+          '</li>';
+      }
+    }
+
+    var cheerHtml = '';
+    if (piggyCheer && piggyCheer.title) {
+      cheerHtml = '<div class="piggy-cheer" role="status">' +
+        '<div class="pc-emoji">' + ic(piggyCheer.emoji, 'bico-brand', '鼓励') + '</div>' +
+        '<div class="pc-body"><b>' + esc(piggyCheer.title) + '</b><span>' + esc(piggyCheer.text) + '</span></div>' +
+          '<button type="button" class="pc-close" data-act="piggy-cheer-close" aria-label="收起">' +
+        ic('close', null, '收起') + '</button>' +
+        '</div>';
+    }
+
+    var errHtml = piggyError
+      ? '<div class="piggy-err" role="alert">' + esc(piggyError) + '</div>'
+      : '';
+
+    return '' +
+      '<div class="piggy-hero">' +
+      '  <div class="ph-ico"><svg><use href="#i-piggy"/></svg></div>' +
+      '  <div class="ph-main">' +
+      '    <div class="ph-amt">' + piggyFmt(st.balanceCents) + '</div>' +
+      '    <div class="ph-sub">罐子里共有 · 已存 ' + st.count + ' 笔' +
+      (st.streak >= 2 ? ' · 连续 ' + st.streak + ' 天' : '') + '</div>' +
+      '  </div>' +
+      '</div>' +
+      '<div class="piggy-avail">账面可用余额 <b>' + money(o.budgetState.remaining) + '</b>' +
+      '<span>最多可存 ' + piggyFmt(maxCents) + '</span></div>' +
+      '<div class="piggy-input">' +
+      '  <span class="pi-unit">¥</span>' +
+      '  <input class="piggy-amt-input" type="text" inputmode="decimal" autocomplete="off" ' +
+      '         value="' + esc(piggyDraft) + '" ' +
+      '         placeholder="请输入金额" aria-label="金额" />' +
+      '</div>' +
+      '<div class="piggy-quick">' + quick + '<span class="pq-tip">快捷金额</span></div>' +
+      errHtml +
+      '<div class="piggy-actions">' +
+      '  <button type="button" class="piggy-btn primary" data-act="piggy-deposit">存入存钱罐</button>' +
+      '  <button type="button" class="piggy-btn" data-act="piggy-withdraw"' +
+      (st.balanceCents <= 0 ? ' disabled' : '') + '>取出</button>' +
+      '</div>' +
+      (st.balanceCents > 0
+        ? '<button type="button" class="piggy-btn-all" data-act="piggy-withdraw-all">全部取出</button>'
+        : '') +
+      cheerHtml +
+      '<div class="piggy-sec">存取记录 <span class="piggy-sec-sub">最近 8 条</span></div>' +
+      '<ul class="piggy-logs">' + logHtml + '</ul>' +
+      '<p class="piggy-note">存进罐子的钱会从「账面可用余额」里挪走，不再算作可花的钱；' +
+      '它不计入支出，所以分类占比、餐饮预警和趋势图都不会被这笔钱影响。随时可以取回。</p>';
+  }
+
+  /** 把面板重绘进两个宿主（完整版弹层 / 简洁版页面） */
+  function renderPiggyPanels() {
+    var a = $('piggyBody');
+    var b = $('spPiggyBody');
+    var html = piggyReady() ? piggyPanelHtml() : '';
+    if (a) { a.innerHTML = html; }
+    if (b) { b.innerHTML = html; }
+  }
+
+  /** 简洁版存钱罐屏 */
+  function renderSimplePiggy() {
+    var box = $('spPiggyBody');
+    if (!box) { return; }
+    box.innerHTML = piggyReady() ? piggyPanelHtml() : '<div class="sp-empty sp-empty-block">当前浏览器不能保存数据，存钱罐暂不可用</div>';
+  }
+
+  function openPiggySheet() {
+    if (!piggyReady()) {
+      showToast('当前浏览器不能保存数据，存钱罐暂不可用', 'warn');
+      return;
+    }
+    piggyDraft = '';
+    renderPiggyPanels();
+    $('piggyMask').hidden = false;
+    var input = piggyInput($('piggyBody'));
+    if (input) { input.focus(); }
+  }
+
+  function closePiggySheet() {
+    $('piggyMask').hidden = true;
+    // 关掉就丢掉一次性的话术、报错与草稿，下次打开是干净的
+    piggyCheer = null;
+    piggyError = '';
+    piggyDraft = '';
+  }
+
+  /**
+   * 校验失败统一出口：先记住用户输入的原文，再重绘，最后把焦点还给输入框。
+   * 直接 renderPiggyPanels() 会把 input 整个重建，导致刚打的金额消失。
+   */
+  function piggyFail(msg, host) {
+    var input = piggyInput(host);
+    piggyDraft = input ? String(input.value || '') : '';
+    piggyError = msg;
+    renderPiggyPanels();
+    var again = piggyInput(host);
+    if (again) { again.focus(); }
+  }
+
+  /** 读输入框 → 执行存入 */
+  function piggyDoDeposit(host) {
+    var input = piggyInput(host);
+    var raw = input ? String(input.value || '').trim() : '';
+    var cents = PIGGY.parseAmount(raw);
+    if (cents === null) {
+      if (raw === '') {
+        piggyFail('请输入金额', host);
+      } else {
+        piggyFail('金额不合法，请输入大于 0 的数字（最多两位小数）。', host);
+      }
+      return;
+    }
+    if (cents > PIGGY.MAX_CENTS) {
+      piggyFail('单笔最多 ' + piggyFmt(PIGGY.MAX_CENTS) + '，换个金额吧。', host);
+      return;
+    }
+    var o = getOverview();
+    var remainCents = Math.round((o.budgetState.remaining || 0) * 100);
+    if (remainCents <= 0) {
+      piggyFail('账面可用余额已经是 0 了，先记一笔收入再来存。', host);
+      return;
+    }
+    if (cents > remainCents) {
+      piggyFail('账面可用余额只剩 ' + piggyFmt(remainCents) + '，最多能存这么多。', host);
+      return;
+    }
+    var before = PIGGY.stats();
+    var res = PIGGY.deposit(cents, '存入存钱罐');
+    if (!res.ok) {
+      piggyFail((res.reason === 'store')
+        ? '浏览器存储不可用，这次没能存进去。' : '金额不合法，换个数字试试。', host);
+      return;
+    }
+    piggyError = '';
+    piggyDraft = '';
+    var after = getOverview();
+    piggyCheer = PIGGY.cheer({
+      amountCents: cents,
+      balanceCents: res.balanceCents,
+      countBefore: before.count,
+      streak: PIGGY.stats().streak,
+      remainingCents: Math.round((after.budgetState.remaining || 0) * 100),
+      dailyCents: Math.round((after.budgetState.dailyAllowance || 0) * 100)
+    });
+    renderAll();
+    renderPiggyPanels();
+    showToast('已存入 ' + piggyFmt(cents) + '，账面可用余额 -' + piggyFmt(cents), 'ok');
+  }
+
+  /** 读输入框 → 执行取出（留空 = 全部取出） */
+  function piggyDoWithdraw(host) {
+    var st = PIGGY.stats();
+    if (st.balanceCents <= 0) {
+      piggyFail('罐子里还没有钱，先存一笔吧。', host);
+      return;
+    }
+    var input = piggyInput(host);
+    var raw = input ? String(input.value || '').trim() : '';
+    if (raw === '') {
+      piggyFail('请输入金额', host);
+      return;
+    }
+    var cents = PIGGY.parseAmount(raw);
+    if (cents === null) {
+      piggyFail('金额不合法，请输入大于 0 的数字（最多两位小数）。', host);
+      return;
+    }
+    var res = PIGGY.withdraw(cents, '从存钱罐取出');
+    if (!res.ok) {
+      piggyFail((res.reason === 'store')
+        ? '浏览器存储不可用，这次没能取出。' : '罐子里没有这么多钱。', host);
+      return;
+    }
+    piggyError = '';
+    piggyDraft = '';
+    piggyCheer = null;
+    renderAll();
+    renderPiggyPanels();
+    showToast('已取出 ' + piggyFmt(res.log.cents) + '，账面可用余额已恢复', 'ok');
+  }
+
+  /**
+   * 一键全部取出：不直接扣款，而是把当前余额填进输入框并提示，
+   * 由用户点「取出」做二次确认。避免「没填金额就点取出 = 取光全部」的误操作。
+   */
+  function piggyDoWithdrawAll(host) {
+    var st = PIGGY.stats();
+    if (st.balanceCents <= 0) {
+      piggyFail('罐子里还没有钱，先存一笔吧。', host);
+      return;
+    }
+    piggyDraft = (st.balanceCents / 100).toFixed(2);
+    piggyError = '已填入全部金额（' + piggyFmt(st.balanceCents) + '），点「取出」即可取回。';
+    renderPiggyPanels();
+    var again = piggyInput(host);
+    if (again) { again.focus(); if (again.select) { again.select(); } }
+  }
+
+  /** 面板内点击分发（两个宿主共用） */
+  function piggyPanelClick(e) {
+    var btn = e.target.closest ? e.target.closest('[data-act]') : null;
+    if (!btn) { return; }
+    var host = e.currentTarget; // #piggyBody 或 #spPiggyBody，谁触发就取谁的输入框
+    var act = btn.getAttribute('data-act');
+    if (act === 'piggy-quick') {
+      var input = piggyInput(host);
+      if (input) {
+        input.value = String((Number(btn.getAttribute('data-cents')) || 0) / 100);
+        input.focus();
+      }
+      return;
+    }
+    if (act === 'piggy-deposit') { piggyDoDeposit(host); return; }
+    if (act === 'piggy-withdraw') { piggyDoWithdraw(host); return; }
+    if (act === 'piggy-withdraw-all') { piggyDoWithdrawAll(host); return; }
+    if (act === 'piggy-cheer-close') {
+      piggyCheer = null;
+      renderPiggyPanels();
+    }
+  }
+
+  /* ================================================================== */
+  /* 说话风格（tone.js 接线）                                             */
+  /* ------------------------------------------------------------------ */
+  /* 所有新功能的句子都从这里出：先把当前语气灌进 TONE，再取文案。
+     这样「设置页切语气 → 下一次渲染立刻生效」，且不需要在每个调用点写 set。 */
+  /* ================================================================== */
+
+  /**
+   * 取一句当前语气的文案。
+   * @param {string} key tone.js 的文案 key
+   * @param {Object} [vars] 占位符
+   * @return {string} 缺模块 / 缺 key 时返回空串（调用方自行降级）
+   */
+  function toneLine(key, vars) {
+    if (!TONE || TONE.missing) { return ''; }
+    TONE.set(getSettings().tone);
+    return TONE.t(key, vars);
+  }
+
+  /** 语气元信息列表（设置页三张卡片用它渲染；tone.js 缺失时用替身自带的） */
+  function toneList() {
+    return (TONE && TONE.TONES && TONE.TONES.length) ? TONE.TONES : [];
+  }
+
+  /* ================================================================== */
+  /* 心愿单（v1.2 新增 · 独立模块）                                       */
+  /* ------------------------------------------------------------------ */
+  /* 边界：只通过 WISH 读写自己的独立存储键，不写 state.bills、不动分类/   */
+  /*      恩格尔/趋势；对主账本唯一的影响是「省下的钱」这一个数：          */
+  /*      入清单即计入（沿用既有 coolingSkip 行为），成交时按 savedCounted */
+  /*      精确回退，放弃时不动，避免双计。                               */
+  /* ================================================================== */
+
+  /** 弹层当前页签：cooling / bought / dropped */
+  var wishTab = 'cooling';
+
+  /** 心愿单是否可用：模块存在 + 存储可写 */
+  function wishReady() {
+    return !!(WISH && !WISH.missing && WISH.isReady && WISH.isReady());
+  }
+
+  /** 取「最近到期」的那条冷静中条目（用于看板/简洁版进度条） */
+  function wishNextItem() {
+    var arr = WISH.listCooling();
+    if (!arr.length) { return null; }
+    var best = arr[0];
+    for (var i = 1; i < arr.length; i++) {
+      if (arr[i].dueDate < best.dueDate) { best = arr[i]; }
+    }
+    return best;
+  }
+
+  /** 到期文案：还剩 3 天 / 今天到期 / 逾期 2 天 */
+  function wishDueText(prog) {
+    if (prog.remainingDays > 0) { return '还剩 ' + prog.remainingDays + ' 天'; }
+    if (prog.remainingDays === 0) { return '今天到期'; }
+    return '已逾期 ' + Math.abs(prog.remainingDays) + ' 天';
+  }
+
+  /** 看板小卡：冷静中件数 + 最近到期那条的进度 */
+  function renderWishCard(ov) {
+    var card = $('wishCard');
+    var box = $('wishMini');
+    if (!card || !box) { return; }
+    if (!wishReady()) { card.hidden = true; return; }
+    card.hidden = false;
+    var o = ov || getOverview();
+    var todayKey = o.todayStr || ENG.formatDate(new Date());
+    var st = WISH.stats();
+    var next = wishNextItem();
+    var pct = next ? WISH.progress(next, todayKey).pct : 0;
+    var due = WISH.dueItems(todayKey).length;
+    var meta = st.cooling > 0
+      ? ('冷静中 ' + st.cooling + ' 件' + (due > 0 ? ' · ' + due + ' 件已到期' : ''))
+      : '清单是空的';
+    box.innerHTML =
+      '<div class="wish-mini-top">' +
+      '  <span class="wish-mini-amt">' + money(st.coolingAmount) + '</span>' +
+      '  <span class="wish-mini-meta">' + esc(meta) + '</span>' +
+      '</div>' +
+      '<div class="wish-mini-bar"><i style="width:' + pct + '%"></i></div>' +
+      '<div class="wish-mini-note">' +
+      (st.savedAmount > 0
+        ? '因为冷静期，你已经省下 ' + money(st.savedAmount) + '。'
+        : (next
+          ? '「' + esc(next.title) + '」' + esc(wishDueText(WISH.progress(next, todayKey))) + '再决定。'
+          : '想买又下不了手的东西，先放进来晾 48 小时。')) +
+      '</div>';
+  }
+
+  /** 单条心愿卡（弹层列表用） */
+  function wishItemHtml(item, todayKey) {
+    var isCooling = item.status === 'cooling';
+    var prog = WISH.progress(item, todayKey);
+    var meta = money(item.amount) + ' · 到期 ' + esc(item.dueDate);
+    if (isCooling) {
+      meta += ' · ' + esc(wishDueText(prog));
+      if (item.extendCount > 0) { meta += ' · 已延长 ' + item.extendCount + ' 次'; }
+    } else if (item.status === 'bought') {
+      meta += ' · 已买下';
+    } else {
+      meta += ' · 已放弃';
+    }
+    var actions = '';
+    if (isCooling) {
+      var extDisabled = item.extendCount >= WISH.EXTEND_MAX;
+      actions =
+        '<div class="wish-actions">' +
+        '  <button type="button" class="wish-btn wish-btn--primary" data-act="wish-buy" data-id="' +
+        esc(item.id) + '">还想买</button>' +
+        '  <button type="button" class="wish-btn wish-btn--ghost" data-act="wish-extend" data-id="' +
+        esc(item.id) + '"' + (extDisabled ? ' disabled' : '') + '>再想 ' + WISH.EXTEND_DAYS + ' 天</button>' +
+        '  <button type="button" class="wish-btn wish-btn--ghost" data-act="wish-drop" data-id="' +
+        esc(item.id) + '">算了</button>' +
+        '  <button type="button" class="wish-btn wish-btn--danger" data-act="wish-del" data-id="' +
+        esc(item.id) + '" aria-label="删除这条心愿">删除</button>' +
+        '</div>';
+    } else {
+      actions =
+        '<div class="wish-actions">' +
+        '  <button type="button" class="wish-btn wish-btn--danger" data-act="wish-del" data-id="' +
+        esc(item.id) + '" aria-label="删除这条心愿">删除</button>' +
+        '</div>';
+    }
+    var bar = isCooling
+      ? '<div class="wish-bar" role="progressbar" aria-valuemin="0" aria-valuemax="100" ' +
+        'aria-valuenow="' + prog.pct + '" aria-label="冷静期进度"><i style="width:' + prog.pct + '%"></i></div>'
+      : '';
+    return '<li class="wish-item">' +
+      '<div class="wish-item-main">' +
+      '  <div class="wish-item-title">' + esc(item.title) +
+      (prog.overdue && isCooling ? '<span class="wish-overdue">已到期</span>' : '') + '</div>' +
+      (item.note ? '<div class="wish-item-note">' + esc(item.note) + '</div>' : '') +
+      '  <div class="wish-item-meta">' + meta + '</div>' +
+      bar +
+      '</div>' + actions +
+      '</li>';
+  }
+
+  /** 弹层主体：三页签 + 列表 + 底部累计 */
+  function wishSheetHtml() {
+    var todayKey = ENG.formatDate(new Date());
+    var st = WISH.stats();
+    var tabs = [
+      { key: 'cooling', label: '冷静中', count: st.cooling },
+      { key: 'bought', label: '已买', count: st.bought },
+      { key: 'dropped', label: '已放弃', count: st.dropped }
+    ];
+    var tabsHtml = '';
+    for (var i = 0; i < tabs.length; i++) {
+      var t = tabs[i];
+      var active = (wishTab === t.key);
+      tabsHtml += '<button type="button" role="tab" aria-selected="' + (active ? 'true' : 'false') +
+        '" class="wish-tab' + (active ? ' active' : '') + '" data-act="wish-tab" data-val="' +
+        esc(t.key) + '">' + esc(t.label) + ' ' + t.count + '</button>';
+    }
+
+    var items = WISH.list(wishTab);
+    var listHtml;
+    if (!items.length) {
+      var emptyText = wishTab === 'cooling'
+        ? '清单是空的。下次想买又拿不定主意，先放进这里晾 48 小时。'
+        : (wishTab === 'bought' ? '还没有从心愿单里买下的东西。' : '还没有放弃过的心愿。');
+      listHtml = '<li class="wish-empty">' + esc(emptyText) + '</li>';
+    } else {
+      listHtml = items.map(function (it) { return wishItemHtml(it, todayKey); }).join('');
+    }
+
+    return '' +
+      '<div class="wish-tabs" role="tablist" aria-label="心愿单分类">' + tabsHtml + '</div>' +
+      '<ul class="wish-list">' + listHtml + '</ul>' +
+      '<div class="wish-sec">' +
+      '  <span class="wish-stat">因为冷静期，累计省下 <b>' + money(st.savedAmount) + '</b></span>' +
+      '</div>' +
+      '<p class="wish-foot-note">放进心愿单不会产生账单；点「还想买」才会记一笔支出。' +
+      '同一件东西最多再延长 ' + WISH.EXTEND_MAX + ' 次，' + WISH.EXTEND_DAYS + ' 天一次。</p>';
+  }
+
+  function renderWishSheet() {
+    var body = $('wishBody');
+    if (!body) { return; }
+    body.innerHTML = wishReady() ? wishSheetHtml() : '';
+  }
+
+  function openWishSheet() {
+    if (!wishReady()) {
+      showToast('当前浏览器不能保存数据，心愿单暂不可用', 'warn');
+      return;
+    }
+    if (!wishTab) { wishTab = 'cooling'; }
+    // 打开时若「冷静中」是空的、但别的页签有内容，直接落到有内容的那一页
+    if (!WISH.listCooling().length) {
+      if (WISH.list('bought').length) { wishTab = 'bought'; }
+      else if (WISH.list('dropped').length) { wishTab = 'dropped'; }
+      else { wishTab = 'cooling'; }
+    } else {
+      wishTab = 'cooling';
+    }
+    renderWishSheet();
+    var mask = $('wishMask');
+    if (mask) { mask.hidden = false; }
+  }
+
+  function closeWishSheet() {
+    var mask = $('wishMask');
+    if (mask) { mask.hidden = true; }
+  }
+
+  /**
+   * 心愿单三出口的统一入口：sheet 里的按钮与聊天回访卡共用。
+   * @param {string} id 心愿条目 id
+   * @param {string} act  bought（买了）/ dropped（放弃）/ extend（再冷静几天）
+   */
+  function wishReviewDecide(id, act) {
+    if (!id) { return; }
+    var item = WISH.get(id);
+    if (!item) { return; }
+    if (item.status !== 'cooling') {
+      showToast('这条心愿已经做过决定了');
+      renderAll();
+      renderWishSheet();
+      return;
+    }
+    var line;
+    if (act === 'bought') {
+      var bill = commitBill({
+        amount: item.amount,
+        category: '购物',
+        note: item.title,
+        date: ENG.formatDate(new Date()),
+        motivation: '情绪',
+        want: true,
+        type: 'expense'
+      });
+      var res = WISH.decide(id, 'bought', { billId: bill.id });
+      if (!res.ok) {
+        // 清单写不进去也要保住账单：账单已入 state，清单这边只是没记上状态
+        showToast('账单已记下，但心愿单状态没保存成功', 'warn');
+      }
+      if (item.savedCounted) {
+        state.savedMoney = ENG.round2(Math.max(0, state.savedMoney - item.amount));
+        state.blockedCount = Math.max(0, Math.round(state.blockedCount) - 1);
+        saveState();
+      }
+      line = toneLine('cool.bought', { title: item.title, amount: money(item.amount) });
+      addAIMessage(aiBubble(esc(line || ('已记一笔 ' + money(item.amount) + '：' + item.title))));
+      showToast('已记一笔 ' + money(item.amount), 'ok');
+    } else if (act === 'dropped') {
+      /* 放弃时不碰 savedMoney：钱在入清单那一刻就已经计入了（design §8.2），
+         这里再加一次就是双计。 */
+      var r2 = WISH.decide(id, 'dropped');
+      if (!r2.ok) { showToast('心愿单状态没保存成功', 'warn'); }
+      line = toneLine('cool.dropped', { title: item.title, amount: money(item.amount) });
+      addAIMessage(aiBubble(esc(line || ('放下的 ' + money(item.amount) + ' 会留在你兜里。'))));
+      showToast('已标记为放弃', 'ok');
+    } else if (act === 'extend') {
+      var r3 = WISH.extend(id, WISH.EXTEND_DAYS);
+      if (!r3.ok) {
+        showToast(r3.reason === 'max' ? '最多只能再延长 ' + WISH.EXTEND_MAX + ' 次，这次做个决定吧'
+          : '这条心愿已经做过决定了', 'warn');
+        renderAll();
+        renderWishSheet();
+        return;
+      }
+      line = toneLine('cool.extend', { days: WISH.EXTEND_DAYS });
+      addAIMessage(aiBubble(esc(line || ('再给自己 ' + WISH.EXTEND_DAYS + ' 天。'))));
+      showToast('已延长 ' + WISH.EXTEND_DAYS + ' 天', 'ok');
+    } else {
+      return;
+    }
+    renderAll();
+    renderWishSheet();
+  }
+
+  /** 弹层内点击分发 */
+  function wishPanelClick(e) {
+    var btn = e.target.closest ? e.target.closest('[data-act]') : null;
+    if (!btn) { return; }
+    var act = btn.getAttribute('data-act');
+    var id = btn.getAttribute('data-id');
+    if (act === 'wish-tab') {
+      wishTab = btn.getAttribute('data-val') || 'cooling';
+      renderWishSheet();
+      return;
+    }
+    if (act === 'wish-buy') { wishReviewDecide(id, 'bought'); return; }
+    if (act === 'wish-drop') { wishReviewDecide(id, 'dropped'); return; }
+    if (act === 'wish-extend') { wishReviewDecide(id, 'extend'); return; }
+    if (act === 'wish-del') {
+      var item = WISH.get(id);
+      if (!item) { return; }
+      /* 删除是「清理痕迹」，不是决策：仍在冷静中的条目删除时要把它当初计入的
+         省下的钱退回，否则会出现「条目没了、省下的钱还在」的假账。 */
+      var res = WISH.remove(id);
+      if (!res.ok) {
+        showToast('删除失败，浏览器存储不可用', 'warn');
+        return;
+      }
+      if (item.status === 'cooling' && item.savedCounted) {
+        state.savedMoney = ENG.round2(Math.max(0, state.savedMoney - item.amount));
+        state.blockedCount = Math.max(0, Math.round(state.blockedCount) - 1);
+        saveState();
+      }
+      showToast('已删除这条心愿', 'ok');
+      renderAll();
+      renderWishSheet();
+    }
+  }
+
+  /** 简洁版首页小卡：冷静中件数 + 累计省下 */
+  function renderSimpleWish(ov) {
+    var box = $('spWishCard');
+    if (!box) { return; }
+    if (!wishReady()) { box.hidden = true; return; }
+    box.hidden = false;
+    var o = ov || getOverview();
+    var todayKey = o.todayStr || ENG.formatDate(new Date());
+    var st = WISH.stats();
+    if (!st.cooling && !st.savedAmount) {
+      box.innerHTML = '<div class="sp-wish-row">' +
+        '<span class="sp-wish-label">心愿单</span>' +
+        '<span class="sp-wish-count">空</span></div>' +
+        '<div class="sp-wish-note">想买又拿不定主意？说出来，我先帮你放进清单晾 48 小时。</div>';
+      return;
+    }
+    var next = wishNextItem();
+    var pct = next ? WISH.progress(next, todayKey).pct : 100;
+    var due = WISH.dueItems(todayKey).length;
+    box.innerHTML = '<div class="sp-wish-row">' +
+      '<span class="sp-wish-label">心愿单 · 冷静中</span>' +
+      '<span class="sp-wish-count">' + st.cooling + ' 件</span></div>' +
+      '<div class="sp-wish-bar"><i style="width:' + pct + '%"></i></div>' +
+      '<div class="sp-wish-note">' +
+      (due > 0
+        ? esc(due + ' 件到期了，点开做个决定')
+        : (next ? esc('「' + next.title + '」' + wishDueText(WISH.progress(next, todayKey))) : '清单是空的')) +
+      (st.savedAmount > 0 ? ' · 累计省下 ' + money(st.savedAmount) : '') +
+      '</div>';
+  }
+
+  /** 到期回访卡：最多列 2 条，其余引导打开心愿单 */
+  function reviewedWishHtml(items) {
+    var arr = Array.isArray(items) ? items : [];
+    var max = 2;
+    var shown = arr.slice(0, max);
+    var title = toneLine('cool.due', { title: shown.length ? shown[0].title : '' }) ||
+      '心愿单里的东西到期了，还想买吗？';
+    var body = '';
+    for (var i = 0; i < shown.length; i++) {
+      var it = shown[i];
+      body += '<div class="wish-item">' +
+        '<div class="wish-item-main">' +
+        '  <div class="wish-item-title">' + esc(it.title) + '</div>' +
+        (it.note ? '<div class="wish-item-note">' + esc(it.note) + '</div>' : '') +
+        '  <div class="wish-item-meta">' + money(it.amount) + ' · 加入于 ' + esc(it.startDate) + '</div>' +
+        '</div>' +
+        '<div class="wish-actions">' +
+        '  <button type="button" class="wish-btn wish-btn--primary" data-act="wish-review" data-id="' +
+        esc(it.id) + '" data-val="bought">还想买</button>' +
+        '  <button type="button" class="wish-btn wish-btn--ghost" data-act="wish-review" data-id="' +
+        esc(it.id) + '" data-val="extend">再想 ' + WISH.EXTEND_DAYS + ' 天</button>' +
+        '  <button type="button" class="wish-btn wish-btn--ghost" data-act="wish-review" data-id="' +
+        esc(it.id) + '" data-val="dropped">算了</button>' +
+        '</div>' +
+        '</div>';
+    }
+    var more = arr.length > max
+      ? '<div class="wish-extra"><button type="button" class="btn-mini" data-act="wish-open">还有 ' +
+        (arr.length - max) + ' 件到期了，打开心愿单</button></div>'
+      : '<div class="wish-extra"><button type="button" class="btn-mini" data-act="wish-open">打开心愿单</button></div>';
+    return '<div class="decision-card cool-card verdict-warn">' +
+      '<div class="dc-icon cool">⏰</div>' +
+      '<div class="dc-title">' + esc(title) + '</div>' +
+      '<div class="dc-sub">冷静期到了 · 共 ' + arr.length + ' 件</div>' +
+      '<div class="wish-list">' + body + '</div>' +
+      more +
+      '</div>';
+  }
+
+  /**
+   * 到期回访：打开 App（init 末尾）+ 每次切到 chat / sai 各查一次，
+   * 同一天只提醒一次（settings.wishReviewDate）。
+   */
+  function maybeWishReview() {
+    if (!wishReady()) { return; }
+    var todayKey = ENG.formatDate(new Date());
+    var items = WISH.dueItems(todayKey);
+    if (!items.length) { return; }
+    var st = getSettings();
+    if (st.wishReviewDate === todayKey) { return; }
+    // 先写回去重标记：即使后面气泡渲染失败，也不会同一天反复弹
+    st.wishReviewDate = todayKey;
+    persistSettings();
+    addAIMessage(reviewedWishHtml(items));
+  }
+
+  /* ================================================================== */
+  /* 消费诊断 + 周期末预测（diagnose.js 接线）                            */
+  /* ================================================================== */
+
+  /** 诊断卡里每条规则的短标题与行动建议（句子主体由 tone.js 出） */
+  var DIAG_META = {
+    dailyOver: { title: '单日超支', action: '大额支出拆到别的日子，或把单日上限调高' },
+    wantRatio: { title: '非必需占比偏高', action: '把「想要」类的开销压两成，先保吃饭和通勤' },
+    cycleUp: { title: '环比涨太快', action: '对照上个周期，找出多出来的那几笔' },
+    smallFreq: { title: '小额高频', action: '奶茶零食这类零碎，一周先砍掉一半' }
+  };
+
+  /**
+   * 组装诊断入参（看板与简洁版共用，避免两处口径漂移）。
+   * prevExpense 取「上一个同长度周期」的支出：以本周期起点前推 totalDays 天。
+   */
+  function diagInput(ov) {
+    var st = getSettings();
+    var o = ov || getOverview();
+    /* 必须格式化成 YYYY-MM-DD：ENG.addDays 返回 Date，而 aggregate 内部拿 b.date
+       （字符串）跟起止日做字符串比较，传 Date 会让区间过滤失效、算出全账本总额 */
+    var prevEnd = ENG.formatDate(ENG.addDays(o.cycle.start, -1));
+    var prevStart = ENG.formatDate(ENG.addDays(o.cycle.start, -o.cycle.totalDays));
+    var prevAgg = ENG.aggregate(state.bills, prevStart, prevEnd);
+    return {
+      bills: state.bills,
+      cycle: o.cycle,
+      prevExpense: ENG.round2(prevAgg.expense),
+      settings: { dailyCap: st.dailyCap, alertRatio: st.alertRatio },
+      todayKey: o.todayStr
+    };
+  }
+
+  /** 当前周期的诊断结果（最多 3 条，已排序） */
+  function diagList(ov) {
+    if (!DIAG || DIAG.missing) { return []; }
+    return DIAG.build(diagInput(ov));
+  }
+
+  /** 一条诊断事实 → 一句当前语气的话（缺 key 时用中性兜底句，不显示空白） */
+  function diagSentence(item) {
+    var vars = {
+      amount: money(item.amount),
+      days: item.days,
+      ratio: item.ratio + '%',
+      growth: item.ratio + '%',
+      count: item.count,
+      cat: item.category
+    };
+    var line = toneLine('diag.' + item.code, vars);
+    if (line) { return line; }
+    if (item.code === 'dailyOver') { return '有 ' + item.days + ' 天单日花超了，最多的一天 ' + money(item.amount) + '。'; }
+    if (item.code === 'wantRatio') { return '非必需消费占了 ' + item.ratio + '%，一共 ' + money(item.amount) + '。'; }
+    if (item.code === 'cycleUp') { return '比上个周期多花了 ' + item.ratio + '%，这周期 ' + money(item.amount) + '。'; }
+    if (item.code === 'smallFreq') { return item.count + ' 笔小额加起来 ' + money(item.amount) + '。'; }
+    return '';
+  }
+
+  /** 完整版诊断卡：左色条 + 软底（等级不用文字色表达） */
+  function renderDiagCard(ov) {
+    var card = $('diagCard');
+    var box = $('diagList');
+    var badge = $('diagBadge');
+    if (!card || !box) { return; }
+    if (!DIAG || DIAG.missing) { card.hidden = true; return; }
+    card.hidden = false;
+    var list = diagList(ov);
+    box.setAttribute('aria-live', 'polite');
+    if (!list.length) {
+      if (badge) {
+        badge.textContent = '无异常';
+        badge.className = 'badge badge-soft';
+      }
+      box.innerHTML = '<div class="diag-empty">' +
+        esc(toneLine('diag.empty') || '这周期没什么明显问题，保持就好。') + '</div>';
+      return;
+    }
+    var sev = DIAG.maxSeverity(list);
+    if (badge) {
+      badge.textContent = sev === 'high' ? '需要注意' : '留意一下';
+      badge.className = 'badge badge-soft' + (sev === 'high' ? ' warn' : '');
+    }
+    var html = '';
+    for (var i = 0; i < list.length; i++) {
+      var it = list[i];
+      var meta = DIAG_META[it.code] || { title: '消费提示', action: '' };
+      html += '<div class="diag-item is-' + esc(it.level) + '">' +
+        '<span class="diag-bar is-' + esc(it.level) + '" aria-hidden="true"></span>' +
+        '<div class="diag-main">' +
+        '  <div class="diag-head"><span class="diag-title">' + esc(meta.title) + '</span></div>' +
+        '  <div class="diag-evidence">' + esc(diagSentence(it)) + '</div>' +
+        (meta.action ? '<div class="diag-action">' + esc(meta.action) + '</div>' : '') +
+        '</div>' +
+        '</div>';
+    }
+    box.innerHTML = html;
+  }
+
+  /** 简洁版诊断列表 */
+  function renderSimpleDiag(ov) {
+    var box = $('spDiag');
+    if (!box) { return; }
+    if (!DIAG || DIAG.missing) { box.hidden = true; return; }
+    box.hidden = false;
+    var list = diagList(ov);
+    if (!list.length) {
+      box.innerHTML = '<div class="sp-diag-item is-low">' +
+        '<div class="sp-diag-head"><b class="sp-diag-title">消费诊断</b></div>' +
+        '<div class="sp-diag-text">' +
+        esc(toneLine('diag.empty') || '这周期没什么明显问题，保持就好。') + '</div></div>';
+      return;
+    }
+    var html = '';
+    for (var i = 0; i < list.length; i++) {
+      var it = list[i];
+      var meta = DIAG_META[it.code] || { title: '消费提示' };
+      html += '<div class="sp-diag-item is-' + esc(it.level) + '">' +
+        '<div class="sp-diag-head"><b class="sp-diag-title">' + esc(meta.title) + '</b></div>' +
+        '<div class="sp-diag-text">' + esc(diagSentence(it)) + '</div>' +
+        '</div>';
+    }
+    box.innerHTML = html;
+  }
+
+  /** 周期末预测（纯函数入参：本周期支出 / 已过天数 / 剩余天数 / 总预算） */
+  function forecastData(ov) {
+    var o = ov || getOverview();
+    var total = Number(state.budget.total) || 0;
+    return DIAG.forecast({
+      spent: ENG.round2(o.cycleAgg.expense),
+      passedDays: o.cycle.passedDays,
+      remainingDays: o.cycle.remainingDays,
+      total: total
+    });
+  }
+
+  /** 完整版预算卡里的期末预测 KPI */
+  function renderForecastKpi(ov) {
+    var box = $('forecastKpi');
+    if (!box) { return; }
+    if (!DIAG || DIAG.missing) { box.hidden = true; return; }
+    var total = Number(state.budget.total) || 0;
+    if (total <= 0) { box.hidden = true; return; }   // 没设总预算时预测没有意义
+    box.hidden = false;
+    var f = forecastData(ov);
+    var over = f.level === 'over';
+    var line = over
+      ? (toneLine('forecast.over', { amount: money(f.overBudgetBy) }) ||
+        ('照这个节奏，期末会超 ' + money(f.overBudgetBy) + '。'))
+      : (toneLine('forecast.safe', { amount: money(Math.max(0, f.remainingAtEnd)) }) ||
+        ('照现在这样，期末还能剩 ' + money(Math.max(0, f.remainingAtEnd)) + '。'));
+    box.innerHTML =
+      '<div class="fk-label">期末预测</div>' +
+      '<div class="fk-value' + (over ? ' is-over' : '') + '">' +
+      (over ? '超支 ' : '结余 ') + money(over ? f.overBudgetBy : Math.max(0, f.remainingAtEnd)) + '</div>' +
+      '<div class="fk-note">' + esc(line) + '</div>';
+  }
+
+  /** 简洁版预算页的期末预测一行 */
+  function renderSimpleForecast(ov) {
+    var box = $('spForecast');
+    if (!box) { return; }
+    if (!DIAG || DIAG.missing) { box.hidden = true; return; }
+    var total = Number(state.budget.total) || 0;
+    if (total <= 0) { box.hidden = true; return; }
+    box.hidden = false;
+    var f = forecastData(ov);
+    var over = f.level === 'over';
+    var line = over
+      ? (toneLine('forecast.over', { amount: money(f.overBudgetBy) }) ||
+        ('照这个节奏，期末会超 ' + money(f.overBudgetBy) + '。'))
+      : (toneLine('forecast.safe', { amount: money(Math.max(0, f.remainingAtEnd)) }) ||
+        ('照现在这样，期末还能剩 ' + money(Math.max(0, f.remainingAtEnd)) + '。'));
+    box.innerHTML = '期末预测 <b' + (over ? ' class="is-over"' : '') + '>' +
+      (over ? '超支 ' : '结余 ') + money(over ? f.overBudgetBy : Math.max(0, f.remainingAtEnd)) +
+      '</b> <small>' + esc(line) + '</small>';
   }
 
   /* ================================================================== */
@@ -2048,7 +3217,7 @@
       var tip;
       var warnCls = '';
       if (p.need <= 0) {
-        tip = '🎉 已达成目标，还多存了 ' + money(Math.max(0, g.saved - g.target)) + '。';
+        tip = ic('target', 'bico-brand', '已达成') + '已达成目标，还多存了 ' + money(Math.max(0, g.saved - g.target)) + '。';
       } else if (p.monthsLeft === null) {
         tip = '当前月结余为负，先让结余转正，再谈攒钱。';
         warnCls = ' warn';
@@ -2128,29 +3297,145 @@
   }
 
   /**
-   * 快捷记账面板（顶栏「＋ 记一笔」）：金额 / 分类 / 备注 / 日期。
-   * 直接走 commitBill 落账，提交后聊天空出回执、预算条即时刷新。
+   * 分类选择器（自定义控件，替代原生 select）。
+   * 原生下拉在移动端是系统蓝色高亮 + 系统滚动条，和这套绿色柔和皮肤完全两张脸，
+   * 所以做成「触发器 = 淡底图标 + 分类名」，点开后原地展开 3 列分类网格：
+   * 每个选项复用明细列表同一套「淡底方块 + 深墨图标」语言，选中有绿描边 + 勾。
+   * 真实值放 hidden input（id 由调用方给），原本读 .value 的代码不用改。
+   * @param {string} id hidden input 的 id
+   * @param {string} selected 初始分类
    */
-  function openQuickAddModal(presetCategory) {
-    var todayStr = ENG.formatDate(new Date());
-    var options = '';
+  function catPickerHtml(id, selected) {
+    var cur = DATA.CATEGORY_KEYS.indexOf(selected) !== -1 ? selected : DATA.CATEGORIES[0].key;
+    var opts = '';
     var i;
     for (i = 0; i < DATA.CATEGORIES.length; i++) {
-      options += '<option value="' + esc(DATA.CATEGORIES[i].key) + '">' + esc(DATA.CATEGORIES[i].key) + '</option>';
+      var key = DATA.CATEGORIES[i].key;
+      var on = key === cur;
+      opts += '<button type="button" class="catpick-opt' + (on ? ' on' : '') + '"' +
+        ' data-cat="' + esc(key) + '" role="option" aria-selected="' + (on ? 'true' : 'false') + '">' +
+        '<span class="catpick-tile" style="' + spCatTileStyle(key) + '">' + spCatIcon(key) +
+        '<svg class="catpick-check" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>' +
+        '</span>' +
+        '<span class="catpick-name">' + esc(key) + '</span>' +
+        '</button>';
     }
+    return '<div class="catpick" data-catpick>' +
+      '<button type="button" class="catpick-btn" data-catpick-toggle aria-haspopup="listbox" aria-expanded="false">' +
+      '<span class="catpick-val" style="' + spCatTileStyle(cur) + '">' + spCatIcon(cur) + '</span>' +
+      '<span class="catpick-cur">' + esc(cur) + '</span>' +
+      '<svg class="catpick-arrow" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9.5l6 6 6-6"/></svg>' +
+      '</button>' +
+      '<div class="catpick-panel" role="listbox" aria-label="选择分类" hidden>' + opts + '</div>' +
+      '<input type="hidden" id="' + id + '" value="' + esc(cur) + '" />' +
+      '</div>';
+  }
+
+  /** 当前展开着的分类选择器（同一时刻只可能有一个弹窗，用单例避免重复挂监听） */
+  var catPickCtx = null;
+
+  /** 给 catPickerHtml 生成的控件挂交互（展开 / 选中 / 收起 / 点外部关闭） */
+  function bindCatPicker(box, id) {
+    var wrap = box.querySelector('[data-catpick]');
+    var hidden = box.querySelector('#' + id);
+    if (!wrap || !hidden) { return; }
+    var btn = wrap.querySelector('[data-catpick-toggle]');
+    var panel = wrap.querySelector('.catpick-panel');
+    var valTile = wrap.querySelector('.catpick-val');
+    var curName = wrap.querySelector('.catpick-cur');
+
+    function setOpen(open) {
+      panel.hidden = !open;
+      if (open) { wrap.classList.add('open'); } else { wrap.classList.remove('open'); }
+      btn.setAttribute('aria-expanded', open ? 'true' : 'false');
+      catPickCtx = open ? { wrap: wrap, close: function () { setOpen(false); } } : null;
+    }
+    function close() { setOpen(false); }
+
+    btn.addEventListener('click', function (e) {
+      e.stopPropagation();
+      setOpen(panel.hidden);
+    });
+
+    panel.addEventListener('click', function (e) {
+      var opt = e.target.closest ? e.target.closest('.catpick-opt') : null;
+      if (!opt) { return; }
+      var key = opt.getAttribute('data-cat');
+      var i;
+      hidden.value = key;
+      valTile.setAttribute('style', spCatTileStyle(key));
+      valTile.innerHTML = spCatIcon(key);
+      curName.textContent = key;
+      var all = panel.querySelectorAll('.catpick-opt');
+      for (i = 0; i < all.length; i++) {
+        var on = all[i] === opt;
+        if (on) { all[i].classList.add('on'); } else { all[i].classList.remove('on'); }
+        all[i].setAttribute('aria-selected', on ? 'true' : 'false');
+      }
+      close();
+      btn.focus();
+      hidden.dispatchEvent(new Event('change', { bubbles: true }));
+    });
+
+    /* Esc：面板开着时只收起面板，不要连带把整个「记一笔」弹窗关掉 */
+    wrap.addEventListener('keydown', function (e) {
+      if (e.key !== 'Escape') { return; }
+      if (panel.hidden) { return; }
+      e.stopPropagation();
+      close();
+    });
+
+    /* 点面板外部收起（全局监听只挂一次，见下） */
+    if (!bindCatPicker.bound) {
+      bindCatPicker.bound = true;
+      DOC.addEventListener('click', function (e) {
+        if (!catPickCtx) { return; }
+        if (catPickCtx.wrap.contains(e.target)) { return; }
+        catPickCtx.close();
+      });
+    }
+  }
+
+  /**
+   * 快捷记账面板（顶栏「＋ 记一笔」）：金额 / 分类 / 备注 / 日期。
+   * 直接走 commitBill 落账，提交后聊天空出回执、预算条即时刷新。
+   * @param {?string} [presetCategory] 预填分类（意图层已知的品类）
+   * @param {?string} [presetDate] 预填日期 'YYYY-MM-DD'（L3 表单只让用户填缺的那个）
+   */
+  function openQuickAddModal(presetCategory, presetDate) {
+    var todayStr = ENG.formatDate(new Date());
+    /* C10：日期预填；不合法一律回落到今天（按钮点击时首参会是事件对象，这里统一兜住） */
+    var datePrefill = /^\d{4}-\d{2}-\d{2}$/.test(String(presetDate || '')) ? String(presetDate) : todayStr;
+    /* 分类预填：只接受合法分类名，避免把事件对象/脏值塞进选择器 */
+    var catPrefill = (typeof presetCategory === 'string' &&
+      DATA.CATEGORY_KEYS.indexOf(presetCategory) !== -1) ? presetCategory : '';
     var box = openModal('' +
       '<h4>记一笔</h4>' +
       '<p>金额和分类必填，备注可选。记完预算条会立刻更新。</p>' +
       '<label class="field"><span>金额（¥）</span><input id="qaAmount" type="number" min="0.01" step="0.01" inputmode="decimal" placeholder="0.00" /></label>' +
-      '<label class="field"><span>分类</span><select id="qaCategory">' + options + '</select></label>' +
+      '<div class="field"><span>分类</span>' + catPickerHtml('qaCategory', catPrefill) + '</div>' +
+      /* 「这笔属于」：给账单卡的情绪/想要标签一个真实来源，也是冷静期判定的依据 */
+      '<div class="field"><span>这笔属于</span><div class="radio-group" data-act="qa-kind">' +
+      '<label class="radio-item"><input type="radio" name="qaKind" value="need" checked /><span>需要</span></label>' +
+      '<label class="radio-item"><input type="radio" name="qaKind" value="want" /><span>想要</span></label>' +
+      '<label class="radio-item"><input type="radio" name="qaKind" value="mood" /><span>情绪消费</span></label>' +
+      '</div></div>' +
       '<label class="field"><span>备注</span><input id="qaNote" type="text" placeholder="例如：黄焖鸡米饭" maxlength="30" /></label>' +
-      '<label class="field"><span>日期</span><input id="qaDate" type="date" value="' + todayStr + '" /></label>' +
+      '<label class="field"><span>日期</span><input id="qaDate" type="date" value="' + datePrefill + '" /></label>' +
+      /* 想记收入却被弹窗困成支出的出口（复用 .btn-mini，不新增 CSS） */
+      '<p>要记生活费/兼职收入？<button type="button" class="btn-mini" data-act="qa-to-income">记收入 →</button></p>' +
       '<div class="modal-actions">' +
       '<button type="button" class="btn-cancel" data-act="modal-cancel">取消</button>' +
       '<button type="button" class="btn-ok" data-act="quick-add-save">记好了</button>' +
       '</div>');
+    bindCatPicker(box, 'qaCategory');
 
     box.querySelector('[data-act="modal-cancel"]').addEventListener('click', closeModal);
+    /* 想记收入的出口：关掉本弹窗、直接进「记一笔收入」表单 */
+    box.querySelector('[data-act="qa-to-income"]').addEventListener('click', function () {
+      closeModal();
+      openIncomeModal();
+    });
     box.querySelector('[data-act="quick-add-save"]').addEventListener('click', function () {
       var amount = Number(box.querySelector('#qaAmount').value);
       if (!isFinite(amount) || amount <= 0) {
@@ -2161,22 +3446,31 @@
       var category = box.querySelector('#qaCategory').value;
       var note = box.querySelector('#qaNote').value.trim();
       var date = box.querySelector('#qaDate').value || todayStr;
-      var bill = commitBill({ amount: amount, category: category, note: note, date: date });
+      /* 与聊天记账对齐：走同一套情绪/想要推断，再被用户的三选覆盖 */
+      var motive = NLP.detectMotivation(note + ' ' + category);
+      var picked = box.querySelector('input[name="qaKind"]:checked');
+      var kind = picked ? picked.value : '';
+      if (kind === 'want') { motive = { motivation: '刚需', want: true }; }
+      if (kind === 'mood') { motive = { motivation: '情绪', want: true }; }
+      if (kind === 'need') { motive = { motivation: '刚需', want: false }; }
+      var draft = {
+        date: /^\d{4}-\d{2}-\d{2}$/.test(date) ? date : todayStr,
+        amount: ENG.round2(amount),
+        category: DATA.CATEGORY_KEYS.indexOf(category) !== -1 ? category : '其他',
+        note: note || category,
+        motivation: motive.motivation,
+        want: motive.want,
+        type: 'expense'
+      };
       closeModal();
-      var ov = getOverview();
-      addAIMessage(aiBubble('已记下 <b>' + money(bill.amount) + '</b>（' + esc(category) +
-        (note ? ' · ' + esc(note) : '') + '）。本周期还剩 <b>' + money(ov.budgetState.remaining) +
-        '</b>，日均可用 <b>' + money(ov.budgetState.dailyAllowance) + '</b>。'));
-      renderAll();
-      showToast('已记下 ' + money(bill.amount), 'ok');
+      switchView('chat');   /* 否则在记账本/看板页保存后看不到回执 */
+      /* startFlow 会自动给出：冷静期拦截 + 账单卡 + 余额概览 + 理财专家一句话 */
+      startFlow([draft]);
+      showToast('已记下 ' + money(draft.amount), 'ok');
     });
     setTimeout(function () {
       var amountInput = box.querySelector('#qaAmount');
       if (amountInput) { amountInput.focus(); }
-      if (presetCategory) {
-        var catSel = box.querySelector('#qaCategory');
-        if (catSel) { catSel.value = presetCategory; }
-      }
     }, 50);
   }
 
@@ -2267,7 +3561,7 @@
       renderGoals();
       var left = ENG.round2(Math.max(0, goal.target - goal.saved));
       addAIMessage(aiBubble('已存入 ' + money(amount) + '，目标「' + esc(goal.name) + '」现在攒到 ' +
-        money(goal.saved) + '，' + (left > 0 ? '还差 ' + money(left) + '。' : '已经达成啦 🎉')));
+        money(goal.saved) + '，' + (left > 0 ? '还差 ' + money(left) + '。' : '已经达成啦')));
     });
     var input = box.querySelector('#dAmount');
     if (input) { input.focus(); }
@@ -2287,6 +3581,15 @@
       highlightCategory = null;
       undoStack = [];
       saveState();
+      /* 存钱罐跟着一起清空：否则重置后账面余额仍被罐子占着，用户会以为没重置干净。
+         只清罐子自己的键，不动其它任何存储。 */
+      PIGGY.reset();
+      piggyCheer = null;
+      piggyError = '';
+      /* 心愿单同理：重置后旧清单会指向一套已经不存在的账，一并清空；
+         只清自己的键（ai_jizhang_wishlist_v1），不碰主账本。 */
+      if (WISH && !WISH.missing) { WISH.reset(); }
+      wishTab = 'cooling';
       closeModal();
       renderAll();
       addAIMessage(aiBubble('演示数据已经重置好了，账单、目标、成就都回到了初始状态。'));
@@ -2558,6 +3861,26 @@
     $('setSwitchAlbum').checked = st.privacy.album;
     $('setSwitchClipboard').checked = st.privacy.clipboard;
     $('setCacheValue').textContent = estimateCacheSize();
+    /* ---- 说话风格：3 张卡片按当前 tone 勾选（卡片本身由 HTML 静态渲染） ---- */
+    checkRadioGroup('setTone', TONE.normalize(st.tone));
+    /* ---- 单日支出上限：0 = 关闭「单日超支」诊断规则 ---- */
+    var capInput = $('setDailyCap');
+    if (capInput) { capInput.value = String(Math.round(Number(st.dailyCap) || 0)); }
+    /* ---- 语气卡：高亮当前项 + 用 tone.js 现取一句试听（文案只维护一份） ---- */
+    var toneCards = DOC.querySelectorAll('.set-tone-card');
+    var curTone = TONE.normalize(st.tone);
+    for (var ti = 0; ti < toneCards.length; ti++) {
+      var toneInput = toneCards[ti].querySelector('input[name="setTone"]');
+      var toneKey = toneInput ? toneInput.value : '';
+      toneCards[ti].classList.toggle('active', toneKey === curTone);
+      var sampleEl = toneCards[ti].querySelector('.stc-sample');
+      if (sampleEl && toneKey && !TONE.missing) {
+        var keepTone = TONE.get();
+        TONE.set(toneKey);
+        sampleEl.textContent = TONE.t('cool.added', { title: '降噪耳机' });
+        TONE.set(keepTone);
+      }
+    }
   }
 
   /** 设置页所有事件绑定（在 bindEvents 里调用一次） */
@@ -2618,6 +3941,32 @@
       if (!input) { return; }
       setUiMode(input.value);
     });
+
+    /* ---- 说话风格：三张卡片单选（change 会冒泡，委托到容器上） ---- */
+    var toneGroup = $('setToneGroup');
+    if (toneGroup) {
+      toneGroup.addEventListener('change', function (e) {
+        var input = (e.target && e.target.closest) ? e.target.closest('input[name="setTone"]') : null;
+        if (!input) { return; }
+        getSettings().tone = TONE.normalize(input.value);
+        persistSettings();
+        renderAll();
+        showToast('说话风格已切换');
+      });
+    }
+
+    /* ---- 单日支出上限：诊断卡规则①的旋钮，0 = 关闭该规则 ---- */
+    var capInput = $('setDailyCap');
+    if (capInput) {
+      capInput.addEventListener('change', function () {
+        var v = clampNumber(this.value, 0, 99999, 60);
+        getSettings().dailyCap = v;
+        this.value = String(Math.round(v));
+        persistSettings();
+        renderAll();
+        showToast(v > 0 ? ('单日上限已设为 ' + money(v)) : '已关闭单日超支提醒');
+      });
+    }
 
     /* ---- 数据与隐私 ---- */
     $('rowSetCache').addEventListener('click', clearAppCache);
@@ -2853,7 +4202,7 @@
     var ratio = state.budget.total > 0 ? Math.max(0, Math.min(100, bs.remaining / state.budget.total * 100)) : 0;
     var barColor = bs.status === 'danger' ? '#EF5350' : (bs.status === 'tight' ? '#FF8A3D' : '#07C160');
     var html = '' +
-      '<div class="bubble ai">帮你查了下这个周期（' + esc(ov.cycle.start) + ' ~ ' + esc(ov.cycle.end) + '）👇</div>' +
+      '<div class="bubble ai">帮你查了下这个周期（' + esc(ov.cycle.start) + ' ~ ' + esc(ov.cycle.end) + '）</div>' +
       '<div class="bill-card">' +
       '  <div class="bill-card-head"><span>周期剩余 / 总预算</span><span>还剩 ' + ov.cycle.remainingDays + ' 天</span></div>' +
       '  <div class="bill-card-main">' +
@@ -2878,7 +4227,10 @@
       return;
     }
     var svg = '<svg viewBox="0 0 100 100">' +
-      '<g transform="rotate(-90 50 50)">' + donutSvgHtml(slices, 100, 20, 100) + '</g></svg>';
+      '<g transform="rotate(-90 50 50)">' + donutSvgHtml(slices, 100, 20, 100) + '</g>' +
+      '<text x="50" y="48" text-anchor="middle" font-size="12" font-weight="600" fill="#2B313B">' + money(ov.cycleAgg.expense) + '</text>' +
+      '<text x="50" y="59" text-anchor="middle" font-size="6" fill="#8A93A0">总支出</text>' +
+      '</svg>';
     var legend = '';
     var i;
     for (i = 0; i < slices.length && i < 6; i++) {
@@ -2886,6 +4238,7 @@
       legend += '<div><i style="background:' + slices[i].color + '"></i>' + esc(slices[i].key) +
         ' ' + money(slices[i].value) + '（' + pct.toFixed(0) + '%）</div>';
     }
+    addAIMessage(aiBubble('本周期支出构成：'));
     var html = '<div class="mini-pie">' + svg + '<div class="mini-pie-legend">' + legend + '</div></div>';
     addAIMessage(html);
 
@@ -2898,7 +4251,7 @@
 
   function showEntryGuide() {
     var html = '' +
-      '<div class="bubble ai">直接说一句话就行，比如这几句 👇</div>' +
+      '<div class="bubble ai">直接说一句话就行，比如这几句：</div>' +
       '<div class="msg-actions">' +
       '  <button type="button" class="btn-mini" data-cmd="午饭食堂 15">午饭食堂 15</button>' +
       '  <button type="button" class="btn-mini" data-cmd="昨天打车15，奶茶12">昨天打车15，奶茶12</button>' +
@@ -2907,20 +4260,9 @@
     addAIMessage(html);
   }
 
-  function showParseFailure(text) {
-    var html = '' +
-      '<div class="bubble ai">我没听清金额，换个说法？比如「午饭食堂 15」。</div>' +
-      '<div class="msg-actions">' +
-      '  <button type="button" class="btn-mini" data-cmd="午饭食堂 15">午饭食堂 15</button>' +
-      '  <button type="button" class="btn-mini" data-cmd="昨天打车 15">昨天打车 15</button>' +
-      '  <button type="button" class="btn-mini" data-cmd="游戏皮肤 99">游戏皮肤 99</button>' +
-      '</div>';
-    addAIMessage(html);
-    var hint = String(text || '').trim();
-    if (hint) {
-      addAIMessage(aiBubble('（你刚才说的是「' + esc(hint) + '」，我在里面没找到金额。）'));
-    }
-  }
+  /* C5：旧的「整句否定 + 固定金额示例」兜底已退役（现由 answerGiveUp / intent.js 的
+     giveUpHtml 承担 L5 出口）。旧文案在全库清零：缺金额时一律只问金额，并按反死循环
+     规则逐级升级，绝不重复同一句提示。 */
 
   function showGoalGuide() {
     addAIMessage(aiBubble('想攒钱买点什么？点下面按钮填一下，我帮你算每月该存多少。'));
@@ -3027,7 +4369,7 @@
       '    <button type="button" class="btn-mini" data-act="cycle-no" data-bill="' + esc(bill.id) + '">不用，只记这一笔</button>' +
       '  </div>' +
       '</div>';
-    addAIMessage(aiBubble('🤔 多问一句：') + html);
+    addAIMessage(aiBubble(ic('think', 'bico-brand', '提示') + '多问一句：') + html);
   }
 
   /**
@@ -3162,9 +4504,9 @@
     var rated = s.worth + s.mid + s.waste;
     return '<div class="worth-stats">' +
       '<div class="worth-grid">' +
-      '  <div class="wcell w-worth"><b>' + s.worth + '</b><small>值 ✅</small></div>' +
+      '  <div class="wcell w-worth"><b>' + s.worth + '</b><small>' + ic('target', null, '值') + '值</small></div>' +
       '  <div class="wcell w-mid"><b>' + s.mid + '</b><small>一般</small></div>' +
-      '  <div class="wcell w-waste"><b>' + s.waste + '</b><small>不值 ❌</small></div>' +
+      '  <div class="wcell w-waste"><b>' + s.waste + '</b><small>' + ic('stop', null, '不值') + '不值</small></div>' +
       '  <div class="wcell"><b>' + s.none + '</b><small>未评价</small></div>' +
       '</div>' +
       '<div class="worth-bar"><i style="width:' + s.wasteRate.toFixed(1) + '%"></i></div>' +
@@ -3267,7 +4609,7 @@
       lines += '<div class="pf-sub">以下文件没能解析出记录：</div>';
       bad.forEach(function (f) {
         lines += '<div class="pf-item">' +
-          '<div class="pf-name">❌ ' + esc(f.name) + '</div>' +
+          '<div class="pf-name">' + ic('alert', 'bico-bad', '未识别') + esc(f.name) + '</div>' +
           '<div class="pf-reason">' + esc(f.reason || '解析失败') + '</div>';
         if (f.preview) {
           lines += '<pre class="pf-preview">' + esc(f.preview) + '</pre>';
@@ -3320,7 +4662,7 @@
     if (bannerEl) {
       bannerEl.hidden = !isCurrent;
       if (isCurrent) {
-        bannerEl.textContent = '📒 正在分析你当前账本里已记的 ' + (state.bills || []).length +
+        bannerEl.textContent = '正在分析你当前账本里已记的 ' + (state.bills || []).length +
           ' 笔记录（直接来自账本，无需导入）';
       }
     }
@@ -3331,7 +4673,7 @@
       var failHtml;
       if (isCurrent) {
         if (statusEl) { statusEl.textContent = '当前账本还没有记录。'; }
-        failHtml = '<div class="parse-fail"><div class="pf-emoji">📒</div>' +
+        failHtml = '<div class="parse-fail"><div class="pf-emoji">' + ic('clipboard', null, '账本') + '</div>' +
           '<div class="pf-title">账本还是空的</div>' +
           '<p class="pf-tip">回到聊天说一句「中午黄焖鸡18」就能记账；也可以切到上方「导入 CSV」把微信 / 支付宝账单导进来。</p></div>';
       } else {
@@ -3403,7 +4745,7 @@
       html += '<div class="insight-box"><div class="insight-title">给你的 ' + insightList.length + ' 条建议</div>';
       insightList.forEach(function (it) {
         html += '<div class="insight-item ' + (it.level === 'warn' ? 'warn' : 'tip') + '">' +
-          '<div class="insight-head">' + (it.level === 'warn' ? '⚠️ ' : '💡 ') + esc(it.title) + '</div>' +
+          '<div class="insight-head">' + (it.level === 'warn' ? ic('alert', 'bico-warn', '提醒') : ic('bulb', 'bico-brand', '建议')) + esc(it.title) + '</div>' +
           '<div class="insight-evidence">' + esc(it.evidence) + '</div>' +
           '<div class="insight-action">' + esc(it.action) + '</div>' +
           '</div>';
@@ -4139,7 +5481,7 @@
       var previewEl = $('ocrPreview');
       ocrPreviewSuppressed = true;
       if (previewEl) { previewEl.hidden = true; }
-      html += '<div class="ocr-warn ocr-warn-demo">⚠️ 这是内置示例，不是你上传的截图，仅用于演示流程</div>';
+      html += '<div class="ocr-warn ocr-warn-demo">' + ic('alert', 'bico-warn', '注意') + '这是内置示例，不是你上传的截图，仅用于演示流程</div>';
     }
 
     html += '<div class="ocr-card-head">' +
@@ -4350,22 +5692,19 @@
 
     html += '<div class="deals-sec">今天的限时活动</div>';
     if (!limited.length) {
-      var kfc = DEALS.nextOf('kfc', d);
       html += '<div class="deals-empty">今天是' + esc(DEALS.weekdayCn(d)) +
-        '，没有固定的限时活动（肯德基在周四、麦当劳在周一、瑞幸 / 库迪在周二）。<br>' +
-        '最近一场：<b>肯德基疯狂星期四 ' + esc(DEALS.dateKey(kfc)) + '（' + esc(DEALS.weekdayCn(kfc)) +
-        '）</b>，还有 ' + DEALS.daysBetween(d, kfc) + ' 天。</div>';
+        '，没有固定的限时活动。点上方「14 天日历」可以看最近哪天有品牌优惠。</div>';
     } else {
       limited.forEach(function (it) {
         html += '<div class="deal-item">' +
-          '<div class="di-head"><span class="di-emoji">' + esc(it.emoji) + '</span>' +
+          '<div class="di-head"><span class="di-emoji">' + itemIcon(it) + '</span>' +
           '<b>' + esc(it.name) + ' · ' + esc(it.title) + '</b>' +
           '<span class="di-tag">' + esc(it.tag) + '</span></div>' +
-          (it.place ? '<div class="di-place">📍 ' + esc(it.place) + '</div>' : '') +
+          (it.place ? '<div class="di-place">' + ic('globe', 'bico-mute', '地点') + esc(it.place) + '</div>' : '') +
           '<p>' + esc(it.what) + '</p>' +
-          '<p class="di-how">👉 ' + esc(it.how) + '</p>' +
-          '<p class="di-tip">⚠ ' + esc(it.tip) + '</p>' +
-          (it.coach ? '<p class="di-coach">🎓 ' + esc(it.coach) + '</p>' : '') +
+          '<p class="di-how">' + ic('bulb', 'bico-brand', '怎么做') + esc(it.how) + '</p>' +
+          '<p class="di-tip">' + ic('alert', 'bico-warn', '提醒') + esc(it.tip) + '</p>' +
+          (it.coach ? '<p class="di-coach">' + ic('cap', 'bico-brand', '理财专家') + esc(it.coach) + '</p>' : '') +
           '</div>';
       });
     }
@@ -4388,7 +5727,7 @@
     if (always.length) {
       html += '<div class="deals-sec">常驻优惠（不用等）</div><div class="deals-pills">';
       always.forEach(function (it) {
-        html += '<span class="deals-pill" title="' + esc(it.tip) + '">' + esc(it.emoji) + ' ' +
+        html += '<span class="deals-pill" title="' + esc(it.tip) + '">' + itemIcon(it) + ' ' +
           esc(it.name) + '·' + esc(it.title) + (it.place ? '（' + esc(it.place) + '）' : '') + '</span>';
       });
       html += '</div>';
@@ -4414,13 +5753,13 @@
       } else {
         day.items.forEach(function (it) {
           html += '<span class="dc-chip ' + (it.type === 'promo' ? 'is-promo' : '') + '">' +
-            esc(it.emoji) + ' ' + esc(it.name) + '·' + esc(it.title) + '</span>';
+            itemIcon(it) + ' ' + esc(it.name) + '·' + esc(it.title) + '</span>';
         });
       }
       html += '</div></div>';
     });
     html += '</div>';
-    html += '<p class="deals-note">日历由日期算法生成：周四 = 校门口肯德基，周一 = 阳光广场麦当劳，周二 = 阳光广场瑞幸 / 库迪；' +
+    html += '<p class="deals-note">日历由日期算法生成：每周几 / 每月几号自动算出对应品牌活动，真实有效、不联网也不会过期；' +
       '大促只标「预热开始」和「当天」，不重复刷屏。</p>';
     return html;
   }
@@ -4537,7 +5876,7 @@
   function dealResultHtml(r) {
     var html = '<div class="dc-result">';
     html += '<div class="dc-headline' + (r.comparable ? '' : ' is-warn') + '">' +
-      (r.comparable ? '✅ ' : '⚠️ ') + esc(r.headline) + '</div>';
+      (r.comparable ? ic('target', 'bico-brand', '可比') : ic('alert', 'bico-warn', '注意')) + esc(r.headline) + '</div>';
 
     if (r.rows && r.rows.length) {
       html += '<div class="dc-table">' +
@@ -4556,10 +5895,10 @@
     }
 
     if (r.budget) {
-      html += '<p class="dc-line ' + (r.budget.ok ? 'is-good' : 'is-bad') + '">💰 ' + esc(r.budget.text) + '</p>';
+      html += '<p class="dc-line ' + (r.budget.ok ? 'is-good' : 'is-bad') + '">' + ic('wallet', null, '预算') + esc(r.budget.text) + '</p>';
     }
     if (r.band) {
-      html += '<p class="dc-line">📊 这个价属于「' + esc(r.band.band) + '」的 <b>' + esc(r.band.label) + '</b> 档：' +
+      html += '<p class="dc-line">' + ic('bar', 'bico-mute', '价格区间') + '这个价属于「' + esc(r.band.band) + '」的 <b>' + esc(r.band.label) + '</b> 档：' +
         esc(r.band.text) + '。</p>';
     }
     if (r.timing && r.timing.text) {
@@ -4572,7 +5911,7 @@
     }
     if (r.warnings && r.warnings.length) {
       html += '<ul class="dc-list is-warn">';
-      r.warnings.forEach(function (s) { html += '<li>⚠ ' + esc(s) + '</li>'; });
+      r.warnings.forEach(function (s) { html += '<li>' + ic('alert', 'bico-warn', '注意') + esc(s) + '</li>'; });
       html += '</ul>';
     }
     if (r.ok && r.best) {
@@ -4622,7 +5961,8 @@
       '<div class="deals-sec">数据从哪来（三条路径，各自标注）</div>' +
       '<div class="deal-item">' +
       '<div class="di-head"><svg class="di-emoji" viewBox="0 0 24 24"><use href="#i-abacus"/></svg><b>路径三 · 真实日期算法</b><span class="di-tag">已实现</span></div>' +
-      '<p>疯狂星期四 = <code>weekday()==3</code>（周四）、麦当劳「13.9 元随心配」= 每周一、瑞幸 / 库迪 9.9 元 = 每周二、双11 = 11-11。' +
+      '<p>疯狂星期四 = <code>weekday()==4</code>（周四）、麦当劳「13.9 元随心配」= 每周一、瑞幸 / 库迪 9.9 元 = 每周二；' +
+      '海底捞大学生 69 折 = 工作日（<code>weekday</code> 在 [1..5]）；双11 = 11-11。' +
       '日期全部由代码算出，指定任意日期都能算出下一次是哪天，不依赖网络、不会过期。</p>' +
       '<p class="di-how">产出：14 天日历 + 「真实商家日历.csv」（可下载，Excel 直接打开）</p>' +
       '</div>' +
@@ -4675,7 +6015,7 @@
       html += '<div class="dm-line dm-promo"><span class="dm-dot"></span>' + esc(np.promo.name) +
         ' 还有 <b>' + np.days + '</b> 天 · ' + esc(np.promo.depth) + '</div>';
     }
-    html += '<div class="dm-line dm-tip">💡 ' + esc(DEALS.timingAdvice(0, d).text) + '</div>';
+    html += '<div class="dm-line dm-tip">' + ic('bulb', 'bico-brand', '提示') + esc(DEALS.timingAdvice(0, d).text) + '</div>';
     box.innerHTML = html;
   }
 
@@ -5358,14 +6698,14 @@
     var html = '', i;
 
     if (!list.length) {
-      html += '<div class="dm-line">今天的动作都打完卡了 🎉</div>';
+      html += '<div class="dm-line">' + ic('target', 'bico-brand', '已完成') + '今天的动作都打完卡了</div>';
     } else {
       for (i = 0; i < list.length && i < 3; i++) {
         html += '<div class="dm-line"><span class="dm-dot"></span><b>' +
           esc(list[i].title) + '</b> <em>' + esc(SAV.saveText(list[i])) + '</em></div>';
       }
     }
-    html += '<div class="dm-line dm-tip">💡 本周期省下 ' + money(sum.monthSaved) +
+    html += '<div class="dm-line dm-tip">' + ic('bulb', 'bico-brand', '提示') + '本周期省下 ' + money(sum.monthSaved) +
       ' · 累计打卡 ' + sum.count + ' 次</div>';
     box.innerHTML = html;
   }
@@ -5380,7 +6720,7 @@
     var ctx = savingsCtx();
     var list = SAV.rankToday(SAV.ENTRIES, ctx);
     if (!list.length) {
-      addAIMessage(aiBubble('今天的动作都打完卡了 🎉<br>点顶部「省钱」→「省钱图谱」分段，翻翻别的分类，或者明天再来。'));
+      addAIMessage(aiBubble(ic('target', 'bico-brand', '已完成') + '今天的动作都打完卡了<br>点顶部「省钱」→「省钱图谱」分段，翻翻别的分类，或者明天再来。'));
       return;
     }
     var hitN = 0, i;
@@ -5437,58 +6777,88 @@
   /* 消息路由                                                            */
   /* ================================================================== */
 
-  var EXACT_COMMANDS = {
-    '查余额': showBalanceCard,
-    '余额': showBalanceCard,
-    '还能花多少': showBalanceCard,
-    '本月花销饼图': showPieCard,
-    '饼图': showPieCard,
-    '记一笔': showEntryGuide,
-    '记收入': openIncomeModal,
-    '记一笔收入': openIncomeModal,
-    '账单分析': openAnalysisSheet,
-    '导入账单': openImportSheet,
-    '截屏记账': openOcrModal,
-    '截图记账': openOcrModal,
-    '我想攒钱': showGoalGuide,
-    '我想攒钱买': showGoalGuide,
-    '省钱图谱': showSavingsGraph,
-    '省钱清单': showSavingsPanelToday,
-    '今天怎么省': showSavingsPanelToday,
-    '我的省钱账': showSavingsBook,
-    '所有省钱大全': showSavingsIndex,
-    '省钱大全': showSavingsIndex,
-    '理财课': showLearnGuide,
-    '理财学院': showLearnGuide,
-    '设置': openSettingsPage,
-    '设置预算': openDrawer
-  };
+  /**
+   * 命令白名单（C3）：唯一事实来源是 COMMAND_SPECS；
+   * EXACT_COMMANDS 由它生成，保持旧的「{命令文本: 处理函数}」结构与旧引用兼容。
+   */
+  var COMMAND_SPECS = [
+    { key: 'balance', aliases: ['查余额', '余额', '还能花多少'], fn: showBalanceCard },
+    { key: 'pie', aliases: ['本月花销饼图', '饼图'], fn: showPieCard },
+    { key: 'entry-guide', aliases: ['记一笔'], fn: showEntryGuide },
+    { key: 'income', aliases: ['记收入', '记一笔收入'], fn: openIncomeModal },
+    { key: 'analysis', aliases: ['账单分析'], fn: openAnalysisSheet },
+    { key: 'import', aliases: ['导入账单'], fn: openImportSheet },
+    { key: 'ocr', aliases: ['截屏记账', '截图记账'], fn: openOcrModal },
+    { key: 'goals', aliases: ['我想攒钱', '我想攒钱买'], fn: showGoalGuide },
+    { key: 'savings-graph', aliases: ['省钱图谱'], fn: showSavingsGraph },
+    { key: 'savings-today', aliases: ['省钱清单', '今天怎么省'], fn: showSavingsPanelToday },
+    { key: 'savings-book', aliases: ['我的省钱账'], fn: showSavingsBook },
+    { key: 'savings-index', aliases: ['所有省钱大全', '省钱大全'], fn: showSavingsIndex },
+    { key: 'learn', aliases: ['理财课', '理财学院'], fn: showLearnGuide },
+    { key: 'settings', aliases: ['设置'], fn: openSettingsPage },
+    { key: 'budget', aliases: ['设置预算'], fn: openDrawer }
+  ];
+
+  /** 由 COMMAND_SPECS 生成的别名词典（保持旧结构，其他地方的引用零改动） */
+  var EXACT_COMMANDS = (function () {
+    var map = {};
+    var i;
+    var j;
+    for (i = 0; i < COMMAND_SPECS.length; i++) {
+      for (j = 0; j < COMMAND_SPECS[i].aliases.length; j++) {
+        map[COMMAND_SPECS[i].aliases[j]] = COMMAND_SPECS[i].fn;
+      }
+    }
+    return map;
+  })();
+
+  /**
+   * 命令命中结构构造器。
+   * @param {string} key 命令 key（埋点 / 分发用）
+   * @param {Function} fn 处理函数
+   * @param {string} [alias] 命中的别名
+   * @return {{key:string, fn:Function, alias:string}}
+   */
+  function cmdHit(key, fn, alias) {
+    return { key: key, fn: fn, alias: alias || '' };
+  }
 
   /**
    * 判断一句话是否命中「本地命令」（无需云端即可处理的明确指令）。
-   * 命中返回对应的处理函数，否则返回 null（应交给云端 / NLP 解析）。
+   * 命中返回 {key, fn, alias}，否则返回 null（交给意图分类 / 云端裁决）。
    */
-  function localCommandName(raw) {
+  function commandMatch(raw) {
     var text = String(raw || '').trim();
     if (!text) { return null; }
     if (Object.prototype.hasOwnProperty.call(EXACT_COMMANDS, text)) {
-      return EXACT_COMMANDS[text];
+      return cmdHit(text, EXACT_COMMANDS[text], text);
     }
     var compact = text.replace(/\s+/g, '');
     if (compact === '查余额' || compact === '余额' || compact === '还能花多少' || compact === '还能花多少钱' ||
-      compact === '我还剩多少' || compact === '看余额') { return showBalanceCard; }
-    if (compact.indexOf('饼图') !== -1 || compact === '本月花销' || compact === '花销占比') { return showPieCard; }
-    if (compact.indexOf('设置预算') !== -1 || compact === '预算设置') { return openDrawer; }
+      compact === '我还剩多少' || compact === '看余额') { return cmdHit('balance', showBalanceCard, compact); }
+    if (compact.indexOf('饼图') !== -1 || compact === '本月花销' || compact === '花销占比') {
+      return cmdHit('pie', showPieCard, compact);
+    }
+    if (/(改|调|设置).{0,3}预算/.test(compact) || compact === '预算设置') { return cmdHit('budget', openDrawer, compact); }
     if (compact === '设置' || compact === '系统设置' || compact === '偏好设置' ||
-      compact === '通用设置' || compact === '打开设置') { return openSettingsPage; }
-    if (compact.indexOf('我想攒钱') !== -1 || compact.indexOf('攒钱买') !== -1) { return showGoalGuide; }
-    if (compact.indexOf('记收入') !== -1 || compact.indexOf('记一笔收入') !== -1) { return openIncomeModal; }
-    if (compact.indexOf('账单分析') !== -1) { return openAnalysisSheet; }
-    if (compact.indexOf('导入') !== -1 && compact.indexOf('账单') !== -1) { return openImportSheet; }
-    if (compact.indexOf('截屏记账') !== -1 || compact.indexOf('截图记账') !== -1) { return openOcrModal; }
-    /* ---- 业务规则：句子里带金额的一律当成记账 ---- */
-    // 提到这里是因为下面每条「省钱 / 优惠」分支都必须先过它：
-    // 例「肯德基疯狂星期四 25」要记一笔餐饮，不能被活动卡或图谱抢走。
+      compact === '通用设置' || compact === '打开设置') { return cmdHit('settings', openSettingsPage, compact); }
+    if (compact.indexOf('我想攒钱') !== -1 || compact.indexOf('攒钱买') !== -1) {
+      return cmdHit('goals', showGoalGuide, compact);
+    }
+    if (compact.indexOf('记收入') !== -1 || compact.indexOf('记一笔收入') !== -1) {
+      return cmdHit('income', openIncomeModal, compact);
+    }
+    if (compact.indexOf('账单分析') !== -1) { return cmdHit('analysis', openAnalysisSheet, compact); }
+    if (compact.indexOf('导入') !== -1 && compact.indexOf('账单') !== -1) {
+      return cmdHit('import', openImportSheet, compact);
+    }
+    if (compact.indexOf('截屏记账') !== -1 || compact.indexOf('截图记账') !== -1) {
+      return cmdHit('ocr', openOcrModal, compact);
+    }
+    /* ---- 业务规则：句子里带金额的一律当成记账（= 意图层的 V4 规则） ----
+       ⚠️ 禁止改动：这是「带金额优先记账」的唯一实现处，V4 与它保持同一判据。
+       提到这里是因为下面每条「省钱 / 优惠」分支都必须先过它：
+       例「肯德基疯狂星期四 25」要记一笔餐饮，不能被活动卡或图谱抢走。 */
     var hasAmount = /(\d+(\.\d+)?)\s*(元|块|块钱)?/.test(compact) &&
       !/(多少钱|贵吗|便宜吗|什么时候|哪天|几天|多久|划算吗|比价|哪家便宜)/.test(compact);
     /* ---- 省钱图谱：必须排在专家「省钱」分支之前，否则「省钱攻略 奶茶」会被专家抢走 ---- */
@@ -5496,62 +6866,1140 @@
       var svIdx = compact.indexOf('省钱攻略');
       if (svIdx !== -1 && compact.length > svIdx + 4) {
         var svKw = compact.slice(svIdx + 4);
-        return function () { showSavingsSearch(svKw); };
+        return cmdHit('savings-search', function () { showSavingsSearch(svKw); }, compact);
       }
       if (compact.indexOf('所有省钱') !== -1 || compact.indexOf('省钱大全') !== -1 ||
         compact.indexOf('省钱宝典') !== -1) {
-        return showSavingsIndex;
+        return cmdHit('savings-index', showSavingsIndex, compact);
       }
       if (compact.indexOf('省钱图谱') !== -1) {
-        return showSavingsGraph;
+        return cmdHit('savings-graph', showSavingsGraph, compact);
       }
       if (compact.indexOf('省钱账') !== -1 || compact.indexOf('省了多少钱') !== -1 ||
         compact.indexOf('省下多少') !== -1) {
-        return showSavingsBook;
+        return cmdHit('savings-book', showSavingsBook, compact);
       }
     }
     /* ---- 理财专家：省钱 / 赚钱 / 剁手冷静法 ---- */
     if (compact === '理财课' || compact === '理财学院' || compact === '看理财课' ||
-      compact === '视频学习') { return showLearnGuide; }
-    if (compact.indexOf('剁手冷静法') !== -1 || compact.indexOf('冷静期') !== -1) { return showCoolingGuide; }
+      compact === '视频学习') { return cmdHit('learn', showLearnGuide, compact); }
+    if (compact.indexOf('剁手冷静法') !== -1 || compact.indexOf('冷静期') !== -1) {
+      return cmdHit('cooling-guide', showCoolingGuide, compact);
+    }
     if (compact.indexOf('省钱') !== -1 && /(怎么|如何|怎样|方法|攻略|技巧|建议|教我)/.test(compact)) {
-      return showSaveMoneyGuide;
+      return cmdHit('save-guide', showSaveMoneyGuide, compact);
     }
     if (compact.indexOf('赚钱') !== -1 && /(怎么|如何|怎样|方法|路子|攻略|建议|教我)/.test(compact)) {
-      return showMakeMoneyGuide;
+      return cmdHit('make-guide', showMakeMoneyGuide, compact);
     }
-    if (compact === '省钱' || compact === '省钱攻略' || compact === '省钱方法') { return showSaveMoneyGuide; }
-    if (compact === '搞钱' || compact === '搞钱路子' || compact === '赚钱方法') { return showMakeMoneyGuide; }
+    if (compact === '省钱' || compact === '省钱攻略' || compact === '省钱方法') {
+      return cmdHit('save-guide', showSaveMoneyGuide, compact);
+    }
+    if (compact === '搞钱' || compact === '搞钱路子' || compact === '赚钱方法') {
+      return cmdHit('make-guide', showMakeMoneyGuide, compact);
+    }
     /* ---- 省钱雷达：活动日历 / 会员日 / 比价 ---- */
     if (hasAmount) { return null; }
     if (/省钱雷达|优惠提醒|打折日|会员日|今日优惠|今天.*(优惠|特价|打折)|有什么优惠|有啥优惠|优惠活动/.test(compact)) {
-      return showDealsTodayCard;
+      return cmdHit('deals-today', showDealsTodayCard, compact);
     }
     if (compact.indexOf('疯狂星期四') !== -1 || compact.indexOf('肯德基') !== -1 ||
       compact.indexOf('周四吃') !== -1) {
-      return showKfcDealsCard;
+      return cmdHit('deals-kfc', showKfcDealsCard, compact);
     }
     if (compact.indexOf('比价') !== -1 || compact.indexOf('哪家便宜') !== -1 ||
       compact.indexOf('哪里便宜') !== -1 || compact.indexOf('多少钱划算') !== -1 ||
       compact.indexOf('划算吗') !== -1 || compact.indexOf('划算不划算') !== -1) {
-      return function () { showDealCompareFromText(text); };
+      return cmdHit('deals-compare', function () { showDealCompareFromText(text); }, compact);
     }
     return null;
   }
 
+  /**
+   * 兼容薄壳（C4）：保留旧函数名，让旧调用点零改动。
+   * 说明：C7 重构后 sendToAssistant / routeCommand 都直接用 commandMatch（需要命令 key 做埋点），
+   * 本壳**刻意保留**——设计稿 C4 明确要求「改名 + 留薄壳」，也方便回滚/外部脚本引用。
+   * 【勿删】当前无内部调用点是已知状态（QA 已备案为偏离），删掉会直接让 C4 验收点失败。
+   * @param {string} raw
+   * @return {?Function}
+   */
+  function localCommandName(raw) {
+    var hit = commandMatch(raw);
+    return hit ? hit.fn : null;
+  }
+
+  /* ================================================================== */
+  /* 意图路由 · pending 状态机 · 表驱动分发（C8）                        */
+  /* ================================================================== */
+
+  /** 云端二次裁决的总开关：置 false 立即回到纯本地（断网态即此状态） */
+  var CLOUD_VERDICT_ENABLED = true;
+  /** 裁决只需要一个短回答，3s 拿不到就用本地结果（用户感知延迟 12s -> 3s） */
+  var VERDICT_TIMEOUT_MS = 3000;
+
+  /**
+   * 单轮待补全上下文。**刻意只放内存，不写 localStorage**（刷新即清空，避免跨会话串味）。
+   * {id, intent, slots, missing, tries, level, formType, promptKey, lastText, ts}
+   */
+  var pendingCtx = null;
+  var pendingSeq = 0;
+  /** 最近 3 条已发 promptKey（反死循环第二道闸） */
+  var pendingRecentKeys = [];
+  /** 连续判不出（unknown）的次数：第 4 次才落到 L5 */
+  var unknownTries = 0;
+
+  function pendingNew(intent, slots, missing, lastText) {
+    pendingSeq++;
+    return {
+      id: 'p' + pendingSeq,
+      intent: intent || 'record',
+      slots: slots || {},
+      missing: missing || [],
+      tries: 0,
+      level: 2,
+      formType: null,
+      promptKey: null,
+      lastText: String(lastText || ''),
+      ts: Date.now()
+    };
+  }
+
+  function pendingSet(p) { pendingCtx = p; }
+  function pendingGet() { return pendingCtx; }
+  function pendingClear() { pendingCtx = null; }
+
+  /** pending 是否已过期（TTL 2 分钟） */
+  function pendingExpired() {
+    if (!pendingCtx) { return true; }
+    return (Date.now() - pendingCtx.ts) > INTENT.CONST.PENDING_TTL_MS;
+  }
+
+  /** 记一条已发 promptKey（只留最近 3 条） */
+  function pendingRememberKey(key) {
+    if (!key) { return; }
+    pendingRecentKeys.push(key);
+    while (pendingRecentKeys.length > 3) { pendingRecentKeys.shift(); }
+  }
+
+  /* ---------------- 埋点（C13）：环形缓冲 <= 200 条，不落盘 ---------------- */
+
+  var intentLog = [];
+
+  /**
+   * 记录一次意图判定（只在内存，便于评审现场演示与阈值校准）。
+   * @param {string} text
+   * @param {string} intent
+   * @param {number} confidence
+   * @param {string} tier
+   * @param {Array<string>} missing
+   * @param {string} [extra] 'L2' 这类层级，或命令 key
+   */
+  function logIntent(text, intent, confidence, tier, missing, extra) {
+    var item = {
+      ts: Date.now(),
+      text: String(text || '').slice(0, 30),
+      intent: intent,
+      confidence: Math.round(Number(confidence || 0) * 100) / 100,
+      tier: tier,
+      missing: missing || [],
+      level: (typeof extra === 'string' && extra.indexOf('L') === 0) ? Number(extra.slice(1)) : null,
+      commandKey: (typeof extra === 'string' && extra.indexOf('L') !== 0) ? extra : null,
+      promptKey: pendingCtx ? pendingCtx.promptKey : null,
+      escalated: !!(pendingCtx && pendingCtx.tries > 0),
+      source: 'local'
+    };
+    intentLog.push(item);
+    while (intentLog.length > 200) { intentLog.shift(); }
+  }
+
+  /** 只读导出，便于控制台 `AJ_INTENT_LOG()` 现场查看 */
+  global.AJ_INTENT_LOG = function () { return intentLog.slice(); };
+
+  /** `?debug=intent` 开关：每条 AI 回复附带 intent · conf · 层级 */
+  function intentDebugOn() {
+    try {
+      var search = String((global.location && global.location.search) || '');
+      return /(?:^|[?&])debug=intent(?:[&=#]|$)/.test(search);
+    } catch (e) {
+      return false;
+    }
+  }
+
+  /** debug 模式下追加一枚小标签，让现场评审「看得见判定」 */
+  function attachIntentTag(res, source) {
+    if (!intentDebugOn() || !res) { return; }
+    var level = (typeof res.level === 'number') ? res.level : 0;
+    addAIMessage('<div class="msg-actions">' +
+      tagHtml(res.intent + ' · ' + res.confidence + ' · L' + level + ' · ' + (source || 'local'), 'gray') +
+      '</div>');
+  }
+
+  /* ---------------- 视图上下文 / 时间范围 ---------------- */
+
+  /**
+   * 构造意图层需要的视图上下文（最近一笔 + 该品类 / 该餐段近 30 天均值）。
+   * @param {Object} [slots]
+   * @return {{now:Date, lastBill:?Object, categoryAvg:number, categoryCount:number, mealAvg:number, mealCount:number}}
+   */
+  function buildIntentViewCtx(slots) {
+    var s = slots || {};
+    var ctx = {
+      now: new Date(), lastBill: null,
+      categoryAvg: 0, categoryCount: 0, categoryAmounts: [],
+      mealAvg: 0, mealCount: 0, mealAmounts: []
+    };
+    if (!state || !state.bills || !state.bills.length) { return ctx; }
+    var sorted = state.bills.slice().sort(function (a, b) {
+      if (a.date !== b.date) { return a.date < b.date ? 1 : -1; }
+      return (b.createdAt || 0) - (a.createdAt || 0);
+    });
+    ctx.lastBill = sorted[0] || null;
+
+    var now = new Date();
+    var cutoff = ENG.formatDate(new Date(now.getFullYear(), now.getMonth(), now.getDate() - 30));
+    var catSum = 0;
+    var catN = 0;
+    var mealSum = 0;
+    var mealN = 0;
+    var i;
+    for (i = 0; i < state.bills.length; i++) {
+      var b = state.bills[i];
+      if (b.type === 'income') { continue; }
+      if (b.date < cutoff) { continue; }
+      if (s.category && b.category === s.category) {
+        catSum += Number(b.amount) || 0;
+        catN++;
+        ctx.categoryAmounts.push(Number(b.amount) || 0);
+      }
+      if (s.meal && b.meal === s.meal) {
+        mealSum += Number(b.amount) || 0;
+        mealN++;
+        ctx.mealAmounts.push(Number(b.amount) || 0);
+      }
+    }
+    ctx.categoryCount = catN;
+    ctx.categoryAvg = catN > 0 ? ENG.round2(catSum / catN) : 0;
+    ctx.mealCount = mealN;
+    ctx.mealAvg = mealN > 0 ? ENG.round2(mealSum / mealN) : 0;
+    return ctx;
+  }
+
+  /**
+   * 把 slots.period 翻译成日期区间。
+   * @param {?string} kind today|week|month|lastMonth|all|cycle
+   * @return {{start:string, end:string, label:string}}
+   */
+  function intentPeriodRange(kind) {
+    var today = new Date();
+    var todayStr = ENG.formatDate(today);
+    var start = todayStr;
+    var end = todayStr;
+    var label = '今天';
+    if (kind === 'week') {
+      start = ENG.formatDate(new Date(today.getFullYear(), today.getMonth(), today.getDate() - 6));
+      label = '最近 7 天';
+    } else if (kind === 'month') {
+      start = ENG.formatDate(new Date(today.getFullYear(), today.getMonth(), 1));
+      label = '这个月';
+    } else if (kind === 'lastMonth') {
+      start = ENG.formatDate(new Date(today.getFullYear(), today.getMonth() - 1, 1));
+      end = ENG.formatDate(new Date(today.getFullYear(), today.getMonth(), 0));
+      label = '上个月';
+    } else if (kind === 'all') {
+      start = '0000-01-01';
+      label = '累计';
+    } else if (kind === 'cycle' && state && state.budget) {
+      var cycle = ENG.getCycle(today, state.budget.payday, null, state.budget.cycleStart);
+      start = cycle.start;
+      end = cycle.end;
+      label = '本周期';
+    }
+    return { start: start, end: end, label: label };
+  }
+
+  /** 月份位移：'2026-03-31' + (-1) -> '2026-02-28' 这类近似（用于环比） */
+  function shiftMonth(dateStr, delta) {
+    var p = String(dateStr || '').split('-');
+    if (p.length !== 3) { return dateStr; }
+    return ENG.formatDate(new Date(Number(p[0]), Number(p[1]) - 1 + delta, Number(p[2])));
+  }
+
+  /* ---------------- 小工具 ---------------- */
+
+  /** 生成一枚 .btn-mini（复用既有样式，不新增组件） */
+  function miniBtn(attrName, attrVal, label, primary) {
+    return '<button type="button" class="btn-mini' + (primary ? ' primary' : '') + '" ' +
+      attrName + '="' + esc(attrVal) + '">' + esc(label) + '</button>';
+  }
+
+  /** .msg-actions 容器 */
+  function actionsWrap(inner) {
+    return '<div class="msg-actions">' + inner + '</div>';
+  }
+
+  /** 兜底取出最近一笔（不依赖 undoStack） */
+  function latestBill() {
+    if (!state || !state.bills || !state.bills.length) { return null; }
+    return state.bills.slice().sort(function (a, b) {
+      if (a.date !== b.date) { return a.date < b.date ? 1 : -1; }
+      return (b.createdAt || 0) - (a.createdAt || 0);
+    })[0];
+  }
+
+  /** 从原句里擦掉数字与动词，得到一个能当备注的短语 */
+  function cleanupDraftNote(raw, category) {
+    var t = String(raw || '')
+      .replace(/\d+(?:\.\d{1,2})?/g, ' ')
+      .replace(/[，。；、,!！?？~～|]+/g, ' ')
+      .replace(/[零〇一二两三四五六七八九十百千]+(?:元|块钱|块|毛|角)/g, ' ')
+      .replace(/(花了|买了|付了|充了|一共|总共|大概|左右|差不多)/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
+    if (!t) { t = category || '其他'; }
+    if (t.length > 20) { t = t.slice(0, 20); }
+    return t;
+  }
+
+  /** 「明天 / 后天」这类未来日期（DATE_WORDS 只覆盖过去与今天） */
+  function futureDateOf(text, now) {
+    var t = String(text || '');
+    var d = new Date(now.getTime());
+    if (t.indexOf('大后天') !== -1) { d.setDate(d.getDate() + 3); return ENG.formatDate(d); }
+    if (t.indexOf('后天') !== -1) { d.setDate(d.getDate() + 2); return ENG.formatDate(d); }
+    if (t.indexOf('明天') !== -1) { d.setDate(d.getDate() + 1); return ENG.formatDate(d); }
+    if (t.indexOf('周末') !== -1) {
+      var delta = (6 - d.getDay() + 7) % 7;
+      d.setDate(d.getDate() + (delta === 0 ? 7 : delta));
+      return ENG.formatDate(d);
+    }
+    return '';
+  }
+
+  /* ---------------- 表驱动分发器 ---------------- */
+
+  /** intent(+子槽位) -> 处理器。新增意图只需加一行，不改 if 分支。 */
+  var DISPATCH = {
+    record: function (res, raw) { return handleRecord(res, raw); },
+    query: function (res, raw) {
+      /* 查询子槽位缺失（判成 query 但不知道该查什么）绝不能兜到余额卡，
+         否则会出现「答非所问」。给的是 L4 的三个入口。 */
+      if (!res.queryKind || (res.missing && res.missing.indexOf('queryKind') !== -1)) {
+        return answerQueryClarify(res);
+      }
+      return (QUERY_DISPATCH[res.queryKind] || QUERY_DISPATCH.detail)(res, raw);
+    },
+    howto: function (res, raw) { return answerHowto(res, raw); },
+    advice: function (res, raw) { return handleAdvice(res, raw); },
+    dataop: function (res, raw) { return handleDataOp(res, raw); },
+    chitchat: function (res, raw) { return answerChitchat(res, raw); },
+    unknown: function (res, raw) { return answerGiveUp(res, raw); }
+  };
+
+  var QUERY_DISPATCH = {
+    balance: function () { showBalanceCard(); },
+    pie: function () { showPieCard(); },
+    category: function (res, raw) { answerCategoryQuery(res, raw); },
+    detail: function (res, raw) { answerDetailQuery(res, raw); }
+  };
+
+  /**
+   * 按意图分发（唯一出口）。任何处理器内部的追问都必须经 INTENT.buildPrompt，
+   * 这是「同一提示语不得重复」的实现前提。
+   * @param {Object} res classifyIntent 的结果
+   * @param {string} raw 用户原句
+   * @param {string} [source] local|cloud|merged
+   */
+  function dispatchByIntent(res, raw, source) {
+    if (!res) { return; }
+    /* 连续判不出的计数器：只要这一句判出了别的意图就归零 */
+    if (res.intent !== 'unknown') { unknownTries = 0; }
+    attachIntentTag(res, source || 'local');
+    var fn = DISPATCH[res.intent] || DISPATCH.unknown;
+    fn(res, raw);
+  }
+
+  /* ---------------- 记账 ---------------- */
+
+  /**
+   * 记账：有金额直接入账（保留 waitBuy 前置，与今天行为一致）；没金额走模糊阶梯。
+   * @param {Object} res
+   * @param {string} raw
+   */
+  function handleRecord(res, raw) {
+    var parsed = NLP.parseBill(raw, { now: new Date() });
+    if (parsed.items.length > 0) {
+      /* ⚠️ 不回归：先问 isWantBuy（「我想买个耳机 500」仍走冷静法） */
+      var wantBuy = COACH.isWantBuy(raw);
+      if (wantBuy) {
+        pendingClear();
+        startCoolingFlow(wantBuy.item, wantBuy.price);
+        return;
+      }
+      if (res.plan) {
+        addAIMessage(aiBubble('这笔还没发生吧？我先记上，真花了再改也来得及。'));
+      }
+      /* F3 部分解析：金额数 > 解析笔数 -> 轻声提示漏了几笔 */
+      var nAmt = NLP.findAmounts(raw).length;
+      if (nAmt > parsed.items.length) {
+        addAIMessage(aiBubble('这句里好像有 ' + nAmt + ' 个金额，我先记了 ' +
+          parsed.items.length + ' 笔，剩下的你再补一句。'));
+      }
+      pendingClear();
+      startFlow(parsed.items);
+      return;
+    }
+    fuzzyAskAmount(res, raw);
+  }
+
+  /**
+   * 判断两次输入是不是「同一件东西的重试」（只做字面判断，不做语义猜测）。
+   * 相同 / 互为子串即视为同一件：此时才继续升级阶梯；
+   * 换了一件新东西（比如上一条问「奶茶」，这条问「一双鞋」）必须重新从 L2 开始。
+   * @param {string} a
+   * @param {string} b
+   * @return {boolean}
+   */
+  function sameItemText(a, b) {
+    var x = String(a || '').replace(/\s+/g, '');
+    var y = String(b || '').replace(/\s+/g, '');
+    if (!x || !y) { return false; }
+    if (x === y) { return true; }
+    if (x.length >= 2 && y.indexOf(x) !== -1) { return true; }
+    if (y.length >= 2 && x.indexOf(y) !== -1) { return true; }
+    return false;
+  }
+
+  /**
+   * 用模糊量词重画 L2 区间按钮（不升阶梯：这是「听懂了但不精确」，不是「没听懂」）。
+   * promptKey 带上量词与尝试次数，避免和上一次的 L2 撞 key；
+   * 若同一个量词连着给两次，则按反死循环规则升级到 L3。
+   * @param {Object} pending
+   * @param {Object} fuzzy {label, min, max, guess}
+   */
+  function reaskAmountRange(pending, fuzzy) {
+    var key = 'record|amount|2#fuzzy:' + (fuzzy && fuzzy.label ? fuzzy.label : '?') + ':' + pending.tries;
+    if (INTENT.mustEscalate(key, pendingRecentKeys)) {
+      fuzzyAskAmount({ slots: pending.slots, confidence: 0.3, tier: 'low' }, pending.lastText);
+      return;
+    }
+    var viewCtx = buildIntentViewCtx(pending.slots);
+    var prompt = INTENT.buildPrompt({
+      intent: 'record',
+      slots: pending.slots,
+      missing: ['amount'],
+      level: 2,
+      formType: 'chip_group',
+      lastText: pending.lastText,
+      hints: INTENT.amountHints(pending.slots, viewCtx),
+      pendId: pending.id,
+      promptKey: key
+    }, viewCtx);
+    addAIMessage(prompt.html);
+    pending.promptKey = key;
+    pending.level = 2;
+    pending.formType = 'chip_group';
+    pending.ts = Date.now();
+    pendingSet(pending);
+    pendingRememberKey(key);
+  }
+
+  /**
+   * 记账缺金额的统一入口 —— 替代已退役的旧兜底（现由 answerGiveUp 承担 L5）。
+   * 逐次调用会自动升级阶梯（tries 记在 pendingCtx 上，永不重复同一句提示）。
+   * @param {Object} res
+   * @param {string} raw
+   */
+  function fuzzyAskAmount(res, raw) {
+    var slots = (res && res.slots) ? res.slots : {};
+    var pending = pendingGet();
+    var fresh = (!pending || pending.intent !== 'record' || pendingExpired() ||
+      !sameItemText(raw, pending.lastText));
+    if (fresh) {
+      pending = pendingNew('record', slots, ['amount'], raw);
+      /* 新的一件东西：去重闸门的记忆也只属于上一件，一并清掉 */
+      pendingRecentKeys = [];
+    } else {
+      pending.lastText = raw;
+      var keys = ['category', 'date', 'meal', 'plan'];
+      var i;
+      for (i = 0; i < keys.length; i++) {
+        if (slots[keys[i]]) { pending.slots[keys[i]] = slots[keys[i]]; }
+      }
+      if (slots.amountFuzzy) { pending.slots.amountFuzzy = slots.amountFuzzy; }
+      if (slots.drink) { pending.slots.drink = true; }
+    }
+    pending.missing = ['amount'];
+    pending.ts = Date.now();
+
+    var hint = INTENT.resolveLevel(pending, 'record', ['amount']);
+    /* 反死循环第二道闸：最近 3 条已发 promptKey 命中即强制升级（只对「同一件东西的重试」生效） */
+    var probe = { tries: pending.tries, level: hint.level, formType: hint.formType, promptKey: hint.promptKey };
+    var guard = 0;
+    while (!fresh && INTENT.mustEscalate(hint.promptKey, pendingRecentKeys) && hint.level < 5 && guard < 3) {
+      probe.tries = probe.tries + 1;
+      hint = INTENT.resolveLevel(probe, 'record', ['amount']);
+      guard++;
+    }
+
+    pending.level = hint.level;
+    pending.formType = hint.formType;
+    pending.promptKey = hint.promptKey;
+    pendingSet(pending);
+
+    var viewCtx = buildIntentViewCtx(pending.slots);
+    var prompt = INTENT.buildPrompt({
+      intent: 'record',
+      slots: pending.slots,
+      missing: ['amount'],
+      level: hint.level,
+      formType: hint.formType,
+      lastText: raw,
+      hints: INTENT.amountHints(pending.slots, viewCtx),
+      pendId: pending.id,
+      promptKey: hint.promptKey
+    }, viewCtx);
+
+    addAIMessage(prompt.html);
+    pendingRememberKey(hint.promptKey);
+    pending.tries++;
+    logIntent(raw, 'record', res ? res.confidence : 0, res ? res.tier : 'low', ['amount'], 'L' + hint.level);
+  }
+
+  /**
+   * 把用户这一句里能填的槽位填进 pending；齐了就直接落账。
+   * @param {Object} pending
+   * @param {string} val 用户输入（可能是裸金额「12」，也可能是一句「奶茶 12」）
+   * @return {boolean} 是否已提交
+   */
+  function applySlotValue(pending, val) {
+    if (!pending) { return false; }
+    var text = String(val || '').trim();
+    var slots = pending.slots || {};
+    var missing = pending.missing || [];
+    var amounts = NLP.findAmounts(text);
+
+    if (missing.indexOf('amount') !== -1) {
+      var amount = amounts.length > 0 ? amounts[0].value : Number(text.replace(/[^\d.]/g, ''));
+      if (!isFinite(amount) || amount <= 0) {
+        /* 用户给的是模糊量词（「十几块」）：他听懂了问题，只是不精确，
+           因此不升阶梯、也不瞎猜入账，而是用区间按钮再问一次（§3.2 F4）。 */
+        var fuzzy = INTENT.fuzzyAmountOf(text);
+        if (fuzzy) {
+          slots.amountFuzzy = fuzzy;
+          pending.slots = slots;
+          reaskAmountRange(pending, fuzzy);
+          return false;
+        }
+        /* 完全没数字 -> 继续阶梯（不重复同一句提示） */
+        fuzzyAskAmount({ slots: slots, confidence: 0.3, tier: 'low' }, pending.lastText);
+        return false;
+      }
+      slots.amount = ENG.round2(amount);
+      /* 多轮上下文：用户只回了纯金额时，品类/餐段沿用上一句（如「我想去吃饭」），
+         只在槽位为空时补，已有值不覆盖。 */
+      var bareNum = String(text).replace(/[\d.]/g, '').replace(/[元块钱\s，。；、,!！?？~～|]+/g, '');
+      if (bareNum.length === 0 && pending.lastText) {
+        if (!slots.category) {
+          var ctxCat = NLP.classify(pending.lastText);
+          if (ctxCat && ctxCat !== '其他') { slots.category = ctxCat; }
+        }
+        if (!slots.meal) {
+          var ctxTime = NLP.parseTime(pending.lastText, new Date());
+          if (ctxTime && ctxTime.meal) { slots.meal = ctxTime.meal; }
+        }
+      }
+    }
+    if (missing.indexOf('category') !== -1) {
+      var cat = NLP.classify(text);
+      if (cat && cat !== '其他') { slots.category = cat; }
+    }
+    if (missing.indexOf('target') !== -1 && INTENT.detectSignals(text).SIG_ANAPHORA) {
+      slots.target = 'last';
+    }
+    /* 用户这次说的是「打车 15」而不只是「15」时，以这一句为新的主语与品类：
+       否则会把金额套到上一轮那句（比如上一轮是「红糖糍粑」）上，造成记错。 */
+    var bareText = text.replace(/[\d.]+/g, '').replace(/[元块钱\s，。；、,!！?？~～|]+/g, '');
+    if (bareText.length >= 2) {
+      pending.lastText = text;
+      var freshCat = NLP.classify(text);
+      if (freshCat && freshCat !== '其他') { slots.category = freshCat; }
+    }
+    pending.slots = slots;
+
+    var still = INTENT.missingSlots(pending.intent || 'record', slots);
+    if (still.length > 0) {
+      pending.missing = still;
+      if (still.indexOf('amount') !== -1) {
+        fuzzyAskAmount({ slots: slots, confidence: 0.3, tier: 'low' }, pending.lastText);
+      } else {
+        pendingClear();
+        addAIMessage(aiBubble('还差一点信息，直接跟我说一句完整的就行，比如「奶茶 12」。'));
+      }
+      return false;
+    }
+
+    if ((pending.intent || 'record') !== 'record') {
+      /* 非记账的 pending：清空后交给常规路由，避免卡在补槽位上 */
+      var rawText = pending.lastText;
+      pendingClear();
+      routeByIntent(rawText);
+      return false;
+    }
+
+    var draft = pendingDraft(pending, slots);
+    pendingClear();
+    startFlow([draft]);
+    return true;
+  }
+
+  /**
+   * 用 pending 里已确认的槽位组装一笔账单草稿。
+   * @param {Object} pending
+   * @param {Object} slots
+   * @return {Object} BillDraft
+   */
+  function pendingDraft(pending, slots) {
+    var raw = String((pending && pending.lastText) || '');
+    var parsed = NLP.parseBill(raw, { now: new Date() });
+    var base = parsed.items.length > 0 ? parsed.items[0] : null;
+    var category = slots.category || (base ? base.category : '其他');
+    var date = slots.date || futureDateOf(raw, new Date()) || (base ? base.date : ENG.formatDate(new Date()));
+    var note = (base && base.note) ? base.note : cleanupDraftNote(raw, category);
+    var motive = NLP.detectMotivation(raw);
+    return {
+      amount: slots.amount,
+      category: category,
+      note: note,
+      date: date,
+      motivation: motive.motivation,
+      want: motive.want,
+      type: (base && base.type === 'income') ? 'income' : 'expense',
+      meal: slots.meal || (base ? base.meal : ''),
+      raw: raw
+    };
+  }
+
+  /**
+   * 判断这句新输入是不是在回答上一轮的追问（只认「填得上缺的那个槽位」）。
+   * @param {string} raw
+   * @param {Object} pending
+   * @return {boolean}
+   */
+  function isSlotAnswer(raw, pending) {
+    if (!pending) { return false; }
+    var text = String(raw || '').trim();
+    if (!text) { return false; }
+    var missing = pending.missing || [];
+    var i;
+    for (i = 0; i < missing.length; i++) {
+      if (missing[i] === 'amount') {
+        if (NLP.findAmounts(text).length > 0) { return true; }
+        if (/^\s*\d+(\.\d+)?\s*(元|块|块钱)?\s*$/.test(text)) { return true; }
+        /* 模糊金额（「十几块」）也是有效作答：回到 L2 的区间按钮，而不是被当成新话题 */
+        if (INTENT.detectSignals(text).SIG_AMOUNT_FUZZY) { return true; }
+      }
+      if (missing[i] === 'category') {
+        if (NLP.classify(text) !== '其他') { return true; }
+      }
+      if (missing[i] === 'target') {
+        if (INTENT.detectSignals(text).SIG_ANAPHORA) { return true; }
+      }
+    }
+    return false;
+  }
+
+  /**
+   * 用户点了 L2 / L3 的待补全按钮。
+   * @param {string} val 按钮值：金额数字 / 'form' / 'skip' / 'ask'
+   * @param {string} [pendId] 按钮归属的 pending.id（不匹配即拒收，防串味）
+   */
+  function pendingAnswer(val, pendId) {
+    var v = String(val === undefined || val === null ? '' : val);
+    if (!pendingCtx) {
+      addAIMessage(aiBubble('这张卡过期了，你再说一句我接着办。'));
+      return;
+    }
+    if (pendId && pendingCtx.id !== pendId) {
+      /* 点的是历史卡片：拒收，并提示过期 */
+      addAIMessage(aiBubble('这张卡过期了，以最新的那条为准。'));
+      return;
+    }
+    if (pendingExpired()) {
+      pendingClear();
+      addAIMessage(aiBubble('这张卡过期了，你再说一句我接着办。'));
+      return;
+    }
+    var slots = pendingCtx.slots || {};
+    if (v === 'form') {
+      var presetCat = slots.category || null;
+      var presetDate = slots.date || null;
+      pendingClear();
+      openQuickAddModal(presetCat, presetDate);
+      return;
+    }
+    if (v === 'skip') {
+      pendingClear();
+      addAIMessage(aiBubble('好，等真花了再记。到时候直接说「' +
+        esc(slots.category || '奶茶') + ' 15」就行。'));
+      return;
+    }
+    if (v === 'ask') {
+      pendingClear();
+      answerHowto({ slots: { topic: 'where' }, confidence: 0.6 }, '');
+      return;
+    }
+    applySlotValue(pendingCtx, v);
+  }
+
+  /* ---------------- 查询 ---------------- */
+
+  /**
+   * 品类 / 范围统计查询（新增）：复用 .bill-card 列最近 3 笔。
+   * @param {Object} res
+   * @param {string} raw
+   */
+  function answerCategoryQuery(res, raw) {
+    var slots = (res && res.slots) ? res.slots : {};
+    var cat = slots.category || '';
+    if (!cat) { showPieCard(); return; }
+    var range = intentPeriodRange(slots.period || 'month');
+    var list = [];
+    var total = 0;
+    var i;
+    for (i = 0; i < state.bills.length; i++) {
+      var b = state.bills[i];
+      if (b.type === 'income') { continue; }
+      if (b.date < range.start || b.date > range.end) { continue; }
+      if (b.category !== cat) { continue; }
+      list.push(b);
+      total += Number(b.amount) || 0;
+    }
+    total = ENG.round2(total);
+
+    /* 环比：与上一个自然月同期比较（可解释，不编造） */
+    var prevStart = shiftMonth(range.start, -1);
+    var prevEnd = shiftMonth(range.end, -1);
+    var prevTotal = 0;
+    for (i = 0; i < state.bills.length; i++) {
+      var pb = state.bills[i];
+      if (pb.type === 'income' || pb.category !== cat) { continue; }
+      if (pb.date < prevStart || pb.date > prevEnd) { continue; }
+      prevTotal += Number(pb.amount) || 0;
+    }
+    prevTotal = ENG.round2(prevTotal);
+
+    var head = range.label + esc(cat) + ' <b>' + money(total) + '</b>，共 ' + list.length + ' 笔';
+    if (prevTotal > 0) {
+      var diff = Math.round((total - prevTotal) / prevTotal * 100);
+      if (diff > 0) { head += '，比上月同期多 ' + diff + '%'; }
+      else if (diff < 0) { head += '，比上月同期少 ' + Math.abs(diff) + '%'; }
+      else { head += '，和上月同期持平'; }
+    }
+    head += '。';
+    addAIMessage(aiBubble(head));
+
+    if (list.length === 0) {
+      addAIMessage(aiBubble('这段时间没有「' + esc(cat) + '」的支出，换个月份再看也行。'));
+      return;
+    }
+    var recent = list.slice().sort(function (a, b2) {
+      if (a.date !== b2.date) { return a.date < b2.date ? 1 : -1; }
+      return (b2.createdAt || 0) - (a.createdAt || 0);
+    }).slice(0, 3);
+    var rows = '';
+    for (i = 0; i < recent.length; i++) {
+      rows += '<div class="bill-card-main">' +
+        '<span class="bill-card-note">' + esc(recent[i].note) + ' · ' + esc(recent[i].date) + '</span>' +
+        '<span class="bill-card-amount expense">-' + money(recent[i].amount) + '</span>' +
+        '</div>';
+    }
+    addAIMessage('<div class="bill-card">' +
+      '<div class="bill-card-head"><span>' + esc(cat) + ' · ' + esc(range.label) + '</span>' +
+      '<span>最近 ' + recent.length + ' 笔</span></div>' + rows + '</div>');
+  }
+
+  /** 把日期说人话：今天 / 昨天 / 前天 / 其余给日期本身 */
+  function dayLabel(dateStr) {
+    var today = new Date();
+    var todayStr = ENG.formatDate(today);
+    if (dateStr === todayStr) { return '今天'; }
+    var d1 = new Date(today.getFullYear(), today.getMonth(), today.getDate() - 1);
+    if (dateStr === ENG.formatDate(d1)) { return '昨天'; }
+    var d2 = new Date(today.getFullYear(), today.getMonth(), today.getDate() - 2);
+    if (dateStr === ENG.formatDate(d2)) { return '前天'; }
+    return String(dateStr || '');
+  }
+
+  /**
+   * 明细查询（新增）：指代 / 某一天的账单，多笔时列候选（F5 指代模糊）。
+   * 候选按钮是**非破坏性**的「看这一笔」，避免用户只想确认却被删单。
+   * @param {Object} res
+   * @param {string} raw
+   */
+  function answerDetailQuery(res, raw) {
+    var slots = (res && res.slots) ? res.slots : {};
+    var list = [];
+    var i;
+    var b;
+    var label;
+    if (slots.date) {
+      for (i = 0; i < state.bills.length; i++) {
+        b = state.bills[i];
+        if (b.date === slots.date) { list.push(b); }
+      }
+      label = dayLabel(slots.date);
+    } else {
+      var range = intentPeriodRange(slots.period || 'today');
+      for (i = 0; i < state.bills.length; i++) {
+        b = state.bills[i];
+        if (b.date < range.start || b.date > range.end) { continue; }
+        list.push(b);
+      }
+      label = range.label;
+    }
+
+    if (list.length === 0) {
+      addAIMessage('<div class="bubble ai">' + esc(label) + '没有账单记录。</div>' +
+        actionsWrap('<button type="button" class="btn-mini primary" data-act="quick-add">记一笔</button>'));
+      return;
+    }
+    if (list.length === 1) {
+      b = list[0];
+      addAIMessage('<div class="bubble ai">' + esc(label) + '就一笔：<b>' + esc(b.note) + '</b> ' +
+        (b.type === 'income' ? '+' : '-') + money(b.amount) + '（' + esc(b.category) + '）。</div>' +
+        actionsWrap('<button type="button" class="btn-mini" data-act="bill-open" data-bill="' + esc(b.id) + '">看详情</button>'));
+      return;
+    }
+    /* F5：指代模糊 -> 列出候选，让用户点，不猜 */
+    list.sort(function (a, b2) {
+      return (b2.createdAt || 0) - (a.createdAt || 0);
+    });
+    var top = list.slice(0, 3);
+    var btns = '';
+    for (i = 0; i < top.length; i++) {
+      btns += '<button type="button" class="btn-mini" data-act="bill-open" data-bill="' + esc(top[i].id) + '">' +
+        esc(top[i].note) + ' ' + money(top[i].amount) + ' · ' + esc(top[i].category) + '</button>';
+    }
+    addAIMessage('<div class="bubble ai">' + esc(label) + '有 ' + list.length + ' 笔，你说哪个？</div>' +
+      actionsWrap(btns));
+  }
+
+  /**
+   * 看某一笔的详情（明细查询的候选点击）：只读，不改数据。
+   * @param {string} id
+   */
+  function answerBillDetail(id) {
+    var b = findBill(id);
+    if (!b) {
+      addAIMessage(aiBubble('这笔已经不在账本里了（可能被撤回）。'));
+      return;
+    }
+    addAIMessage('<div class="bubble ai">' + esc(b.date) + ' · <b>' + esc(b.note) + '</b> ' +
+      (b.type === 'income' ? '+' : '-') + money(b.amount) +
+      '<br>分类 ' + esc(b.category) + ' · 动机 ' + esc(b.motivation) +
+      (b.merchant ? ' · 商家 ' + esc(b.merchant) : '') + '</div>' +
+      actionsWrap('<button type="button" class="btn-mini danger" data-act="undo" data-bill="' + esc(b.id) + '">撤回这笔</button>'));
+  }
+
+  /* ---------------- 求助 / 闲聊 / 出口 ---------------- */
+
+  /**
+   * 怎么办式求助（新增）：直接给方法 + 一键执行按钮。
+   * @param {Object} res
+   * @param {string} raw
+   */
+  function answerHowto(res, raw) {
+    var topic = (res && res.slots && res.slots.topic) ? res.slots.topic : 'where';
+    pendingClear();
+    if (topic === 'backfill') {
+      addAIMessage('<div class="bubble ai">能补，日期可以选到昨天。<br>' +
+        '点下面直接开表单，金额填一下就行：</div>' +
+        actionsWrap('<button type="button" class="btn-mini primary" data-act="howto-backfill">补记昨天的一笔</button>' +
+          miniBtn('data-cmd', '昨天那笔是什么', '看昨天花了啥', false) +
+          miniBtn('data-act', 'howto-edit', '怎么改已经记过的', false)));
+      return;
+    }
+    if (topic === 'delete' || topic === 'edit') {
+      addAIMessage('<div class="bubble ai">两个办法：① 账单卡片右下角「撤回」② 直接跟我说「撤销上一笔」。<br>' +
+        '要我帮你删刚才那笔吗？</div>' +
+        actionsWrap('<button type="button" class="btn-mini primary" data-act="howto-undo">删掉刚才那笔</button>' +
+          miniBtn('data-act', 'howto-backfill', '补记昨天的一笔', false)));
+      return;
+    }
+    addAIMessage('<div class="bubble ai">入口有三个：① 顶栏「＋ 记一笔」② 直接说「午饭食堂 15」③ 点下面按钮。<br>' +
+      '截图记账在右上角的相机图标里。</div>' +
+      actionsWrap('<button type="button" class="btn-mini primary" data-act="quick-add">手动记一笔</button>' +
+        miniBtn('data-cmd', '截屏记账', '用截图记账', false)));
+  }
+
+  /**
+   * 闲聊 / 情绪承接（新增）：必须给出口，且不再追问同一件事。
+   * @param {Object} res
+   * @param {string} raw
+   */
+  function answerChitchat(res, raw) {
+    var mood = (res && res.slots && res.slots.mood) ? res.slots.mood : '';
+    var head;
+    if (mood === 'empty') {
+      head = '我在～要记账就说「午饭食堂 15」，要查账就说「查余额」。';
+    } else if (mood === 'greeting') {
+      head = '在呢～想记一笔还是查查余额？';
+    } else if (mood) {
+      head = '「' + esc(mood) + '」的时候先别算钱了，记完就放松下。<br>顺手做一件？';
+    } else {
+      head = '收到～顺手做一件？';
+    }
+    addAIMessage('<div class="bubble ai">' + head + '</div>' +
+      actionsWrap('<button type="button" class="btn-mini primary" data-act="quick-add">记今天花了啥</button>' +
+        miniBtn('data-cmd', '查余额', '看这周还剩多少', false) +
+        miniBtn('data-cmd', '怎么省钱', '怎么少花点', false)));
+  }
+
+  /**
+   * 判成 query 但缺 queryKind（不知道该查什么）时的澄清卡。
+   * 复用 unknown 的「三个最常用入口」，绝不兜到余额卡。
+   * @param {Object} res
+   */
+  function answerQueryClarify(res) {
+    pendingClear();
+    var prompt = INTENT.buildPrompt({
+      intent: 'unknown', slots: (res && res.slots) || {}, missing: ['queryKind'],
+      level: 4, formType: 'choice', lastText: '', hints: []
+    }, null);
+    addAIMessage(prompt.html);
+  }
+
+  /**
+   * 彻底放弃 + 人工出口（C5，取代旧兜底）。
+   * 首次判不出（unknown）走 L4「三个最常用入口」，连续第 4 次才走 L5「不再猜」。
+   * 文案不含问号，也不再要求用户重说 —— 死循环到此为止。
+   * @param {Object} [res] classifyIntent 的结果（用 res.level 判断该给哪一层）
+   */
+  function answerGiveUp(res) {
+    unknownTries++;
+    var level = unknownTries >= 4 ? 5 : 4;
+    if (res && typeof res.level === 'number' && res.level >= 5) { level = 5; }
+    pendingClear();
+    var prompt = INTENT.buildPrompt({
+      intent: 'unknown', slots: {}, missing: ['intent'],
+      level: level,
+      formType: level >= 5 ? 'giveup' : 'choice',
+      lastText: '',
+      hints: []
+    }, null);
+    addAIMessage(prompt.html);
+  }
+
+  /* ---------------- 建议 / 数据操作 ---------------- */
+
+  /**
+   * 理财建议：先保留 isWantBuy 的完整语义（含负向规则），否则走省钱 / 赚钱。
+   * @param {Object} res
+   * @param {string} raw
+   */
+  function handleAdvice(res, raw) {
+    var wantBuy = COACH.isWantBuy(raw);
+    if (wantBuy) {
+      pendingClear();
+      startCoolingFlow(wantBuy.item, wantBuy.price);
+      return;
+    }
+    var kind = (res && res.slots && res.slots.adviceKind) ? res.slots.adviceKind : 'save';
+    if (kind === 'earn') { showMakeMoneyGuide(); return; }
+    showSaveMoneyGuide();
+  }
+
+  /**
+   * 改 / 删 / 撤：有明确指代就直接撤最近一笔；没有就列候选让用户点。
+   * @param {Object} res
+   * @param {string} raw
+   */
+  function handleDataOp(res, raw) {
+    var slots = (res && res.slots) ? res.slots : {};
+    var missing = (res && res.missing) ? res.missing : [];
+    pendingClear();
+    if (!state.bills.length) {
+      addAIMessage(aiBubble('现在还没有账单可以改，先记一笔吧。'));
+      return;
+    }
+    /* 纠错改金额：用户说「记错了，是18不是15」时，把刚才那笔金额改成 18（不新建、不删了重记） */
+    var isCorrection = !!(slots.correction) && (typeof slots.amount === 'number');
+    if (isCorrection) {
+      var ct = (undoStack.length ? findBill(undoStack[undoStack.length - 1]) : null) || latestBill();
+      if (!ct) {
+        addAIMessage(aiBubble('没找到你刚记的那笔，直接说「奶茶 18」重新记一笔更快。'));
+        return;
+      }
+      var newAmt = ENG.round2(slots.amount);
+      if (Math.abs(newAmt - Number(ct.amount)) < 0.005) {
+        addAIMessage(aiBubble('这笔本来就是 ' + money(ct.amount) + ' 呀，不用改。'));
+        return;
+      }
+      addAIMessage('<div class="bubble ai">你是说刚才那笔 <b>' + esc(ct.note) + '</b> 应该是 <b>' + money(newAmt) +
+        '</b>，不是 <b>' + money(ct.amount) + '</b>？</div>' +
+        actionsWrap('<button type="button" class="btn-mini primary" data-act="fix-amount" data-bill="' + esc(ct.id) +
+          '" data-val="' + newAmt + '">改成 ' + money(newAmt) + '</button>' +
+          '<button type="button" class="btn-mini" data-act="undo" data-bill="' + esc(ct.id) + '">撤回重记</button>'));
+      return;
+    }
+    /* 纠错但没说金额（如单独一句「记错了」）：建立纠错态 + 追问金额，下一句纯数字直接改这一笔（不新增账单） */
+    if (slots.correction) {
+      var cpT = (undoStack.length ? findBill(undoStack[undoStack.length - 1]) : null) || latestBill();
+      if (cpT) { correctionPending = { billId: cpT.id, ts: Date.now() }; }
+      addAIMessage(aiBubble('要改成多少？直接说个数字就行，比如 18。'));
+      return;
+    }
+    /* 按备注/品类删除：用户说「把刚才吃黄焖鸡那笔删了」，用剩下的名词匹配账单 */
+    var kw = String(raw || '').replace(/[\d.]+/g, '')
+      .replace(/删除|删掉|删了|撤了|撤回|撤销|取消|改一下|修改|改成|记错|不对|应该是|把|帮|我|刚才|上次|那笔|这笔|这|一笔|了|的|吧|吃|喝|钱|元|块/g, '')
+      .replace(/[\s，。；、,!！?？~～|]/g, '');
+    if (kw.length >= 2) {
+      var hitList = [];
+      var hb;
+      for (var hi = 0; hi < state.bills.length; hi++) {
+        hb = state.bills[hi];
+        if ((hb.note && hb.note.indexOf(kw) !== -1) || hb.category === kw) { hitList.push(hb); }
+      }
+      if (hitList.length) {
+        hitList.sort(function (a, b) { return (b.createdAt || 0) - (a.createdAt || 0); });
+        var hbtn = '';
+        for (var hj = 0; hj < hitList.length && hj < 4; hj++) {
+          hbtn += '<button type="button" class="btn-mini" data-act="delete-bill" data-bill="' + esc(hitList[hj].id) + '">' +
+            '删除 · ' + esc(hitList[hj].note) + ' ' + money(hitList[hj].amount) + ' · ' + esc(hitList[hj].date) + '</button>';
+        }
+        addAIMessage('<div class="bubble ai">你说的「' + esc(kw) + '」我找到 ' + hitList.length + ' 笔，删哪个？</div>' +
+          actionsWrap(hbtn));
+        return;
+      }
+    }
+    var hasTarget = (slots.target === 'last') || missing.indexOf('target') === -1;
+    if (!hasTarget) {
+      var top = state.bills.slice().sort(function (a, b) {
+        if (a.date !== b.date) { return a.date < b.date ? 1 : -1; }
+        return (b.createdAt || 0) - (a.createdAt || 0);
+      }).slice(0, 3);
+      var btns = '';
+      var i;
+      for (i = 0; i < top.length; i++) {
+        btns += '<button type="button" class="btn-mini" data-act="undo" data-bill="' + esc(top[i].id) + '">' +
+          '撤回 · ' + esc(top[i].note) + ' ' + money(top[i].amount) + '</button>';
+      }
+      addAIMessage('<div class="bubble ai">你要改哪一笔？点一下就先撤掉（撤掉后能重记）。</div>' +
+        actionsWrap(btns));
+      return;
+    }
+    var target = null;
+    if (undoStack.length) { target = findBill(undoStack[undoStack.length - 1]); }
+    if (!target) { target = latestBill(); }
+    if (!target) {
+      addAIMessage(aiBubble('没找到可以撤回的那笔，你可以直接点账单卡片右下角的「撤回」。'));
+      return;
+    }
+    var summary = '<b>' + esc(target.note) + ' -' + money(target.amount) + '</b>';
+    deleteBill(target.id);
+    addAIMessage('<div class="bubble ai">删了刚才那笔：' + summary + '。要重记吗？</div>' +
+      actionsWrap('<button type="button" class="btn-mini primary" data-act="quick-add">重记一笔</button>' +
+        miniBtn('data-cmd', '查余额', '看一眼余额', false)));
+  }
+
+  /* ---------------- 云端裁决（只做二次意见，不做主判） ---------------- */
+
+  /**
+   * 是否值得花 3 秒问云端。只有「意图层真有歧义」才值得：
+   * record（缺金额是槽位问题）/ command / chitchat / howto 都是本地秒回更优。
+   * @param {Object} res
+   * @return {boolean}
+   */
+  function needsCloudVerdict(res) {
+    if (!CLOUD_VERDICT_ENABLED) { return false; }
+    if (!res) { return false; }
+    if (res.intent === 'record' || res.intent === 'command') { return false; }
+    if (res.intent === 'chitchat' || res.intent === 'howto') { return false; }
+    /* 槽位已齐（意图本身没有歧义，只是数据上的指代模糊）不需要问云端裁决 */
+    if (!res.missing || res.missing.length === 0) { return false; }
+    return res.tier !== 'high';
+  }
+
+  /**
+   * 向云端要一个「短裁决」（3s 超时即用本地结果）。
+   * 只把本地 top2 作为候选传过去，降低幻觉空间。
+   * @param {string} raw
+   * @param {Object} res 本地分类结果
+   * @param {Function} cb cb(verdict|null)
+   */
+  function askForVerdict(raw, res, cb) {
+    var done = false;
+    function finish(v) {
+      if (done) { return; }
+      done = true;
+      clearTimeout(timer);
+      cb(v);
+    }
+    if (!cloudReady || typeof global.AJ !== 'object' || typeof global.AJ.ask !== 'function') {
+      cb(null);
+      return;
+    }
+    var ranked = INTENT.rankIntents(res.scores || {});
+    var top2 = [];
+    if (ranked[0]) { top2.push(ranked[0].intent); }
+    if (ranked[1]) { top2.push(ranked[1].intent); }
+    var ctx = buildContext() || {};
+    ctx.pending = pendingCtx ? { intent: pendingCtx.intent, missing: pendingCtx.missing, tries: pendingCtx.tries } : null;
+    ctx.localIntent = {
+      intent: res.intent,
+      confidence: res.confidence,
+      candidates: top2,
+      missing: res.missing
+    };
+    var timer = setTimeout(function () { finish(null); }, VERDICT_TIMEOUT_MS);
+    var p;
+    try {
+      p = global.AJ.ask(raw, ctx);
+    } catch (e) {
+      finish(null);
+      return;
+    }
+    Promise.resolve(p).then(function (json) {
+      if (!json || json.fallback === true) { finish(null); return; }
+      if (json.intent) {
+        finish({ intent: json.intent, confidence: json.confidence, missing: json.clarify ? [json.clarify] : null });
+        return;
+      }
+      if (json.verdict && json.verdict.intent) { finish(json.verdict); return; }
+      finish(null);
+    }).catch(function () { finish(null); });
+  }
+
+  /**
+   * 本地入口（C6）：云端不可用时的纯 fallback，只做「命令 -> 意图分发」。
+   * 已删除 showParseFailure 调用：任何路径都不再回退到「没听清金额」。
+   * @param {string} raw
+   */
   function routeCommand(raw) {
     var text = String(raw || '').trim();
     if (!text) { return; }
-
-    var fn = localCommandName(text);
-    if (fn) { fn(); return; }
-
-    var parsed = NLP.parseBill(text);
-    if (parsed.items.length === 0) {
-      showParseFailure(text);
+    var cmd = commandMatch(text);
+    if (cmd) {
+      logIntent(text, 'command', 0.99, 'high', null, cmd.key);
+      cmd.fn();
       return;
     }
-    startFlow(parsed.items);
+    routeByIntent(text);
+  }
+
+  /**
+   * 纯本地意图路由（本地分类 -> 分发，永不触网）。
+   * @param {string} raw
+   */
+  function routeByIntent(raw) {
+    var text = String(raw || '').trim();
+    if (!text) { return; }
+    var res = INTENT.classifyIntent(text, {
+      now: new Date(),
+      lastBill: buildIntentViewCtx().lastBill
+    });
+    logIntent(text, res.intent, res.confidence, res.tier, res.missing);
+    dispatchByIntent(res, text, 'local');
   }
 
   /* ================================================================== */
@@ -5694,9 +8142,10 @@
 
   /**
    * 构造给大模型的精简上下文快照（只取展示/记账需要的最小字段）。
+   * @param {Object} [localIntent] 本地分类器初判（C12：作为云端裁决的约束传下去）
    * @return {Object|null}
    */
-  function buildContext() {
+  function buildContext(localIntent) {
     if (!state) { return null; }
     var ov = getOverview();
     var i;
@@ -5717,7 +8166,14 @@
       cycleEnd: ov ? ov.cycleEnd : null,
       billCount: state.bills.length,
       recentBills: recent,
-      goals: goals
+      goals: goals,
+      /* C12：把「上一轮在等哪个槽位」和「本地初判」一并交给云端，减少重复追问 */
+      pending: pendingCtx ? {
+        intent: pendingCtx.intent,
+        missing: pendingCtx.missing,
+        tries: pendingCtx.tries
+      } : null,
+      localIntent: localIntent || null
     };
   }
 
@@ -5733,126 +8189,97 @@
   };
 
   /**
-   * 把一条消息发给 WorkBuddy 云服务对话模型，渲染回复并执行 actions；
-   * 任何失败都回退到本地 routeCommand，保证「开箱即用」。
+   * 消息主入口（C7）：命令 -> 本地意图分类 -> pending 续接 -> 高置信本地执行
+   * -> 低置信云端二次裁决 -> 兜底 L3 澄清。
+   *
+   * 设计原则（§4.2.1）：
+   *   1) 明确命令仍是最先短路，且「带金额不走命令」规则不变；
+   *   2) 意图判断全部在本地（<1ms、断网可用），云端降级为「低置信时的第二意见」；
+   *   3) 任何路径都不再回退到「没听清金额」。
    * @param {string} text
    */
   function sendToAssistant(text) {
     var raw = String(text || '').trim();
     if (!raw) { return; }
 
-    // 明确是本地命令（记收入 / 查余额 / 设置预算 / 账单分析 / 截屏记账 / 我想攒钱 …）直接本地处理：
-    // 不走云端、不出现「思考中」，彻底避免云端挂起导致的卡死，也更跟手。
-    var localFn = localCommandName(raw);
-    if (localFn) { localFn(); return; }
-
-    // 理财专家：「想买 XX」-> 先走剁手冷静法三步问答，而不是直接记账
-    var wantBuy = COACH.isWantBuy(raw);
-    if (wantBuy) { startCoolingFlow(wantBuy.item, wantBuy.price); return; }
-
-    // 自由文本记账：本地 NLP 能解析出账单条目时直接本地处理（秒回、不出现「思考中」）。
-    // 只有真正需要对话理解的问句才走云端，避免无谓的云端延迟。
-    var parsed = NLP.parseBill(raw);
-    if (parsed.items.length > 0) { startFlow(parsed.items); return; }
-
-    // 先插一个「思考中」气泡，拿到结果后只替换气泡里的文字（保留时间戳）
-    addAIMessage(aiBubble('账小助正在思考…'));
-    var thinkingRow = chatListEl().lastElementChild;
-
-    // 防止云端（流式）长时间无响应导致一直「思考中」：handled 锁定后，超时与云端结果只会生效一次
-    var handled = false;
-
-    function setReply(t) {
-      if (thinkingRow && thinkingRow.parentNode) {
-        var bubble = thinkingRow.querySelector ? thinkingRow.querySelector('.bubble') : null;
-        if (bubble) { bubble.textContent = t; return; }
-      }
-      addAIMessage(aiBubble(esc(t)));
-    }
-
-    function clearThinking() {
-      if (thinkingRow && thinkingRow.parentNode) {
-        thinkingRow.parentNode.removeChild(thinkingRow);
-      }
-    }
-
-    // 本地兜底：云端未就绪 / 失败 / 超时 -> 用本地 routeCommand 处理
-    function fallback() {
-      if (handled) { return; }
-      handled = true;
-      clearThinking();
-      routeCommand(raw);
-    }
-
-    function onCloudDone(json) {
-      if (handled) { return; }
-      if (!json || json.fallback === true) {
-        // 云服务未就绪或上游失败 -> 本地兜底
-        fallback();
-        return;
-      }
-      var reply = json.reply;
-      var actions = Array.isArray(json.actions) ? json.actions : [];
-
-      if (!reply && actions.length === 0) {
-        // 云端既没文字也没动作 -> 本地兜底
-        fallback();
-        return;
-      }
-
-      // 云端结果可用，锁定，超时不再回退
-      handled = true;
-
-      if (reply) {
-        setReply(reply);
-      } else {
-        // 没有文字回复时把「思考中」气泡去掉，避免残留
-        clearThinking();
-      }
-
-      actions.forEach(function (a) {
-        if (!a || !a.type) { return; }
-        if (a.type === 'add_bill') {
-          var category = (DATA.CATEGORY_KEYS.indexOf(a.category) !== -1) ? a.category : '其他';
-          var dateOk = /^\d{4}-\d{2}-\d{2}$/.test(String(a.date || ''));
-          var draft = {
-            amount: Number(a.amount),
-            category: category,
-            note: a.note || category || '记账',
-            date: dateOk ? a.date : ENG.formatDate(new Date()),
-            motivation: (a.motivation === '情绪') ? '情绪' : '刚需',
-            want: !!a.want,
-            type: 'expense'
-          };
-          startFlow([draft]);
-        } else if (a.type === 'command') {
-          var fn = COMMAND_MAP[a.name];
-          if (fn) { fn(); }
+    /* P0：纠错待补金额——上一轮问「要改成多少」，这一句若为纯数字，直接改上一笔金额（不新增账单） */
+    if (correctionPending && (Date.now() - correctionPending.ts) < 120000) {
+      var cAmts = NLP.findAmounts(raw);
+      var cBare = String(raw).replace(/[\d.]/g, '').replace(/[元块钱\s，。；、,!！?？~～|是改成到应为了吧的]/g, '');
+      if (cAmts.length > 0 && cBare.length === 0) {
+        var cB = findBill(correctionPending.billId);
+        correctionPending = null;
+        if (cB) {
+          cB.amount = ENG.round2(cAmts[0].value);
+          saveState(); renderAll();
+          addAIMessage(aiBubble('改好了，这笔现在是 ' + money(cB.amount) + '。'));
+        } else {
+          addAIMessage(aiBubble('这笔已经不在账本里了（可能被撤回），直接说「奶茶 18」重新记一笔就行。'));
         }
-      });
+        return;
+      }
+      correctionPending = null; /* 不是纯金额，清掉，正常处理 */
     }
 
-    if (typeof global.AJ !== 'object' || typeof global.AJ.ask !== 'function') { fallback(); return; }
-
-    // 兜底超时：云端（流式）长时间不返回时，回退到本地 routeCommand，避免一直「思考中」
-    var safetyTimer = setTimeout(function () { fallback(); }, 12000);
-
-    // 直接调用 WorkBuddy 云服务（免密钥）对话接口；失败或未就绪时回退本地 routeCommand
-    var cloudPromise;
-    try {
-      cloudPromise = global.AJ.ask(raw, buildContext());
-    } catch (e) {
-      clearTimeout(safetyTimer);
-      fallback();
+    /* ① 明确命令（最高优先级；commandMatch 内部已实现「带金额一律记账」的 hasAmount 门控） */
+    var cmd = commandMatch(raw);
+    if (cmd) {
+      pendingClear();
+      logIntent(raw, 'command', 0.99, 'high', null, cmd.key);
+      cmd.fn();
       return;
     }
-    Promise.resolve(cloudPromise).then(function (json) {
-      clearTimeout(safetyTimer);
-      onCloudDone(json);
-    }).catch(function () {
-      clearTimeout(safetyTimer);
-      fallback();
+
+    /* ② 本地意图分类（纯函数，不触网，<1ms） */
+    var res = INTENT.classifyIntent(raw, {
+      now: new Date(),
+      lastBill: buildIntentViewCtx().lastBill
     });
+    logIntent(raw, res.intent, res.confidence, res.tier, res.missing);
+
+    /* ③ pending 续接：用户可能是在回答上一轮的追问（也可能是换了话题） */
+    if (pendingCtx) {
+      if (pendingExpired()) {
+        pendingClear();
+      } else if (res.tier === 'high' && res.intent !== pendingCtx.intent && res.confidence >= 0.75) {
+        /* 高置信的新意图：用户主动换话题，旧 pending 直接丢弃 */
+        pendingClear();
+      } else if ((Date.now() - pendingCtx.ts) > 30000 && NLP.findAmounts(raw).length === 0 &&
+        !INTENT.detectSignals(raw).SIG_CATEGORY) {
+        /* 半分钟后的「完全不含数字/品类词」输入：更像另一个话题 */
+        pendingClear();
+      } else if (isSlotAnswer(raw, pendingCtx)) {
+        applySlotValue(pendingCtx, raw);
+        return;
+      }
+    }
+
+    /* ④ 高置信 -> 本地直接执行，不调云端（省掉等待，断网也能演示） */
+    if (res.tier === 'high' && !needsCloudVerdict(res)) {
+      dispatchByIntent(res, raw, 'local');
+      return;
+    }
+
+    /* ⑤ 低置信 -> 可选云端二次裁决（3s 超时；只允许在本地 top2 内改判） */
+    if (res.tier === 'low' && needsCloudVerdict(res)) {
+      /* 云端真就绪才插「正在确认」气泡，否则不要闪一下再消失 */
+      var thinkingRow = null;
+      if (cloudReady && typeof global.AJ === 'object' && typeof global.AJ.ask === 'function') {
+        addAIMessage(aiBubble('账小助正在确认…'));
+        thinkingRow = chatListEl().lastElementChild;
+      }
+      askForVerdict(raw, res, function (verdict) {
+        if (thinkingRow && thinkingRow.parentNode) {
+          thinkingRow.parentNode.removeChild(thinkingRow);
+        }
+        var finalRes = verdict ? INTENT.mergeVerdict(res, verdict) : res;
+        dispatchByIntent(finalRes, raw, verdict ? 'merged' : 'local');
+      });
+      return;
+    }
+
+    /* ⑥ 云端不可用 / verylow -> 本地低置信策略（L3/L4 澄清），永不回到「没听清金额」 */
+    dispatchByIntent(res, raw, 'local');
   }
 
   function handleSend(text) {
@@ -5868,6 +8295,81 @@
     switchView('chat');
     // 改为请求后端；后端不可用或返回 fallback 时，sendToAssistant 内部回退到本地逻辑
     sendToAssistant(raw);
+  }
+
+  /* ---- Dim3：按时间/预算生成动态快捷 chips + 会话级主动提示 ---- */
+  var proactiveShown = false;
+  /** 按时间与预算状态生成快捷 chips */
+  function buildSceneChips() {
+    var hour = new Date().getHours();
+    var res = [];
+    var ov, bs;
+    try { ov = getOverview(); } catch (e) { ov = null; bs = null; }
+    bs = ov && ov.budgetState ? ov.budgetState : null;
+    var danger = !!bs && (bs.isOver || bs.status === 'danger');
+    if (danger) { res.push({ label: '帮我看下怎么省', cmd: '怎么省钱', coach: true }); }
+    res.push({ label: '查余额', cmd: '查余额' });
+    res.push({ label: '本月花销饼图', cmd: '本月花销饼图' });
+    res.push({ label: '记一笔', cmd: '记一笔' });
+    if (hour >= 21 || hour < 2) {
+      res.push({ label: '记夜宵', cmd: '夜宵' });
+      res.push({ label: '今天花了多少', cmd: '今天花了多少' });
+    } else if (hour >= 6 && hour < 10) {
+      res.push({ label: '记早餐', cmd: '早餐' });
+    }
+    res.push({ label: '记收入', cmd: '记收入' });
+    res.push({ label: '怎么省钱', cmd: '怎么省钱', coach: true });
+    res.push({ label: '今天有啥优惠', cmd: '今天有什么优惠' });
+    return res;
+  }
+  function renderSceneChips() {
+    var box = $('quickChips');
+    if (!box) { return; }
+    var chips = buildSceneChips();
+    var html = '';
+    var i;
+    for (i = 0; i < chips.length; i++) {
+      html += '<button class="chip' + (chips[i].coach ? ' coach-chip' : '') + '" type="button" data-cmd="' +
+        esc(chips[i].cmd) + '">' + esc(chips[i].label) + '</button>';
+    }
+    box.innerHTML = html;
+  }
+  function maybeProactiveHint() {
+    if (proactiveShown) { return; }
+    var ov, bs;
+    try { ov = getOverview(); } catch (e) { return; }
+    bs = ov && ov.budgetState ? ov.budgetState : null;
+    if (bs && (bs.isOver || bs.status === 'danger')) {
+      proactiveShown = true;
+      addAIMessage('<div class="bubble ai">最近是不是外卖点得有点多？预算快到线啦。<br>要不要我帮你看下这几天怎么把食堂吃出性价比？</div>' +
+        actionsWrap('<button type="button" class="btn-mini primary" data-cmd="怎么省钱">帮我制定省钱计划</button>' +
+          '<button type="button" class="btn-mini" data-cmd="查余额">先看看余额</button>'));
+      return;
+    }
+    /* 预算没到危险线时，再看「消费诊断」：有 high / mid 才提示，一个周期只提一次。
+       这条只走 addAIMessage，不注册进意图分发表（intent.js 一个字不改）。 */
+    maybeDiagHint(ov);
+  }
+
+  /**
+   * 消费诊断的周期级主动提示。
+   * 去重口径：settings.hintCycle 存「已提示过的周期起点」，同一周期只提一次；
+   * 手清该字段即可让它在本周期再提示一次（便于 QA 验证）。
+   */
+  function maybeDiagHint(ov) {
+    if (!ov || !DIAG || DIAG.missing) { return; }
+    var st = getSettings();
+    if (st.hintCycle === ov.cycle.start) { return; }
+    var list = diagList(ov);
+    var sev = DIAG.maxSeverity(list);
+    if (sev !== 'high' && sev !== 'mid') { return; }
+    st.hintCycle = ov.cycle.start;
+    persistSettings();
+    proactiveShown = true;
+    var line = toneLine('hint.proactive', { n: list.length }) ||
+      ('这个周期有 ' + list.length + ' 个地方想跟你聊聊。');
+    addAIMessage(aiBubble(esc(line)) +
+      actionsWrap('<button type="button" class="btn-mini primary" data-act="go-diag">看看诊断</button>'));
   }
 
   function switchView(view, fromBack) {
@@ -5889,6 +8391,7 @@
       if (viewHistory.length > 20) { viewHistory.shift(); }
     }
     DOC.body.setAttribute('data-view', view);
+    if (view === 'chat' || view === 'sai') { renderSceneChips(); maybeProactiveHint(); maybeWishReview(); }
     var tabs = DOC.querySelectorAll('#tabbar .tab, #tabbarSimple .tab');
     var i;
     for (i = 0; i < tabs.length; i++) {
@@ -5898,6 +8401,11 @@
     /* 简洁版「省钱」屏：面板常驻在 #spSaveBody 内，切进来时补一次渲染，
        保证首次进入与数据变更后看到的都是最新内容（不弹遮罩、不调 openSaveHub）。 */
     if (view === 'ssave') { renderSaveHubPanel(); }
+    /* 简洁版「存钱罐」屏：进入时补一次渲染，保证数字是最新的 */
+    if (view === 'spiggy') {
+      piggyDraft = '';
+      renderSimplePiggy();
+    }
   }
 
   /** 「返回」按钮：回到进入当前子视图前的视图；没有历史时回当前 UI 类型的首页 */
@@ -5931,6 +8439,13 @@
         handleDealAct(dealAct.getAttribute('data-deal-act'));
         return;
       }
+      /* ---- 意图层待补全卡片的作答（C9：必须排在 [data-cmd] 之前）----
+         槽位作答不走 handleSend，避免用户气泡里出现裸的「12」这种噪声。 */
+      var pendEl = e.target.closest ? e.target.closest('[data-act="pend"]') : null;
+      if (pendEl) {
+        pendingAnswer(pendEl.getAttribute('data-val'), pendEl.getAttribute('data-pend'));
+        return;
+      }
       var target = e.target.closest ? e.target.closest('[data-cmd]') : null;
       if (target) {
         handleSend(target.getAttribute('data-cmd'));
@@ -5939,6 +8454,32 @@
       var act = e.target.closest ? e.target.closest('[data-act]') : null;
       if (!act) { return; }
       var name = act.getAttribute('data-act');
+      /* ---- 意图层的固定出口（L4/L5/求助卡） ---- */
+      if (name === 'bill-open') {
+        answerBillDetail(act.getAttribute('data-bill'));
+        return;
+      }
+      if (name === 'quick-add') {
+        pendingClear();
+        openQuickAddModal();
+        return;
+      }
+      if (name === 'howto-backfill') {
+        pendingClear();
+        var yest = new Date();
+        yest.setDate(yest.getDate() - 1);
+        openQuickAddModal(null, ENG.formatDate(yest));
+        return;
+      }
+      if (name === 'howto-undo') {
+        pendingClear();
+        handleDataOp({ slots: { target: 'last' }, missing: [] }, '');
+        return;
+      }
+      if (name === 'howto-edit') {
+        answerHowto({ slots: { topic: 'edit' } }, '');
+        return;
+      }
       if (name === 'learn-all') {
         /* 聊天气泡里的「去理财学院看全部」：视图映射交给 switchView（简洁版自动到 scoach） */
         openAcademy();
@@ -5946,6 +8487,23 @@
       }
       if (name === 'undo') {
         deleteBill(act.getAttribute('data-bill'));
+        return;
+      }
+      if (name === 'fix-amount') {
+        var fid = act.getAttribute('data-bill');
+        var fv = Number(act.getAttribute('data-val'));
+        var fb = findBill(fid);
+        if (fb && isFinite(fv) && fv > 0) {
+          fb.amount = ENG.round2(fv);
+          saveState();
+          renderAll();
+          addAIMessage(aiBubble('改好了，这笔现在是 ' + money(fb.amount) + '。'));
+        }
+        return;
+      }
+      if (name === 'delete-bill') {
+        var did = act.getAttribute('data-bill');
+        if (did) { deleteBill(did); }
         return;
       }
       if (name === 'worth') {
@@ -5979,6 +8537,14 @@
         coolingSkip();
       } else if (name === 'cool-start') {
         startCoolingFlow('想买的东西', 0);
+      } else if (name === 'wish-review') {
+        /* 到期回访卡的三出口：与弹层里点按钮走同一个入口，避免两套逻辑漂移 */
+        wishReviewDecide(act.getAttribute('data-id'), act.getAttribute('data-val'));
+      } else if (name === 'wish-open') {
+        openWishSheet();
+      } else if (name === 'go-diag') {
+        /* 诊断提示条的「看看诊断」：完整版去看板，简洁版去预算页（诊断卡在那儿） */
+        switchView(getUiMode() === 'simple' ? 'sbudget' : 'dash');
       }
     });
 
@@ -6238,6 +8804,8 @@
       if (act === 'export') { exportAllCsv(); }
       if (act === 'import') { openImportSheet(); }
       if (act === 'reset') { confirmReset(); }
+      if (act === 'piggy') { openPiggySheet(); }
+      if (act === 'wish') { openWishSheet(); }
     });
     DOC.addEventListener('click', function (e) {
       var menu = $('moreMenu');
@@ -6446,11 +9014,47 @@
         closeModal();
         if (!$('analysisMask').hidden) { closeAnalysisSheet(); }
         if (!$('saveHubMask').hidden) { closeSaveHub(); }
+        if (!$('piggyMask').hidden) { closePiggySheet(); }
+        if ($('wishMask') && !$('wishMask').hidden) { closeWishSheet(); }
         if (!$('ocrMask').hidden) { closeOcrModal(); }
         if ($('settingsDrawer').classList.contains('open')) { closeDrawer(); }
         if ($('modalMask').hidden && !$('settingsMask').hidden) { closeSettingsPage(); }
       }
     });
+
+    /* ---- 存钱罐弹层 ---- */
+    $('btnClosePiggy').addEventListener('click', closePiggySheet);
+    $('btnPiggyCard').addEventListener('click', openPiggySheet);
+    $('btnPiggyTop').addEventListener('click', openPiggySheet);
+    $('piggyMask').addEventListener('click', function (e) {
+      if (e.target === $('piggyMask')) { closePiggySheet(); }
+    });
+    /* 输入框是每次重绘出来的，事件绑在静态宿主上做委托：回车 = 存入 */
+    ['piggyBody', 'spPiggyBody'].forEach(function (id) {
+      var host = $(id);
+      if (!host) { return; }
+      host.addEventListener('keydown', function (e) {
+        if (e.key === 'Enter' || e.keyCode === 13) {
+          if (e.target && e.target.classList && e.target.classList.contains('piggy-amt-input')) {
+            e.preventDefault();
+            piggyDoDeposit(host);
+          }
+        }
+      });
+    });
+
+    /* ---- 心愿单弹层（sheet）：四处入口共用同一套渲染 ---- */
+    if ($('btnCloseWish')) { $('btnCloseWish').addEventListener('click', closeWishSheet); }
+    if ($('btnWishCard')) { $('btnWishCard').addEventListener('click', openWishSheet); }
+    if ($('btnWishTop')) { $('btnWishTop').addEventListener('click', openWishSheet); }
+    if ($('wishMask')) {
+      $('wishMask').addEventListener('click', function (e) {
+        if (e.target === $('wishMask')) { closeWishSheet(); }
+      });
+    }
+    if ($('wishBody')) { $('wishBody').addEventListener('click', wishPanelClick); }
+    /* 简洁版首页小卡：整卡可点 */
+    if ($('spWishCard')) { $('spWishCard').addEventListener('click', openWishSheet); }
 
     $('tabbar').addEventListener('click', function (e) {
       var tab = e.target.closest ? e.target.closest('.tab[data-view]') : null;
@@ -6464,7 +9068,7 @@
 
   function addWelcome() {
     var ov = getOverview();
-    addAIMessage(aiBubble('你好呀，我是账小助 👋<br>一句话就能记账，试试「中午食堂 15」。<br>想省钱 / 搞钱，去底部「理财专家」找我，剁手前也可以先让我把把关。'));
+    addAIMessage(aiBubble(ic('chat', 'bico-brand', '打招呼') + '你好呀，我是账小助<br>一句话就能记账，试试「中午食堂 15」。<br>想省钱 / 搞钱，去底部「理财专家」找我，剁手前也可以先让我把把关。'));
     addAIMessage(aiBubble('当前周期 ' + esc(ov.cycle.start) + ' ~ ' + esc(ov.cycle.end) + '，总预算 ' +
       money(state.budget.total) + '，已花 ' + money(ov.cycleAgg.expense) + '。' + ov.sentence));
   }
@@ -6472,6 +9076,9 @@
   function init() {
     loadState();
     loadSavingsDb();
+    PIGGY.load();
+    /* 心愿单是独立存储键：没这个 key 的老账本 load() 返回空库且不写盘 */
+    if (WISH && !WISH.missing) { WISH.load(); }
     if (!savingsReady()) { degradeSavingsUi(); }
     if (!storageOK) { showStorageTip(); }
     applyAppearance();
@@ -6489,6 +9096,9 @@
     // 默认视图按 UI 类型分流：简洁版进「记账」首页，完整版进聊天（修复简洁版刷新后落空白）
     switchView(getUiMode() === 'simple' ? 'shome' : 'chat');
     initCloud();
+    renderSceneChips();
+    maybeProactiveHint();
+    maybeWishReview();
   }
 
   if (DOC.readyState === 'loading') {

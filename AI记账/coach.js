@@ -41,6 +41,11 @@
     return ENG.fmtMoney(n);
   }
 
+  /** 行内小图标（与 app.js 的 ic 同义；各模块独立闭包，不能跨文件取名） */
+  function ic(name, cls, label) {
+    return DATA.inlineIcon('i-' + name, cls, label);
+  }
+
   /* ================================================================== */
   /* 一、账单触发规则（记账后主动建议）                                    */
   /* ================================================================== */
@@ -104,7 +109,7 @@
 
   function saveMoneyAnswer() {
     return '' +
-      '<div class="coach-qa-title">💡 理财专家说 · 校园省钱攻略</div>' +
+      '<div class="coach-qa-title">' + ic('bulb', 'bico-brand', '省钱攻略') + '理财专家说 · 校园省钱攻略</div>' +
       '<ol class="coach-qa-list">' +
       '<li><b>食堂平替外卖</b>：一荤一素 10 元上下，一周少点 3 次外卖立省 50+</li>' +
       '<li><b>拿铁因子</b>：奶茶咖啡改自泡茶包 / 食堂现磨，一周省 30+</li>' +
@@ -117,7 +122,7 @@
 
   function makeMoneyAnswer() {
     return '' +
-      '<div class="coach-qa-title">💰 理财专家说 · 校园搞钱路子</div>' +
+      '<div class="coach-qa-title">' + ic('wallet', 'bico-brand', '搞钱路子') + '理财专家说 · 校园搞钱路子</div>' +
       '<ol class="coach-qa-list">' +
       '<li><b>勤工俭学</b>：图书馆助理 / 实验室值班 / 助教，时薪 15-25，稳定靠谱</li>' +
       '<li><b>技能变现</b>：PPT 代做、约拍、家教，校园群 / 闲鱼接单，一单 50-300</li>' +
@@ -125,7 +130,7 @@
       '<li><b>奖学金</b>：国奖 8000、校奖 1000-3000，性价比最高的「赚钱」</li>' +
       '<li><b>竞赛奖金</b>：创新创业 / 程序设计大赛，拿钱同时给简历加分</li>' +
       '</ol>' +
-      '<div class="coach-qa-foot warn">⚠️ 先交钱的兼职都是骗子，天上不会掉馅饼。</div>';
+      '<div class="coach-qa-foot warn">' + ic('alert', 'bico-warn', '防骗提醒') + '先交钱的兼职都是骗子，天上不会掉馅饼。</div>';
   }
 
   /* ================================================================== */
@@ -222,7 +227,7 @@
     if (score >= 5) {
       return {
         level: 'ok',
-        icon: '✅',
+        icon: 'check',
         title: '可以买',
         text: '刚需、高频、无压力，下单前记得比价，学生优惠 / 教育资格能用就用。'
       };
@@ -230,14 +235,14 @@
     if (score >= 3) {
       return {
         level: 'warn',
-        icon: '⚠️',
+        icon: 'alert',
         title: '建议晾 48 小时',
         text: '先加进购物车，两天后还想要，再来找我，我帮你记上这笔。'
       };
     }
     return {
       level: 'stop',
-      icon: '🛑',
+      icon: 'stop',
       title: '建议先不买',
       text: '多半是情绪 / 从众冲动。先去做别的事转移注意力，真需要了再说。'
     };
@@ -250,7 +255,7 @@
   var ACADEMY = [
     {
       id: 'cooldown',
-      icon: '🛑',
+      icon: 'clock',
       title: '剁手冷静法：48 小时法则',
       tag: '冲动消费',
       body: '想买的东西先加购物车，晾满 48 小时再决定。\n' +
@@ -260,7 +265,7 @@
     },
     {
       id: 'latte',
-      icon: '☕',
+      icon: 'cat-food',
       title: '拿铁因子：小钱也是钱',
       tag: '日常开销',
       body: '每天一杯 15 元奶茶，一年约 5475 元，够换一台平板。\n' +
@@ -269,7 +274,7 @@
     },
     {
       id: 'engel',
-      icon: '🍚',
+      icon: 'split',
       title: '恩格尔系数：吃饭钱别超 60%',
       tag: '餐饮',
       body: '餐饮支出 ÷ 总支出超过 60%，说明吃占了大头。\n' +
@@ -279,7 +284,7 @@
     },
     {
       id: 'infodiff',
-      icon: '📱',
+      icon: 'radar',
       title: '省钱信息差：先看别人怎么省',
       tag: '节流实操',
       body: '同一样东西有人 39 买、有人 89 买，差的往往不是钱，是信息。\n' +
@@ -295,7 +300,7 @@
     },
     {
       id: 'bloggers',
-      icon: '📺',
+      icon: 'link',
       title: '跟着博主学省钱（B 站）',
       tag: '跟人学',
       body: '省钱干货更新最快的地方在博主主页，不在文章里：\n' +
@@ -317,7 +322,7 @@
     },
     {
       id: 'budget',
-      icon: '📊',
+      icon: 'bar',
       title: '50/30/20 预算法（学生版）',
       tag: '预算',
       body: '把每月生活费切成三份：\n' +
@@ -327,7 +332,7 @@
     },
     {
       id: 'invest',
-      icon: '🏦',
+      icon: 'wallet',
       title: '零花钱理财第一课',
       tag: '理财入门',
       body: '学生理财从「不亏」开始，不追高、不碰不懂的：\n' +
@@ -349,7 +354,7 @@
     },
     {
       id: 'mooc',
-      icon: '🎓',
+      icon: 'cap',
       title: '中国大学 MOOC《个人理财》',
       tag: '系统学习',
       body: '想把理财学成体系，去跟一门完整课程：\n' +
@@ -365,7 +370,7 @@
     },
     {
       id: 'loan',
-      icon: '⚠️',
+      icon: 'alert',
       title: '警惕校园贷与超前消费',
       tag: '避坑',
       body: '凡是「零门槛、秒到账」的贷款都别碰：\n' +
@@ -375,7 +380,7 @@
     },
     {
       id: 'resale',
-      icon: '🔄',
+      icon: 'swap',
       title: '闲置转让回血指南',
       tag: '搞钱',
       body: '宿舍里躺着的是钱，不是垃圾：\n' +
@@ -385,7 +390,7 @@
     },
     {
       id: 'work',
-      icon: '🎒',
+      icon: 'lock',
       title: '勤工俭学避坑指南',
       tag: '搞钱',
       body: '靠谱优先于钱多：\n' +
@@ -467,7 +472,7 @@
     if (impulse.length >= 2) {
       tips.push({
         level: 'warn',
-        icon: '🛑',
+        icon: 'stop',
         title: '本周期冲动消费 ' + impulse.length + ' 笔 · ' + fmtMoney(impulseTotal),
         text: '超过 2 笔就该上「剁手冷静法」了：加购物车晾 48 小时，大部分冲动会自动消退。'
       });
@@ -487,7 +492,7 @@
       var top = hits.slice().sort(function (a, b) { return b.alt.save - a.alt.save; })[0];
       tips.push({
         level: 'info',
-        icon: '☕',
+        icon: 'cat-food',
         title: '发现 ' + hits.length + ' 笔高溢价消费',
         text: '全部换平替一周约省 ' + fmtMoney(weeklySave) + ' 元。最大一笔是「' +
           top.bill.note + '」，换成' + top.alt.altName + '立省 ' + fmtMoney(top.alt.save) + '。'
@@ -499,7 +504,7 @@
     if (engel.ratio != null && engel.ratio > 0.6) {
       tips.push({
         level: 'warn',
-        icon: '🍚',
+        icon: 'pie',
         title: '恩格尔系数 ' + Math.round(engel.ratio * 100) + '% · 吃饭钱偏高',
         text: '外卖是主因：食堂两荤一素约 12 元，一周少点 3 次外卖，餐饮立省 50+。'
       });
@@ -510,7 +515,7 @@
     if (rate != null && rate < 30) {
       tips.push({
         level: 'warn',
-        icon: '📉',
+        icon: 'bar',
         title: '本周期储蓄率 ' + Math.round(rate) + '%',
         text: '健康线 30%。发钱日先转 10% 进梦想基金，剩下的再花，无痛攒钱。'
       });
@@ -521,7 +526,7 @@
     if (balance < 500) {
       tips.push({
         level: 'info',
-        icon: '🛟',
+        icon: 'piggy',
         title: '先攒 500 元应急金',
         text: '手机碎屏、临时考证报名都靠它。每月存 100，5 个月就有了，再谈理财。'
       });
@@ -536,7 +541,7 @@
     if (spent > expected * 1.2 && spent > 0) {
       tips.push({
         level: 'warn',
-        icon: '⏱️',
+        icon: 'clock',
         title: '花钱速度超前 ' + Math.round((spent / expected - 1) * 100) + '%',
         text: '按这个节奏月末要超支。接下来 ' + (ov.cycle.remainingDays || 0) + ' 天日均只花 ' +
           fmtMoney(bs.dailyAllowance) + '，先把外卖换成食堂。'
@@ -547,7 +552,7 @@
     if (tips.length === 0) {
       tips.push({
         level: 'ok',
-        icon: '🎉',
+        icon: 'alert',
         title: '本周期节奏健康',
         text: '支出、储蓄、冲动控制都在线。保持每周复盘，月底来查收成就。'
       });

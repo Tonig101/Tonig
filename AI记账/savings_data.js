@@ -1,5 +1,5 @@
 /**
- * savings_data.js — 省钱图谱 · 数据层（100 条 / 10 分类 × 10 条）
+ * savings_data.js — 省钱图谱 · 数据层（113 条 / 10 分类，其中 4 类已扩展）
  *
  * 数据来源：《大学生全网省钱与防割韭菜图谱（100 条）》用户提供版
  * 处理原则（对应《省钱功能开发规格.md》§10）：
@@ -40,7 +40,7 @@
   var BILL_CATS = ['餐饮', '社交', '购物', '学习', '交通', '娱乐', '居住', '医疗', '其他', '跨类'];
 
   /**
-   * 100 条条目。字段说明见规格 §3.1。
+   * 113 条条目（用户提供 100 条 + 后续新增 13 条品牌优惠）。字段说明见规格 §3.1。
    * trigger 支持单维度或多维度（**任一维度满足即命中**，OR 语义）：
    *   { weekday:[1..7] }            1=周一 … 7=周日
    *   { monthday:[1..28] }          每月几号（限 1-28，规避 2 月缺日）
@@ -51,7 +51,7 @@
   var ENTRIES = [
 
     /* ================================================================ */
-    /* 一、连锁快餐（10）                                                 */
+    /* 一、连锁快餐（14）                                                 */
     /* ================================================================ */
     { id: 'fastfood.mcd.01', cat: 'fastfood', title: '麦当劳周一「随心配 1+1」',
       action: '周一点「随心配 1+1」，两件组合价 13.9 元；8/18/28 会员日顺手用积分兑免费小吃。饮料要中杯，别升大杯。',
@@ -143,8 +143,44 @@
       billCats: ['餐饮'], keywords: ['米村拌饭', '石锅拌饭', '免费续'],
       certainty: 'stable', source: '米村拌饭门店' },
 
+    { id: 'fastfood.mcd.member', cat: 'fastfood', title: '麦当劳会员日：领券再下单',
+      action: '周一 App 里领会员日券（满减 / 指定单品优惠），下单前先去「我的卡包」用掉，别原价点。',
+      who: '常点麦当劳的人', gate: '需周一；需领券后下单',
+      scene: 'weekday-lunch', risk: '券有门槛和指定品类；领了不用过期作废；和随心配比价后再用',
+      trigger: { weekday: [1] },
+      save: { type: 'range', min: 3, max: 10 }, priceRef: {},
+      billCats: ['餐饮'], keywords: ['麦当劳', '会员日', '领券', '优惠券'],
+      certainty: 'varies', source: '麦当劳 App 会员日' },
+
+    { id: 'fastfood.wallace.member', cat: 'fastfood', title: '华莱士周五会员日买一送一',
+      action: '周五会员日指定款买一送一，拉个饭搭子一人一份最划算；一个人就别硬凑两份。',
+      who: '有饭搭子的宿舍', gate: '需周五；限会员日指定款',
+      scene: 'weekday-dinner', risk: '买一送一多为指定单品；和团购双人餐二选一别叠加；出品看门店',
+      trigger: { weekday: [5] },
+      save: { type: 'range', min: 10, max: 20 }, priceRef: {},
+      billCats: ['餐饮'], keywords: ['华莱士', '会员日', '买一送一'],
+      certainty: 'varies', source: '华莱士会员日' },
+
+    { id: 'fastfood.dicos.18', cat: 'fastfood', title: '德克士每月 18 号买一送一',
+      action: '每月 18 号德克士指定款买一送一，两个人吃刚好；一个人就去拼单或只点特价。',
+      who: '想吃炸鸡又想省的人', gate: '需每月 18 号；限指定款',
+      scene: 'monthly', risk: '买一送一多为指定单品；一个人吃两份反而多花；注意核销时段',
+      trigger: { monthday: [18] },
+      save: { type: 'range', min: 10, max: 20 }, priceRef: {},
+      billCats: ['餐饮'], keywords: ['德克士', '18号', '买一送一'],
+      certainty: 'varies', source: '德克士门店活动' },
+
+    { id: 'fastfood.haidilao.student', cat: 'fastfood', title: '海底捞大学生 69 折',
+      action: '学生认证后，工作日 14:00-17:00 及 22:00 后到店享 69 折；挑人少时段，锅底小料另算。',
+      who: '已做学生认证的人', gate: '需学生认证；仅工作日 14:00-17:00 与 22:00 后',
+      scene: 'weekday-dinner', risk: '周末和饭点不打折；锅底、小料、酒水不参与；认证只认本人账号',
+      trigger: { weekday: [1, 2, 3, 4, 5] },
+      save: { type: 'ratio', rate: 0.31, cap: 80 }, priceRef: { before: 150 },
+      billCats: ['餐饮'], keywords: ['海底捞', '大学生', '69折', '学生认证'],
+      certainty: 'stable', source: '海底捞大学生优惠' },
+
     /* ================================================================ */
-    /* 二、中式简餐与外卖（10）                                           */
+    /* 二、中式简餐与外卖（12）                                           */
     /* ================================================================ */
     { id: 'delivery.pinhaofan.11', cat: 'delivery', title: '美团/饿了么「拼好饭」频道',
       action: '点外卖先进「拼好饭」频道，10-15 元一顿，月底吃土救星；不赶时间就选它。',
@@ -235,6 +271,24 @@
       save: { type: 'range', min: 8, max: 15 }, priceRef: {},
       billCats: ['餐饮'], keywords: ['汉堡', '穷鬼', '套餐'],
       certainty: 'stable', source: '门店通用做法' },
+
+    { id: 'delivery.dominos.21', cat: 'delivery', title: '达美乐周一外卖 8 折',
+      action: '周一在达美乐小程序 / 外卖平台点单走 8 折，两个人拼一单把配送费摊薄。',
+      who: '想吃披萨的人', gate: '需周一；以外卖价为准',
+      scene: 'weekday-dinner', risk: '8 折仅限外卖、不含堂食；特价套餐可能不参与；满减与折扣二选一',
+      trigger: { weekday: [1] },
+      save: { type: 'ratio', rate: 0.2, cap: 30 }, priceRef: { before: 60 },
+      billCats: ['餐饮'], keywords: ['达美乐', 'Domino', '外卖', '8折'],
+      certainty: 'varies', source: '达美乐小程序' },
+
+    { id: 'delivery.dominos.22', cat: 'delivery', title: '达美乐周三外卖 7 折',
+      action: '周三达美乐外卖 7 折，比周一更狠；凑够起送再下单，别为凑单点多。',
+      who: '周三想吃披萨的人', gate: '需周三；以外卖价为准',
+      scene: 'weekday-dinner', risk: '7 折限外卖渠道；部分单品不参与；注意起送门槛',
+      trigger: { weekday: [3] },
+      save: { type: 'ratio', rate: 0.3, cap: 40 }, priceRef: { before: 60 },
+      billCats: ['餐饮'], keywords: ['达美乐', 'Domino', '外卖', '7折'],
+      certainty: 'varies', source: '达美乐小程序' },
 
     /* ================================================================ */
     /* 三、校园食堂（10）                                                 */
@@ -330,7 +384,7 @@
       certainty: 'local', source: '校内结算规则（以你学校为准）' },
 
     /* ================================================================ */
-    /* 四、茶饮咖啡（10）                                                 */
+    /* 四、茶饮咖啡（16）                                                 */
     /* ================================================================ */
     { id: 'drinks.luckin.31', cat: 'drinks', title: '瑞幸周二 / 周四 9.9',
       action: '周二、周四下单 9.9 元；淘宝先买礼品卡代下单，还能再省 2-3 元。',
@@ -422,8 +476,62 @@
       billCats: ['餐饮'], keywords: ['保温杯', '茶包', '自制', '奶茶'],
       certainty: 'stable', source: '长期习惯账（无单次金额）' },
 
+    { id: 'drinks.heytea.topping', cat: 'drinks', title: '喜茶 / CoCo：免费加小料',
+      action: '周二喜茶、CoCo 常推免费加小料活动：点纯茶或最便宜的饮品，把免费小料加满，口感立刻升级。',
+      who: '想加料又不想加钱的人', gate: '需周二；看门店活动',
+      scene: 'weekday', risk: '不是所有门店 / 所有饮品都参与；活动款常指定；加太多盖住茶味',
+      trigger: { weekday: [2] },
+      save: { type: 'range', min: 2, max: 5 }, priceRef: {},
+      billCats: ['餐饮'], keywords: ['喜茶', 'CoCo', '免费', '小料', '加料'],
+      certainty: 'varies', source: '喜茶 / CoCo 周活动' },
+
+    { id: 'drinks.mixue.12off', cat: 'drinks', title: '蜜雪冰城满 12 减 2',
+      action: '周三蜜雪常做「满 12 减 2」，三五个人拼单最容易凑到；一个人就加个最便宜的小食凑门槛。',
+      who: '常喝蜜雪的人', gate: '需周三；满 12 元才减',
+      scene: 'weekday', risk: '门槛要凑够 12 元；单点一杯多半不够，别硬凑一堆喝不下',
+      trigger: { weekday: [3] },
+      save: { type: 'range', min: 2, max: 2 }, priceRef: {},
+      billCats: ['餐饮'], keywords: ['蜜雪', '满12减2', '柠檬水'],
+      certainty: 'stable', source: '蜜雪冰城门店活动' },
+
+    { id: 'drinks.chabaidao.upsize', cat: 'drinks', title: '茶百道周三会员升杯',
+      action: '周三茶百道会员日常做「免费升杯 / 加料」，会员下单时勾上升杯，一杯变两杯的量。',
+      who: '茶百道会员', gate: '需周三；需会员身份',
+      scene: 'weekday', risk: '升杯限指定款；非会员先领会员再下单；活动随时变',
+      trigger: { weekday: [3] },
+      save: { type: 'range', min: 3, max: 6 }, priceRef: {},
+      billCats: ['餐饮'], keywords: ['茶百道', '升杯', '会员日'],
+      certainty: 'varies', source: '茶百道小程序' },
+
+    { id: 'drinks.chabaidao.88', cat: 'drinks', title: '茶百道周四 88 折',
+      action: '周四茶百道会员日 88 折，一杯省两三块；顺手把想喝的囤成券，别为折扣硬喝两杯。',
+      who: '茶百道常客', gate: '需周四；部分需会员',
+      scene: 'weekday', risk: '88 折常限指定款；和升杯活动不同天，别搞混',
+      trigger: { weekday: [4] },
+      save: { type: 'ratio', rate: 0.12, cap: 10 }, priceRef: { before: 18 },
+      billCats: ['餐饮'], keywords: ['茶百道', '88折', '会员日'],
+      certainty: 'varies', source: '茶百道小程序' },
+
+    { id: 'drinks.guming.20', cat: 'drinks', title: '古茗每月 20 号会员日',
+      action: '每月 20 号古茗会员日，常发买一送一 / 第二杯半价，找人拼一杯就把单价打下来。',
+      who: '古茗常客', gate: '需每月 20 号；部分需会员',
+      scene: 'monthly', risk: '券有指定款和时段；一个人喝两杯等于没省；先领券再点',
+      trigger: { monthday: [20] },
+      save: { type: 'range', min: 5, max: 15 }, priceRef: {},
+      billCats: ['餐饮'], keywords: ['古茗', '会员日', '20号'],
+      certainty: 'varies', source: '古茗小程序' },
+
+    { id: 'drinks.yihetang.18', cat: 'drinks', title: '益禾堂每月 18 号半价 / 买一送一',
+      action: '每月 18 号益禾堂常做半价或买一送一，两人拼单最香；一个人就只点参与款，别硬凑。',
+      who: '益禾堂常客', gate: '需每月 18 号；部分需会员',
+      scene: 'monthly', risk: '活动款常指定；和德克士 18 号同一天，可顺路一起薅',
+      trigger: { monthday: [18] },
+      save: { type: 'range', min: 5, max: 18 }, priceRef: {},
+      billCats: ['餐饮'], keywords: ['益禾堂', '18号', '半价', '买一送一'],
+      certainty: 'varies', source: '益禾堂小程序' },
+
     /* ================================================================ */
-    /* 五、零食夜市（10）                                                 */
+    /* 五、零食夜市（11）                                                 */
     /* ================================================================ */
     { id: 'snacks.zhaoyiming.41', cat: 'snacks', title: '赵一鸣逢 8 号 88 折',
       action: '每月 8 / 18 / 28 号会员日 88 折，散称零食平时就比超市便宜三成，凑到会员日再买。',
@@ -514,6 +622,15 @@
       save: { type: 'range', min: 4, max: 8 }, priceRef: {},
       billCats: ['餐饮'], keywords: ['瑞幸', '小食', '闲鱼', '券'],
       certainty: 'varies', source: '闲鱼二手券' },
+
+    { id: 'snacks.haoxianglai.8', cat: 'snacks', title: '好想来每月 8 号 88 折',
+      action: '每月 8 号好想来会员日全场 88 折，散称零食平时就比超市便宜，凑到 8 号再补货。',
+      who: '常买散称零食的人', gate: '需每月 8 号；需会员',
+      scene: 'monthly', risk: '88 折有金额门槛；散称容易买多，先列清单再进店',
+      trigger: { monthday: [8] },
+      save: { type: 'ratio', rate: 0.12, cap: 30 }, priceRef: { before: 50 },
+      billCats: ['餐饮'], keywords: ['好想来', '8号', '88折', '零食'],
+      certainty: 'varies', source: '好想来会员日' },
 
     /* ================================================================ */
     /* 六、商超日用（10）                                                 */

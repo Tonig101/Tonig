@@ -469,9 +469,15 @@
   /* 七、HTML 卡片                                                        */
   /* ================================================================== */
 
+  /** 行内小图标（与 app.js 的 ic 同义；模块独立闭包不能跨文件取名） */
+  function svIcon(name, cls, label) {
+    var D = (typeof module !== 'undefined' && module.exports) ? require('./data.js') : global.AJ.data;
+    return D.inlineIcon('i-' + name, cls, label);
+  }
+
   function catMeta(cat) {
     for (var i = 0; i < CATS.length; i++) { if (CATS[i].key === cat) { return CATS[i]; } }
-    return { key: cat, name: '其他', emoji: '💡' };
+    return { key: cat, name: '其他' };
   }
 
   function certTag(certainty) {
@@ -522,7 +528,7 @@
       certTag(entry.certainty) +
       '</div>';
 
-    html += '<div class="sv-risk">⚠️ ' + esc(entry.risk) + '</div>';
+    html += '<div class="sv-risk">' + svIcon('alert') + esc(entry.risk) + '</div>';
 
     html += '<div class="sv-acts">' +
       '<button type="button" class="btn-mini' + (checked ? '' : ' primary') + '" data-sv-act="toggle" data-sv-id="' + esc(entry.id) + '">' +
@@ -548,7 +554,7 @@
     var html = '';
 
     if (!list.length) {
-      return '<div class="sv-empty">今天的动作都打完卡了 🎉<br><span class="hint">去「图谱」里翻翻别的分类，或者明天再来。</span></div>';
+      return '<div class="sv-empty">' + svIcon('target', 'bico-brand', '已完成') + '今天的动作都打完卡了<br><span class="hint">去「图谱」里翻翻别的分类，或者明天再来。</span></div>';
     }
 
     var hitN = 0, relN = 0, k;

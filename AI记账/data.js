@@ -13,17 +13,27 @@
   /** 数据版本号，结构变更时用于迁移 */
   var DATA_VERSION = 1;
 
-  /** 固定分类（"其他" 为兜底分类） */
+  /**
+   * 固定分类（"其他" 为兜底分类）
+   * color = 品牌淡色，用于比例条 / 圆点 / 淡底（12% 透明度）
+   * ink   = 同色系"深墨色"，专用于淡底小方块里的线性图标描边。
+   *         实测在各自 12% 淡底上对比度 4.5:1 以上（WCAG AA），
+   *         浅色分类（餐饮绿 / 交通青）用原色只有 2:1，会糊在底上看不清。
+   * essential = 是否「必需消费」，只给消费诊断卡用：
+   *         true  → 餐饮 / 学习 / 交通 / 居住 / 医疗（吃饭、上课、通勤、住宿、看病）
+   *         false → 社交 / 购物 / 娱乐 / 其他（可压缩的「想要」）
+   *         注意：这是**追加字段**，key / 顺序 / color / ink 一律不动。
+   */
   var CATEGORIES = [
-    { key: '餐饮', color: '#07C160' },
-    { key: '社交', color: '#FF8A3D' },
-    { key: '购物', color: '#7C6CF0' },
-    { key: '学习', color: '#3D9CFF' },
-    { key: '交通', color: '#2AC6C0' },
-    { key: '娱乐', color: '#EF5350' },
-    { key: '居住', color: '#B0803C' },
-    { key: '医疗', color: '#E0629A' },
-    { key: '其他', color: '#9AA3AD' }
+    { key: '餐饮', color: '#07C160', ink: '#047A3E', essential: true },
+    { key: '社交', color: '#FF8A3D', ink: '#AF5410', essential: false },
+    { key: '购物', color: '#7C6CF0', ink: '#5748B8', essential: false },
+    { key: '学习', color: '#3D9CFF', ink: '#1C6CBF', essential: true },
+    { key: '交通', color: '#2AC6C0', ink: '#0A7570', essential: true },
+    { key: '娱乐', color: '#EF5350', ink: '#C0352C', essential: false },
+    { key: '居住', color: '#B0803C', ink: '#7D5722', essential: true },
+    { key: '医疗', color: '#E0629A', ink: '#A93765', essential: true },
+    { key: '其他', color: '#9AA3AD', ink: '#5E6771', essential: false }
   ];
 
   /**
@@ -479,8 +489,37 @@
     return '#9AA3AD';
   }
 
+  /** 根据分类名取"深墨色"（淡底图标专用，保证可读） */
+  function getCategoryInk(key) {
+    var i;
+    for (i = 0; i < CATEGORIES.length; i++) {
+      if (CATEGORIES[i].key === key) {
+        return CATEGORIES[i].ink;
+      }
+    }
+    return '#5E6771';
+  }
+
   /** 分类 key 列表 */
   var CATEGORY_KEYS = CATEGORIES.map(function (c) { return c.key; });
+
+  /**
+   * 对话气泡 / 卡片标题里的小图标。
+   *
+   * 为什么不用 emoji：系统 emoji 在 Windows 上是 Segoe UI Emoji，在 macOS 上是 Apple Color
+   * Emoji —— 同样的「📊」在两台电脑上颜色、粗细、大小都不同，而且和项目自带的线性 svg
+   * 图标（2px 描边 + currentColor）完全不是一套语言，看起来像临时凑上去的。
+   *
+   * @param {string} name  #i-xxx 的 symbol 名（不含 #）
+   * @param {string} [cls] 追加类名，用于不同语境下的尺寸 / 颜色，例如 'bico-warn'
+   * @param {?string} [label] 无障碍名；传了就有 role="img"，省略则 aria-hidden
+   * @returns {string} 内联 <svg> 字符串（需调用方自行拼进 innerHTML）
+   */
+  function inlineIcon(name, cls, label) {
+    return '<svg class="bico' + (cls ? ' ' + cls : '') + '" viewBox="0 0 24 24"' +
+      (label ? ' role="img" aria-label="' + label + '"' : ' aria-hidden="true"') +
+      '><use href="#' + name + '"/></svg>';
+  }
 
   var DATA = {
     STORAGE_KEY: STORAGE_KEY,
@@ -509,9 +548,10 @@
     DEFAULT_GOALS: DEFAULT_GOALS,
     SEED_BILLS: SEED_BILLS,
     SEED_INCOME: SEED_INCOME,
-    getCategoryColor: getCategoryColor
+    inlineIcon: inlineIcon,
+    getCategoryColor: getCategoryColor,
+    getCategoryInk: getCategoryInk
   };
-
   if (typeof window !== 'undefined') {
     window.AJ = window.AJ || {};
     window.AJ.data = DATA;

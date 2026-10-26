@@ -79,6 +79,187 @@
       certainty: 'varies',
       source: '瑞幸 / 库迪 App 活动页'
     },
+    /* —— 以下为「省钱图谱」同步过来的品牌固定活动，统一进雷达日历（每周几 / 每月几号） —— */
+    {
+      id: 'mcd-member', name: '麦当劳会员日', emoji: '🍔', cat: '快餐',
+      place: '门店 / 外卖 App',
+      title: '会员日领券（周一）',
+      rule: { type: 'weekly', weekday: 1 },
+      what: '每周一麦当劳会员日，App 领券后部分单品更便宜',
+      how: '周一打开麦当劳 App 先领「会员日券」，再点单；和 13.9 随心配专区可叠加看哪个更划算',
+      tip: '券的面额每周会变，先比再买；别为了用券多买不需要的东西',
+      coach: '会员日券通常比平时便宜几元，周一吃麦当劳前先领券，但别为凑券加购。',
+      certainty: 'varies',
+      source: '麦当劳 App 会员日'
+    },
+    {
+      id: 'dominos-mon', name: '达美乐', emoji: '🍕', cat: '快餐',
+      place: '外卖 App',
+      title: '外卖 8 折（周一）',
+      rule: { type: 'weekly', weekday: 1 },
+      what: '每周一达美乐外卖 8 折',
+      how: '周一在达美乐小程序 / App 点外卖，结算自动 8 折；比平时下单省约 20%',
+      tip: '仅外卖、自取不一定参与；满减与折扣不同享时选更省的',
+      coach: '周一想吃披萨就等这天，8 折比平时省一笔；别每周都点。',
+      certainty: 'stable',
+      source: '达美乐官方活动'
+    },
+    {
+      id: 'tastien', name: '塔斯汀', emoji: '🍔', cat: '快餐',
+      place: '门店 / 外卖 App',
+      title: '会员日（周二）',
+      rule: { type: 'weekly', weekday: 2 },
+      what: '每周二塔斯汀会员日，部分单品会员价',
+      how: '周二在塔斯汀小程序领会员券，买汉堡 / 披萨更便宜',
+      tip: '会员日力度每周略有不同，先看好再凑单',
+      coach: '周二想吃塔斯汀就这天去，但控制在 1 次。',
+      certainty: 'varies',
+      source: '塔斯汀会员日'
+    },
+    {
+      id: 'heytea-topping', name: '喜茶 / CoCo', emoji: '🧋', cat: '饮品',
+      place: '门店 / 外卖 App',
+      title: '免费加小料（周二）',
+      rule: { type: 'weekly', weekday: 2 },
+      what: '每周二喜茶 / CoCo 免费加小料（珍珠、椰果等）',
+      how: '周二点单时勾选「免费加料」，奶茶口感升级不加价',
+      tip: '只免基础小料，别顺手加收费配料；想省钱就用它替代周三的付费升杯',
+      coach: '周二想喝奶茶就靠免费加料白嫖，比平时省 3-5 元。',
+      certainty: 'varies',
+      source: '喜茶 / CoCo 会员活动'
+    },
+    {
+      id: 'dominos-wed', name: '达美乐', emoji: '🍕', cat: '快餐',
+      place: '外卖 App',
+      title: '外卖 7 折（周三）',
+      rule: { type: 'weekly', weekday: 3 },
+      what: '每周三达美乐外卖 7 折（比周一 8 折更狠）',
+      how: '周三下单自动 7 折，大单更划算；和周一 8 折择低选一天',
+      tip: '力度常变，以结算页为准；自取可能不参与',
+      coach: '周三披萨更便宜，但每周最多 1 次，别因为打折就多吃。',
+      certainty: 'stable',
+      source: '达美乐官方活动'
+    },
+    {
+      id: 'pizza', name: '必胜客', emoji: '🍕', cat: '快餐',
+      place: '门店 / 外卖 App',
+      title: '尖叫星期三（周三）',
+      rule: { type: 'weekly', weekday: 3 },
+      what: '每周三必胜客「尖叫星期三」特价',
+      how: '周三在必胜客 App 看本周尖叫单品，部分半价或买一送一',
+      tip: '指定单品才参与，先确认再点；别为了特价硬凑人数',
+      coach: '周三想吃必胜客就等尖叫日，但每月 1-2 次足够。',
+      certainty: 'varies',
+      source: '必胜客官方活动'
+    },
+    {
+      id: 'mixue', name: '蜜雪冰城', emoji: '🍦', cat: '饮品',
+      place: '门店',
+      title: '满 12 减 2（周三）',
+      rule: { type: 'weekly', weekday: 3 },
+      what: '每周三蜜雪冰城满 12 减 2',
+      how: '周三凑满 12 元自动减 2，和同学拼单很容易达标',
+      tip: '本就便宜，满减是锦上添花；别为凑单多喝',
+      coach: '周三想喝蜜雪就凑满减，省 2 元也是省。',
+      certainty: 'stable',
+      source: '蜜雪冰城门店活动'
+    },
+    {
+      id: 'chabaidao-up', name: '茶百道', emoji: '🧋', cat: '饮品',
+      place: '门店 / 外卖 App',
+      title: '会员升杯（周三）',
+      rule: { type: 'weekly', weekday: 3 },
+      what: '每周三茶百道会员升杯（中杯升大杯等）',
+      how: '周三会员点单勾选升杯，免费大一号；比平时更值',
+      tip: '仅会员、指定饮品；想喝就这天，但别天天喝',
+      coach: '周三茶百道升杯白赚，替代平时的付费大杯。',
+      certainty: 'varies',
+      source: '茶百道会员活动'
+    },
+    {
+      id: 'chabaidao-88', name: '茶百道', emoji: '🧋', cat: '饮品',
+      place: '门店 / 外卖 App',
+      title: '88 折（周四）',
+      rule: { type: 'weekly', weekday: 4 },
+      what: '每周四茶百道 88 折',
+      how: '周四在茶百道点单自动 88 折，比平时省约 12%',
+      tip: '和周三升杯择一即可，别两天都喝；力度以结算页为准',
+      coach: '周四茶百道 88 折，但奶茶一周控制在 2 杯内。',
+      certainty: 'stable',
+      source: '茶百道会员活动'
+    },
+    {
+      id: 'wallace', name: '华莱士', emoji: '🐔', cat: '快餐',
+      place: '门店 / 外卖 App',
+      title: '会员日买一送一（周五）',
+      rule: { type: 'weekly', weekday: 5 },
+      what: '每周五华莱士会员日，指定单品买一送一',
+      how: '周五华莱士会员点单，汉堡 / 鸡块常买一送一，和同学拼最划算',
+      tip: '指定单品参与，先确认品类；别为凑买一送一硬吃两份',
+      coach: '周五华莱士买一送一适合拼单，但别每周都冲。',
+      certainty: 'varies',
+      source: '华莱士会员日'
+    },
+    {
+      id: 'guming', name: '古茗', emoji: '🍵', cat: '饮品',
+      place: '门店 / 外卖 App',
+      title: '会员日（每月 20 号）',
+      rule: { type: 'monthly', day: 20 },
+      what: '每月 20 号古茗会员日，领券 / 折扣',
+      how: '每月 20 号打开古茗小程序领会员券，部分饮品更便宜',
+      tip: '券额每月不同，先比再买；别囤券',
+      coach: '想喝古茗就等 20 号会员日，省几元。',
+      certainty: 'varies',
+      source: '古茗会员日'
+    },
+    {
+      id: 'yihetang', name: '益禾堂', emoji: '🥤', cat: '饮品',
+      place: '门店 / 外卖 App',
+      title: '半价 / 买一送一（每月 18 号）',
+      rule: { type: 'monthly', day: 18 },
+      what: '每月 18 号益禾堂半价或买一送一',
+      how: '每月 18 号益禾堂会员活动，指定饮品半价 / 买一送一',
+      tip: '指定单品参与，拼单更值；别为凑单多喝',
+      coach: '益禾堂 18 号活动力度大，但每月 1 次足够。',
+      certainty: 'varies',
+      source: '益禾堂会员日'
+    },
+    {
+      id: 'haoxianglai', name: '好想来', emoji: '🛒', cat: '零食',
+      place: '门店',
+      title: '88 折（每月 8 号）',
+      rule: { type: 'monthly', day: 8 },
+      what: '每月 8 号好想来全场 88 折',
+      how: '每月 8 号去好想来囤零食，结算 88 折；比平时省 12%',
+      tip: '零食是隐形支出，只在清单内的东西上享受折扣，别顺手多拿',
+      coach: '好想来 8 号 88 折适合囤清单零食，但别逛着逛着拿一堆。',
+      certainty: 'stable',
+      source: '好想来会员日'
+    },
+    {
+      id: 'dicos', name: '德克士', emoji: '🍗', cat: '快餐',
+      place: '门店 / 外卖 App',
+      title: '买一送一（每月 18 号）',
+      rule: { type: 'monthly', day: 18 },
+      what: '每月 18 号德克士指定单品买一送一',
+      how: '每月 18 号德克士会员活动，鸡块 / 汉堡常买一送一',
+      tip: '指定单品参与，拼单更值；和益禾堂 18 号错峰安排',
+      coach: '德克士 18 号买一送一适合拼单，但别每月都冲。',
+      certainty: 'varies',
+      source: '德克士会员日'
+    },
+    {
+      id: 'haidilao', name: '海底捞', emoji: '🍲', cat: '聚餐',
+      place: '门店（需学生认证）',
+      title: '大学生 69 折（工作日 14-17 & 22 后）',
+      rule: { type: 'weekly', weekday: [1, 2, 3, 4, 5] },
+      what: '工作日 14:00-17:00 及 22:00 后，大学生认证 69 折',
+      how: '用学生证 / 学信网认证后，工作日下午茶段或夜宵段去海底捞打 69 折',
+      tip: '仅工作日、且限指定时段；周末和饭点不打折。先确认门店参与再约人',
+      coach: '海底捞大学生 69 折很香，但只在工作日非饭点，约人前先算好时段。',
+      certainty: 'stable',
+      source: '海底捞大学生优惠'
+    },
     {
       id: 'zym', name: '赵一鸣零食', emoji: '🍬', cat: '零食',
       place: '阳光广场',
@@ -200,6 +381,17 @@
     return w === 0 ? 7 : w;
   }
 
+  /** 行内小图标（与 app.js 的 ic 同义；模块独立闭包不能跨文件取名） */
+  function dlIcon(name, cls, label) {
+    var D = (typeof module !== 'undefined' && module.exports) ? require('./data.js') : global.AJ.data;
+    return D.inlineIcon('i-' + name, cls, label);
+  }
+
+  /** 条目小图标：优先线性 svg（it.icon），没有才用 emoji（商户插画，如 🍗 肯德基） */
+  function itemIcon(it, cls) {
+    return it && it.icon ? dlIcon(it.icon, cls, null) : esc(it && it.emoji ? it.emoji : '');
+  }
+
   function weekdayCn(d) { return WEEK_CN[toDate(d).getDay()]; }
 
   /* ================================================================== */
@@ -217,7 +409,10 @@
   function matchRule(m, d) {
     var r = m.rule || {};
     if (r.type === 'always') { return true; }
-    if (r.type === 'weekly') { return isoWeekday(d) === r.weekday; }
+    if (r.type === 'weekly') {
+      if (Array.isArray(r.weekday)) { return r.weekday.indexOf(isoWeekday(d)) !== -1; }
+      return isoWeekday(d) === r.weekday;
+    }
     if (r.type === 'monthly') { return toDate(d).getDate() === r.day; }
     return false;
   }
@@ -268,17 +463,17 @@
         place: m.place || '', coach: m.coach || '',
         title: m.title, what: m.what, how: m.how, tip: m.tip,
         certainty: m.certainty, source: m.source,
-        tag: isAlways ? '常驻' : (m.rule.type === 'weekly' ? '每周' + WEEK_CN[m.rule.weekday % 7] : '每月 ' + m.rule.day + ' 号')
+        tag: isAlways ? '常驻' : (m.rule.type === 'weekly' ? (Array.isArray(m.rule.weekday) ? '工作日' : '每周' + WEEK_CN[m.rule.weekday % 7]) : '每月 ' + m.rule.day + ' 号')
       });
     }
     var np = nextPromo(d);
     if (np && np.days === 0) {
-      out.push({ type: 'promo', id: np.promo.id, name: '电商大促', emoji: '🔥', cat: '电商',
+      out.push({ type: 'promo', id: np.promo.id, name: '电商大促', icon: 'spark', cat: '电商',
         title: np.promo.name + ' 当天', what: np.promo.depth, how: '当天为正式活动日，注意尾款与满减门槛',
         tip: '大促当天不是所有品类都最便宜，先看历史价再下单', certainty: 'stable',
         source: '平台官方活动页', tag: '今天' });
     } else if (np && np.days === np.promo.warmup) {
-      out.push({ type: 'promo', id: np.promo.id, name: '电商大促', emoji: '⏳', cat: '电商',
+      out.push({ type: 'promo', id: np.promo.id, name: '电商大促', icon: 'clock', cat: '电商',
         title: np.promo.name + ' 预热开始（还有 ' + np.days + ' 天）', what: np.promo.depth,
         how: '先加购物车、领券，正式开卖再付；注意预售价与定金规则',
         tip: '预热期的"预售价"未必最低，别被倒计时催着下单', certainty: 'stable',
@@ -628,7 +823,7 @@
     } else if (mode === 'total_nospec') {
       headline = tag(best) + ' 到手价最低 ' + fmt(best.eff) + ' 元' +
         (multi ? '，比最贵的 [' + worst.platform + '] 省 ' + fmt(save) + ' 元' : '') + '。';
-      sublines.push('⚠ 你没给规格（多少包 / 多少 ml），如果各家规格不一样，这个总价差没意义——补上规格我按单价重算。');
+      sublines.push('你没给规格（多少包 / 多少 ml），如果各家规格不一样，这个总价差没意义——补上规格我按单价重算。');
     } else if (multi) {
       headline = tag(best) + ' 到手价最低 ' + fmt(best.eff) + ' 元，比最贵的 [' + worst.platform + '] 省 ' + fmt(save) + ' 元。';
     } else if (rows.length >= 2) {
@@ -774,7 +969,7 @@
     var np = nextPromo(d);
 
     var html = '<div class="deals-card">';
-    html += '<div class="deals-card-head"><b>🛒 省钱雷达</b><span>' + dateKey(d) + ' ' + weekdayCn(d) + '</span></div>';
+    html += '<div class="deals-card-head"><b>' + dlIcon('radar') + '省钱雷达</b><span>' + dateKey(d) + ' ' + weekdayCn(d) + '</span></div>';
 
     if (np) {
       html += '<div class="deals-promo">' +
@@ -787,7 +982,7 @@
       html += '<div class="deals-sec">今天的限时活动</div>';
       limited.forEach(function (it) {
         html += '<div class="deals-item">' +
-          '<div class="di-top"><span class="di-emoji">' + esc(it.emoji) + '</span>' +
+          '<div class="di-top"><span class="di-emoji">' + itemIcon(it) + '</span>' +
           '<b>' + esc(it.name) + ' · ' + esc(it.title) + '</b>' +
           '<span class="di-tag">' + esc(it.tag) + '</span></div>' +
           '<p>' + esc(it.what) + '</p>' +
@@ -802,7 +997,7 @@
     if (always.length) {
       html += '<div class="deals-sec">常驻优惠（不用等）</div><div class="deals-always">';
       always.slice(0, 5).forEach(function (it) {
-        html += '<span class="deals-pill">' + esc(it.emoji) + ' ' + esc(it.name) + '·' + esc(it.title) + '</span>';
+        html += '<span class="deals-pill">' + itemIcon(it) + ' ' + esc(it.name) + '·' + esc(it.title) + '</span>';
       });
       html += '</div>';
     }
@@ -823,7 +1018,7 @@
     var isToday = isoWeekday(d) === 4;
     var delta = daysBetween(d, next);
     var html = '<div class="deals-card">';
-    html += '<div class="deals-card-head"><b>🍗 疯狂星期四</b><span>' + dateKey(d) + ' ' + weekdayCn(d) + '</span></div>';
+    html += '<div class="deals-card-head"><b>' + dlIcon('cat-food') + '疯狂星期四</b><span>' + dateKey(d) + ' ' + weekdayCn(d) + '</span></div>';
     if (isToday) {
       html += '<p class="deals-hl">今天就是周四——想吃就今天去，别拖到明天。</p>';
     } else {
@@ -848,7 +1043,7 @@
     var band = findBand(item);
     var t = timingAdvice(budget || 0, date);
     var html = '<div class="deals-card">';
-    html += '<div class="deals-card-head"><b>🔍 比价 · ' + esc(item || '这个商品') + '</b><span>' + dateKey(date || new Date()) + '</span></div>';
+    html += '<div class="deals-card-head"><b>' + dlIcon('scale') + '比价 · ' + esc(item || '这个商品') + '</b><span>' + dateKey(date || new Date()) + '</span></div>';
     if (band) {
       html += '<p class="deals-hl">「' + esc(band.name) + '」主流价格带：入门 ' + band.low[0] + '-' + band.low[1] +
         ' 元 / 中档 ' + band.mid[0] + '-' + band.mid[1] + ' 元 / 高档 ' + band.high[0] + '-' + band.high[1] + ' 元。</p>';

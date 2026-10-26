@@ -1,0 +1,15 @@
+# 依赖
+node_modules/
+__pycache__/
+*.pyc
+
+# 本地配置（含密钥，只提交 .env.example）
+.env
+.env.local
+
+# 截图产物（9MB，评审用图，不入库）
+_shot/
+
+# 系统文件
+.DS_Store
+Thumbs.db

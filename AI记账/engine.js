@@ -274,7 +274,7 @@
       verdict = 'danger';
       noodleDays = remainingDays;
       message = '买完这笔，本周期生活费直接超支 ¥' + fmt1(-afterBalance) +
-        '，接下来 ' + remainingDays + ' 天只能靠 ' + noodleDays + ' 天泡面配食堂免费汤🥲';
+        '，接下来 ' + remainingDays + ' 天只能靠 ' + noodleDays + ' 天泡面配食堂免费汤。';
       return {
         verdict: verdict,
         newDaily: newDaily,
@@ -288,7 +288,7 @@
       verdict = 'danger';
       noodleDays = Math.max(1, Math.ceil((15 - newDaily) / 15 * remainingDays));
       message = '买完这笔，接下来 ' + remainingDays + ' 天日均只剩 ¥' + fmt1(newDaily) +
-        '。真买的话大概要 ' + noodleDays + ' 天泡面配食堂免费汤🥲';
+        '。真买的话大概要 ' + noodleDays + ' 天泡面配食堂免费汤。';
     } else if (newDaily < 30) {
       verdict = 'tight';
       message = '买完这笔，接下来 ' + remainingDays + ' 天日均只剩 ¥' + fmt1(newDaily) +
@@ -296,7 +296,7 @@
     } else {
       verdict = 'ok';
       message = '买完这笔，接下来 ' + remainingDays + ' 天日均还有 ¥' + fmt1(newDaily) +
-        '，问题不大，放心买 ✅';
+        '，问题不大，放心买。';
     }
 
     return {
@@ -383,6 +383,10 @@
    * @return {{expense:number,income:number,count:number,byCategory:Object,dailyMap:Object}}
    */
   function aggregate(bills, startDate, endDate) {
+    /* 容错：调用方若传 Date，内部比较（b.date 是 YYYY-MM-DD 字符串）会静默失效、
+       退化成统计全量账单。这里统一归一到日期串，避免周期/环比口径算错。 */
+    if (startDate instanceof Date) { startDate = formatDate(startDate); }
+    if (endDate instanceof Date) { endDate = formatDate(endDate); }
     var result = {
       expense: 0,
       income: 0,
