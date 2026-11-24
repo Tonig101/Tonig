@@ -1653,16 +1653,16 @@ var CP=[
 ['战时生产委员会','War Production Board','U','I',2,4,4,1,0,'','每当友方单位部署，返还1点指挥点（每回合最多3次）。','',2,'refundOnDeploy'],
 ['第82空降师','82nd Airborne','U','I',3,3,5,1,0,'B','闪击。部署：抽一张牌。每当友方单位部署，本单位+1/+1。','draw1',2,'growOnAllyDeploy'],
 ['乌拉尔工厂委员会','Ural Factory Committee','S','I',2,3,4,1,0,'','每当友方单位部署，本单位+1/+1。','',2,'growOnAllyDeploy'],
-['闪电集结','Blitz Rally','D','X',2,'triggerDeploy','紧急集结：触发一次友方部署响应（部署受益单位成长，黄蜂打脸）。','always','',2],
-['钢铁葬礼','Iron Funeral','D','X',3,'triggerDeath','提前引爆一个随机友方单位的亡计，该单位随后受1点伤害。','always','',2],
-['动员号令','Mobilization Order','S','X',2,'triggerDeploy','紧急集结：触发一次友方部署响应（部署受益单位成长，黄蜂打脸）。','always','',2],
-['近卫挽歌','Guards Elegy','S','X',3,'triggerDeath','提前引爆一个随机友方单位的亡计，该单位随后受1点伤害。','always','',2],
-['工业调度','Industrial Dispatch','U','X',2,'triggerDeploy','紧急集结：触发一次友方部署响应（部署受益单位成长，黄蜂打脸）。','always','',2],
-['荣誉退役','Honorable Discharge','U','X',3,'triggerDeath','提前引爆一个随机友方单位的亡计，该单位随后受1点伤害。','always','',2],
-['本土动员','Home Guard Rally','B','X',2,'triggerDeploy','紧急集结：触发一次友方部署响应（部署受益单位成长，黄蜂打脸）。','always','',2],
-['皇家葬礼','Royal Funeral','B','X',3,'triggerDeath','提前引爆一个随机友方单位的亡计，该单位随后受1点伤害。','always','',2],
-['体现集结','Spirit Rally','J','X',2,'triggerDeploy','紧急集结：触发一次友方部署响应（部署受益单位成长，黄蜂打脸）。','always','',2],
-['菊水诀别','Kikusui Farewell','J','X',3,'triggerDeath','提前引爆一个随机友方单位的亡计，该单位随后受1点伤害。','always','',2],
+['闪电集结','Blitz Rally','D','X',2,'blitzRally','闪击号令：全体友方地面单位本回合行动费-1并获得闪击。','always','',2],
+['钢铁葬礼','Iron Funeral','D','X',3,'tankFuneral','悼念：全体友方坦克获得+2/+2。','always','',2],
+['动员号令','Mobilization Order','S','X',2,'mobilizeRally','动员：在支援阵线加入2个1/1闪击动员兵。','always','',2],
+['近卫挽歌','Guards Elegy','S','X',3,'guardElegy','挽歌：总部回复5生命，全体友军+1/+1。','always','',2],
+['工业调度','Industrial Dispatch','U','X',2,'refundRally','调度：返还本回合已花费指挥点的一半，并抽一张牌。','always','',2],
+['荣誉退役','Honorable Discharge','U','X',3,'honorDischarge','荣誉：抽两张牌，全体友军+1攻击力。','always','',2],
+['本土动员','Home Guard Rally','B','X',2,'guardRally','堡垒：全体友军+0/+3并获得守护。','always','',2],
+['皇家葬礼','Royal Funeral','B','X',3,'royalFuneral','葬礼：全体友军+0/+4并获得守护。','always','',2],
+['体现集结','Spirit Rally','J','X',2,'sacrificeRally','玉碎前夜：牺牲一个随机友军，全体友军+2/+2。','always','',2],
+['菊水诀别','Kikusui Farewell','J','X',3,'kikusuiFarewell','诀别：牺牲一个友军，对敌方总部造成其攻击力3倍的伤害。','always','',2],
 ['虎王坦克','King Tiger','D','T',6,8,9,2,3,'H','重甲3。亡计：对敌方全体单位造成3点伤害。','dr_dmg3all',1,''],
 ['V-2火箭','V-2 Rocket','D','X',8,'dmg6hq','对敌方总部造成6点伤害。','always','',1],
 ['IS-7重型坦克','IS-7 Heavy Tank','S','T',7,8,9,2,3,'H','重甲3。每当友方单位死亡，本单位+2/+2。','',1,'growOnAllyDeath'],
@@ -4304,30 +4304,86 @@ var GAME={
             GAME.log('\uD83C\uDF39 玉碎总攻：牺牲'+s.cn+'，敌方全体2伤','effect');
           })();
         }
-        // ===== 非指向触发指令 =====
-        // triggerDeploy：模拟一次友方部署，触发部署受益件（SAS/克伦威尔/黄蜂等），不实际放置单位
-        if(code==='triggerDeploy'){
-          (function(){
-            if(typeof GAME.triggerPassive==='function')GAME.triggerPassive('allyDeploy',{owner:who,actor:null});
-            var wespes=who.allUnits().filter(function(u){return u.effCode==='deployPingHQ'&&u.hp>0});
-            wespes.forEach(function(ws){opp.hp-=1;GAME.log('\uD83D\uDC9B 黄蜂响应集结：敌方总部-1','effect')});
-            var nth=who.allUnits().filter(function(u){return u.passive&&u.passive.indexOf('growOnAllyDeploy')>=0&&u.hp>0}).length;
-            GAME.log('\uD83D\uDCE2 紧急集结：触发部署响应（'+nth+'个受益单位）','effect');
-          })();
+        // ===== 差异化集结/葬礼指令（各国不同机制，非换皮）=====
+        // 德·闪电集结：全体友方地面单位本回合行动费-1并获闪击
+        if(code==='blitzRally'){
+          who.allUnits().filter(function(u){return u.hp>0&&(u.isI||u.isT||u.isA)}).forEach(function(u){
+            u.tmpAcost=(u.tmpAcost||0)+1;if(u.kw.indexOf('B')<0)u.kw+='B';u.hasB=true;
+          });
+          GAME.log('\u26A1 闪电集结：全体地面单位本回合行动费-1并获闪击','effect');
         }
-        // triggerDeath：对随机一个友方单位触发其亡计效果，随后该单位受1点伤害
-        if(code==='triggerDeath'){
-          (function(){
-            var us=who.allUnits().filter(function(u){return u.hp>0&&u.effCode&&u.effCode.indexOf('dr_')===0});
-            if(!us.length){GAME.log('触发亡计：无带亡计的友方单位','system');return}
-            var t=us[Math.floor(Math.random()*us.length)];
-            GAME.triggerDeathrattle(t,who);
-            _applyDmg(t,1);
-            GAME.cleanup(who,0);
-            GAME.log('\uD83D\uDC80 '+t.cn+' 亡计被提前引爆（自身-1血）','effect');
-          })();
+        // 苏·动员号令：加入2个1/1闪击动员兵
+        if(code==='mobilizeRally'){
+          for(var mr=0;mr<2&&who.support.length<4;mr++){
+            if('Mobilized Infantry'&&CP){
+              var mc=new Card(['动员兵','Mobilized Infantry','S','I',1,1,1,1,0,'','动员（每回合累积+1/+1，受伤停止但保留）。亡计：对随机敌方单位造成2点伤害。','dr_dmg2',4,'mobilize']);
+              mc.owner=who;mc.zone='support';mc.supSide=mr%2?'R':'L';mc.justDeployed=true;mc.joinedNotDeployed=true;
+              if(!mc.canActOnDeploy){mc.canAct=false;mc.apSpent=99}
+              who.support.push(mc);
+            }
+          }
+          GAME.log('\uD83D\uDCE2 动员号令：加入2个闪击动员兵','effect');
         }
-
+        // 美·工业调度：返还本回合已花费指挥点的一半 + 抽1
+        if(code==='refundRally'){
+          var spent=Math.max(0,who.maxCmd-who.cmd);
+          var back=Math.floor(spent/2);
+          who.cmd=Math.min(who.maxCmd,who.cmd+back);who.draw(1);
+          GAME.log('\uD83C\uDFED 工业调度：返还'+back+'点指挥点，抽1张牌','effect');
+        }
+        // 英·本土动员：全体友军+0/+3并获得守护
+        if(code==='guardRally'){
+          who.allUnits().filter(function(u){return u.hp>0}).forEach(function(u){
+            u.hp+=3;u.maxHp+=3;if(u.kw.indexOf('G')<0){u.kw+='G';u.hasG=true}
+          });
+          GAME.log('\uD83D\uDEE1 本土动员：全体友军+0/+3并获得守护','effect');
+        }
+        // 日·体现集结：牺牲一个随机友军，全体友军+2/+2
+        if(code==='sacrificeRally'){
+          var sac=who.allUnits().filter(function(u){return u.hp>0});
+          if(sac.length){
+            var s=sac[Math.floor(Math.random()*sac.length)];s.hp=0;
+            GAME.triggerPassive('allySacrifice',{owner:who,actor:s});
+            GAME.triggerDeathrattle(s,who);GAME.cleanup(who,0);
+          }
+          who.allUnits().filter(function(u){return u.hp>0}).forEach(function(u){u.atk+=2;u.hp+=2;u.maxHp+=2});
+          GAME.log('\uD83C\uDF39 体现集结：牺牲友军，全体友军+2/+2','effect');
+        }
+        // 德·钢铁葬礼：全体友方坦克+2/+2
+        if(code==='tankFuneral'){
+          who.allUnits().filter(function(u){return u.hp>0&&u.isT}).forEach(function(u){u.atk+=2;u.hp+=2;u.maxHp+=2});
+          GAME.log('\u2694 钢铁葬礼：全体友方坦克+2/+2','effect');
+        }
+        // 苏·近卫挽歌：总部回5 + 全体友军+1/+1
+        if(code==='guardElegy'){
+          who.hp=Math.min(who.maxHp,who.hp+5);var ge=findHQEl(who);if(ge)floatDamage(ge,5,'heal');
+          who.allUnits().filter(function(u){return u.hp>0}).forEach(function(u){u.atk+=1;u.hp+=1;u.maxHp+=1});
+          GAME.log('\u2728 近卫挽歌：总部回复5生命，全体友军+1/+1','effect');
+        }
+        // 美·荣誉退役：抽2张牌，全体友军+1攻击
+        if(code==='honorDischarge'){
+          who.draw(2);
+          who.allUnits().filter(function(u){return u.hp>0}).forEach(function(u){u.atk+=1});
+          GAME.log('\uD83C\uDF96 荣誉退役：抽2张牌，全体友军+1攻击','effect');
+        }
+        // 英·皇家葬礼：全体友军+0/+4并获得守护
+        if(code==='royalFuneral'){
+          who.allUnits().filter(function(u){return u.hp>0}).forEach(function(u){
+            u.hp+=4;u.maxHp+=4;if(u.kw.indexOf('G')<0){u.kw+='G';u.hasG=true}
+          });
+          GAME.log('\uD83D\uDEE1 皇家葬礼：全体友军+0/+4并获得守护','effect');
+        }
+        // 日·菊水诀别：牺牲一个友军，对敌方总部造成其攻击力×3
+        if(code==='kikusuiFarewell'){
+          var ks=who.allUnits().filter(function(u){return u.hp>0&&u.atk>0});
+          if(ks.length){
+            var k=ks[Math.floor(Math.random()*ks.length)];var kdmg=k.atk*3;
+            k.hp=0;GAME.triggerPassive('allySacrifice',{owner:who,actor:k});
+            GAME.triggerDeathrattle(k,who);GAME.cleanup(who,0);
+            opp.hp-=kdmg;var ke=findHQEl(opp);_chainDmgFX(ke,[{isHq:true,owner:opp,dmg:kdmg}]);
+            GAME.log('\uD83C\uDF39 菊水诀别：牺牲'+k.cn+'，敌方总部-'+kdmg,'effect');
+          }else GAME.log('菊水诀别：无可牺牲的攻击单位','system');
+        }
         // ===== 终端卡指令效果 =====
         if(code==='dmg6hq'||code==='dmg5hq'||code==='dmg4hq'){
           var n=code==='dmg6hq'?6:(code==='dmg5hq'?5:4);
