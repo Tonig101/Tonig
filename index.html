@@ -1571,7 +1571,7 @@ var CP=[
 ['M3斯图亚特','M3 Stuart','U','T',2,2,2,1,0,'B','闪击。友方攻击总部时，所有友方坦克+1/+1。','',3,'allyHQAtkBuffTanks'],
 ['M7牧师自行火炮','M7 Priest','U','A',3,4,4,1,0,'','部署：从己方卡组开发1张指令牌到手牌。','develop',2],
 ['P-47雷电','P-47 Thunderbolt','U','F',4,4,4,2,0,'','友方攻击总部时，本单位+1/+1。','',3,'allyHQAtkBuff'],
-['十字军坦克','Crusader','B','T',2,4,4,1,0,'GB','闪击。守护。老兵（回合开始）。升为老兵时抽1张牌。','vet_turn_draw',2],
+['十字军坦克','Crusader','B','T',3,4,4,1,0,'GB','闪击。守护。老兵（回合开始）。升为老兵时抽1张牌。','vet_turn_draw',2],
 ['台风战斗机','Typhoon','B','F',5,4,5,2,0,'F','奋战。本回合每有1个友方单位行动过，本单位行动费-1。','',2,'allyActDiscount'],
 ['皇家西非边防军','RWAFF','B','I',2,4,3,1,0,'','部署：从己方卡组开发1张指令牌到手牌。','develop',2],
 ['蒙哥马利','Montgomery','B','I',3,7,5,2,0,'','友方单位攻击时+1攻。','',1,'allyHQAtkBuff'],
@@ -1593,7 +1593,7 @@ var CP=[
 ['近卫摩托化团','Guards Motorized','S','I',3,4,4,1,0,'G','守护。动员（回合开始+1/+1，受伤失去）。失去动员时对攻击者造成2点伤害。','mobilizeGuard',2],
 ['四号坦克H型','Panzer IV Ausf H','D','T',4,6,5,2,1,'H','重甲1。老兵（击杀）：升为老兵时，所有友方坦克+1/+1。','vet_kill_buffTanks',1,''],
 ['旋风防空车','Wirbelwind','D','T',2,5,4,2,1,'','高射炮。免疫：只要友方另有坦克存活则不受伤害。友方坦克受伤时，本单位+1攻击。','',2,'immuneWhenTank,growOnAllyHurtTank'],
-['猎豹坦克歼击车','Jagdpanther','D','T',6,5,7,2,2,'H','重甲2。攻击后移除目标全部重甲。','removeArmor',1,''],
+['猎豹坦克歼击车','Jagdpanther','D','T',7,6,7,2,2,'H','重甲2。攻击后移除目标全部重甲。','removeArmor',1,''],
 ['第738猎兵团','738th Jager','D','I',2,2,2,1,0,'B','闪击。老兵（回合开始）：升为老兵时，所有友方步兵本回合行动费-1。','vet_turn_discountInf',3,''],
 ['侦察报告','Intel Report D','D','X',2,'revealHand','侦察：查看敌方全部手牌。','always','',2],
 ['天气预报','Forecast D','D','X',3,'forecast','预报：选择天气，从三张天气牌中选一张加入手牌。','always','',2],
@@ -1613,7 +1613,7 @@ var CP=[
 ['战利品收缴','Confiscation S','S','X',4,'dmg2allSelf1','牺牲：敌方全体2伤，己方总部1伤。','enemyHasUnit','无敌方单位',2],
 ['谢尔曼狂怒','Sherman Easy Eight','U','T',5,6,6,2,2,'H','重甲2。老兵（击杀）：升为老兵时抽一张牌。','vet_kill_draw',1,''],
 ['M18地狱猫','M18 Hellcat','U','T',4,3,4,1,0,'B','闪击。攻击后抑制目标：清除其词条并重置属性。','suppress',2,''],
-['第101空降师','101st Airborne','U','I',4,5,5,1,0,'','部署：牺牲一个友方单位，本单位+3/+3。','sacrificeDeploy',2,''],
+['第101空降师','101st Airborne','U','I',4,6,5,1,0,'','部署：牺牲一个友方单位，本单位+4/+4并获得闪击。','sacrificeDeployBuff',2,''],
 ['游骑兵突击营','Ranger Assault Bn','U','I',3,3,3,1,0,'','老兵（回合开始）：升为老兵时，所有友方步兵+1/+1。','vet_turn_buffAllInf',2,''],
 ['空中侦察','Intel Report U','U','X',2,'cmd1','战争机器：额外指挥点槽+1。','cmdSlotBelow10','已达上限',2],
 ['气象预报','Forecast U','U','X',3,'cmd2Draw1Next','战争债券：额外指挥点槽+2，下回合抽1张牌。','always','',2],
@@ -3927,7 +3927,7 @@ var GAME={
   // ---------- 效果目标系统 ----------
   // 判断效果代码是否需要玩家选择目标
   isTargetedEffect:function(code){
-    return{dmg1:1,dmg2:1,heal2:1,buff1:1,buff22_selfDmg2:1,dmg2bomber:1,dmg2fighter:1,kill2c:1,destroyLowAtk:1,dmg1self1draw1:1,pin1:1,pinAtk2:1,bounceEnemyGround:1,killAir:1,dmg2t4:1,dmg1tank:1,removeArmor:1,buffBomber:1,shareBuff:1,sacrificeDeploy:1,pincer:1,pingDraw:1,suppressOrder:1,confiscateOrder:1}[code]||0;
+    return{dmg1:1,dmg2:1,heal2:1,buff1:1,buff22_selfDmg2:1,dmg2bomber:1,dmg2fighter:1,kill2c:1,destroyLowAtk:1,dmg1self1draw1:1,pin1:1,pinAtk2:1,bounceEnemyGround:1,killAir:1,dmg2t4:1,dmg1tank:1,removeArmor:1,buffBomber:1,shareBuff:1,sacrificeDeploy:1,sacrificeDeployBuff:1,pincer:1,pingDraw:1,suppressOrder:1,confiscateOrder:1}[code]||0;
   },
   // 获取效果的合法目标列表
   getEffectTargets:function(code,owner){
@@ -3950,7 +3950,7 @@ var GAME={
       case'killAir':return opp.allUnits().filter(function(u){return(u.isF||u.isO)&&u.hp>0});
       case'shareBuff':return allies.filter(function(u){return u.hp>0&&u.isUnit});
       case'pincer':return allies.filter(function(u){return u.hp>0&&u.isUnit});
-      case'sacrificeDeploy':return owner.allUnits().filter(function(u){return u.hp>0&&u.isUnit});
+      case'sacrificeDeploy':case'sacrificeDeployBuff':return owner.allUnits().filter(function(u){return u.hp>0&&u.isUnit});
       case'suppressOrder':case'confiscateOrder':return opp.allUnits().filter(function(u){return u.hp>0&&u.isUnit});
       default:return[];
     }
@@ -4057,6 +4057,20 @@ var GAME={
           target.hp=0;
           if(typeof GAME.triggerPassive==='function')GAME.triggerPassive('allySacrifice',{owner:owner,actor:target});
           GAME.log('\uD83C\uDFAF 牺牲'+target.cn+'，对敌方'+atk+'点伤害','effect');
+        })();break;
+      case'sacrificeDeployBuff':
+        // 精锐空降：牺牲选定友军，自身+4/+4并获闪击
+        (function(){
+          if(target===sourceCard||target.uid===sourceCard.uid)return;
+          target.hp=0;
+          if(typeof GAME.triggerPassive==='function')GAME.triggerPassive('allySacrifice',{owner:owner,actor:target});
+          GAME.triggerDeathrattle(target,owner);
+          if(sourceCard&&sourceCard.hp>0){
+            sourceCard.atk+=4;sourceCard.hp+=4;sourceCard.maxHp+=4;
+            if(sourceCard.kw.indexOf('B')<0)sourceCard.kw+='B';
+            sourceCard.hasB=true;sourceCard.canAct=true;
+          }
+          GAME.log('\uD83C\uDF96 精锐空降：牺牲'+target.cn+'，本单位+4/+4并获得闪击','effect');
         })();break;
       case'pincer':
         // 钳击：部署单位与选定友军结对，双方各+2/+2；一方离场则另一方失去加成
