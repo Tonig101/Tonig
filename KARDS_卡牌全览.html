@@ -232,6 +232,7 @@ hr{border:none;border-top:1px solid #2a2d3a;margin:20px 0}
   <td class="left">第738猎兵团</td><td class="left">738th Jager</td><td class="ut-i">步兵</td><td>2</td><td>2</td><td class="cost low">2</td><td>1</td><td>0</td><td><span class="kw B">闪击</span></td><td class="limit x3">3</td><td class="eff"><span class="star">&#x2726;</span> 闪击。老兵（回合开始）：升为老兵时，所有友方步兵本回合行动费 -1。</td>
 </tr>
 <tr><td class="left">虎王坦克</td><td class="left">King Tiger</td><td class="ut-t">坦克</td><td>6</td><td>8</td><td class="cost low">9</td><td>2</td><td>3</td><td><span class="kw H">H</span></td><td class="limit x1">1</td><td class="eff"><span class="star">&#x2726;</span> 重甲3。亡计：对敌方全体单位造成3点伤害。</td></tr>
+<tr><td class="left">钳击小队</td><td class="left">Pincer Squad</td><td class="ut-i">步兵</td><td>4</td><td>4</td><td class="cost low">3</td><td>1</td><td>0</td><td><span class="kw P">钳击</span></td><td class="limit x2">2</td><td class="eff"><span class="star">&#x2726;</span> 钳击：部署时选一个友方单位结对，双方+1/+1；其中一方死亡则双方失去加成。</td></tr>
 </tbody>
 </table>
 </div>
@@ -998,6 +999,7 @@ var IMG_MAP={
   'Atlantic Wall':'images/UK/6f32bee126db466a874ea8a4d67409e3.jpeg~tplv-a9rns2rl98-cthumb_lwm3.png',
   'Yamato Battleship':'images/Japan/cca3f8e81e1f40678df9de915020ba3c.jpeg~tplv-a9rns2rl98-cthumb_lwm3.png',
   'Kikusui All-Out':'images/Japan/f1dd04e7928e4dd5b7fb23dff07a3036.jpeg~tplv-a9rns2rl98-cthumb_lwm3.png',
+  'Pincer Squad':'images/Germany/D_A_Wespe.jpg',
   '30th Infantry Regiment':'images/Germany/D_I_30thInfantry.jpg',
   'Panther':'images/Germany/D_T_PantherZimmerit.jpg',
   'Sd Kfz 231':'images/Germany/D_T_SdKfz231.jpg',
@@ -1179,6 +1181,7 @@ function goTo(id){
     <div class="kw-row"><span class="kw-tag-big S">烟幕</span><div class="kw-desc">拥有烟幕的单位或总部<b>无法被敌方单位攻击</b>。单位攻击或移动后<b>失去烟幕</b>。守护单位、位于前线的单位以及战斗机<b>不能具有烟幕</b>。</div></div>
     <div class="kw-row"><span class="kw-tag-big F">奋战</span><div class="kw-desc">每回合可以<b>攻击两次</b>。</div></div>
     <div class="kw-row"><span class="kw-tag-big C">冲击</span><div class="kw-desc">冲击单位首次攻击时，被攻击单位<b>不会造成任何反击伤害</b>。冲击单位攻击单位后，<b>移除冲击</b>。</div></div>
+    <div class="kw-row"><span class="kw-tag-big P">钳击</span><div class="kw-desc">部署时<b>选择一个友方单位结对</b>，双方获得钳击描述的加成（如 +1/+1）。<b>其中一方离场，双方同时失去加成</b>。</div></div>
     <div style="text-align:center;color:var(--y);font-size:.78rem;font-weight:900;margin:16px 0 6px">★ 新增机制（当代实战设计）</div>
     <div class="kw-row"><span class="kw-tag-big" style="background:rgba(249,199,79,.2);color:#fb4">老兵</span><div class="kw-desc">部分单位可在满足<b>各自卡面指定的条件</b>（回合开始 / 击杀 / 受伤）后升为老兵，获得 +1/+1 永久强化，并触发额外效果（抽牌 / 获得闪击 / 强化友军等）。<b>升级条件因卡而异</b>，晋升后卡面显示金色 <b>★老兵</b> 标记。</div></div>
     <div class="kw-row"><span class="kw-tag-big" style="background:rgba(255,120,120,.15);color:#f88">免疫（条件）</span><div class="kw-desc">满足条件时<b>不受伤害</b>，但仍可被<b>压制、弹回、消灭类指令</b>反制。旋风防空车需<b>友方另有坦克存活</b>才免疫——清掉掩护坦克或用消灭指令即可反制。</div></div>

@@ -1441,7 +1441,7 @@ var IMG_MAP={
 };
 var UI={I:'\uD83E\uDE96',T:'\uD83D\uDEE1\uFE0F',A:'\uD83D\uDCA3',F:'\u2708\uFE0F',O:'\uD83D\uDE80',X:'\uD83D\uDCDC'};
 var UT_DESC={I:{sub:'地面单位 \u00B7 陆军',desc:'最基础的<b>陆军单位</b>，是卡组最常见的组成部分。',range:'仅相邻战线',move:'移动或攻击二选一',counter:'正常受反击',guard:'受守护影响'},T:{sub:'地面单位 \u00B7 装甲',desc:'高机动性的<b>陆军单位</b>，可在<b>同一回合中移动和攻击</b>，顺序不限。',range:'仅相邻战线',move:'可移动+攻击',counter:'正常受反击',guard:'受守护影响'},A:{sub:'地面单位 \u00B7 支援',desc:'支援阵线即可直接攻击任意战线。可<b>无视守护</b>，<b>不受反击也不造成反击</b>。',range:'任意战线',move:'移动或攻击二选一',counter:'不受反击',guard:'无视守护'},F:{sub:'空军单位 \u00B7 制空',desc:'<b>空军单位</b>，可向任意战线发起攻击。可<b>拦截同战线敌方轰炸机</b>。',range:'任意战线',move:'移动或攻击二选一',counter:'正常受反击',guard:'受守护影响'},O:{sub:'空军单位 \u00B7 轰炸',desc:'<b>空军单位</b>，可攻击任意战线。<b>无视守护</b>，<b>不受反击</b>（打战斗机除外）。',range:'任意战线',move:'移动或攻击二选一',counter:'不受反击*',guard:'无视守护'}};
-var KW={G:'\uD83D\uDEE1守护',B:'\u26A1闪击',H:'\uD83D\uDEE1重甲',A:'\u2694伏击',S:'\uD83D\uDCA8烟幕',F:'\u2694奋战',C:'\u26A1冲击',M:'\u26F0山地'};
+var KW={G:'\uD83D\uDEE1守护',B:'\u26A1闪击',H:'\uD83D\uDEE1重甲',A:'\u2694伏击',S:'\uD83D\uDCA8烟幕',F:'\u2694奋战',C:'\u26A1冲击',M:'\u26F0山地',P:'⚔钳击'};
 var KW_EN={G:'Guard',B:'Blitz',H:'Heavy Armor',A:'Ambush',S:'Smokescreen',F:'Fury',C:'Charge',M:'Mountain'};
 /* ===== 战斗词条加粗 ===== */
 // 将效果文本中的战斗词条（部署/亡计/闪击等）加粗高亮
@@ -1672,7 +1672,8 @@ var CP=[
 ['兰卡斯特编队','Lancaster Formation','B','O',6,9,9,2,0,'','部署：对敌方总部造成5点伤害。','dmg5hq',1,''],
 ['大西洋壁垒','Atlantic Wall','B','X',8,'guardWall','全体友方单位获得守护并重甲+2。','selfHasUnit','己方无单位',1],
 ['大和号战列舰','Yamato Battleship','J','O',7,7,9,2,2,'H','重甲2。每当友方单位死亡，对敌方总部造成2点伤害。','',1,'hqOnAllyDeath'],
-['菊水总攻击','Kikusui All-Out','J','X',8,'sacAllHq','牺牲所有友方单位，每牺牲一个对敌方总部造成3点伤害。','selfHasUnit','己方无单位',1]
+['菊水总攻击','Kikusui All-Out','J','X',8,'sacAllHq','牺牲所有友方单位，每牺牲一个对敌方总部造成3点伤害。','selfHasUnit','己方无单位',1],
+['钳击小队','Pincer Squad','D','I',3,4,4,1,0,'P','钳击：部署时选一个友方单位结对，双方+1/+1；其中一方死亡则双方失去加成。','pincer',2]
 ];
 
 
@@ -1682,7 +1683,7 @@ var DEFAULT_DECKS={
     {id:"r0",builtin:true,name:"闪击快攻",desc:"低费闪击铺场，前压抢节奏",play:"<b>低费闪击抢节奏</b>。国民掷弹兵/伞兵/第30步兵团前压铺场，第30步兵团随己方单位行动不断降费；三号坦克、Sd Kfz 231 闪击抢线，Sd Kfz 231 击杀还能再行动。黄蜂炮兵每部署一个友军就打脸1点。中期 Bf109 制空、四号突击坦克冲击破甲，突然袭击解场、闪电战让重甲当回合出击。",cards:{"国民掷弹兵":4,"第7伞兵团":3,"第30步兵团":3,"三号坦克":2,"Sd Kfz 231装甲车":2,"突击工兵第一团":3,"黄蜂自行火炮":3,"装甲掷弹兵":2,"Bf109":3,"四号突击坦克":2,"突然袭击":4,"闪电战":3,"协同作战":2,"战术打击":3}},
     {id:"r1",builtin:true,name:"重甲推进",desc:"重甲坦坚推进，后期碾压",play:"<b>重甲铁壁碾压</b>。前期国民掷弹兵+突击工兵拖延，豹式存活到回合开始升老兵、给全军高攻单位闪击；虎式重甲扛线、亡计全体2伤清场。88mmFlak 伏击反制冲锋，黄蜂持续打脸。断水封锁破坏手牌、斯图卡俯冲全体3伤收尾，后期靠重甲质量碾压。",cards:{"国民掷弹兵":4,"突击工兵第一团":3,"三号坦克":1,"Sd Kfz 231装甲车":2,"四号突击坦克":2,"豹式坦克（齐默里特）":1,"虎I重型坦克":1,"88毫米高射炮":1,"黄蜂自行火炮":3,"He177":1,"Fw190":2,"Bf109":3,"突然袭击":4,"闪电战":3,"断水封锁":1,"斯图卡俯冲":2,"协同作战":2,"装甲掷弹兵":2,"虎王坦克":1}},
     {id:"r2",builtin:true,name:"制空轰炸",desc:"制空压制配合轰炸直取总部",play:"<b>制空+轰炸直取总部</b>。Bf109/Fw190 争夺制空，Me262 击杀升老兵抽牌形成永动；Ju87斯图卡、Ju88 双层轰炸机持续打脸，V-2火箭终结。黄蜂炮兵配合战术打击清场，闪电战让轰炸机提前起飞。核心是用制空保护轰炸机，把总部血线压到斩杀线。",cards:{"国民掷弹兵":4,"第7伞兵团":3,"第30步兵团":3,"三号坦克":2,"Bf109":3,"Fw190":2,"Me 262喷气战斗机":1,"Ju87斯图卡":2,"Ju 88轰炸机":2,"黄蜂自行火炮":3,"88毫米高射炮":1,"战术打击":3,"斯图卡俯冲":2,"突然袭击":4,"闪电战":3,"V-2火箭":1}},
-    {id:"r3",builtin:true,name:"部署协同",desc:"低费高频部署，每拍一张都触发收益",play:"<b>部署即收益</b>。国民掷弹兵低费铺场抽牌，装甲掷弹兵部署打点（有坦克打2）。黄蜂自行火炮在场时每部署一个友军就打脸1点。突击炮营部署时若步兵+坦克齐备，使一个坦克+3/+3并获得闪击。Bf109 步兵坦克双全时+3/+3。靠连续铺场触发黄蜂打脸，突击炮营与钳击战术把坦克养到巨大，闪电集结让全军当回合出击终结。",cards:{"国民掷弹兵":4,"装甲掷弹兵":2,"突击工兵第一团":3,"三号坦克":2,"四号突击坦克":2,"突击炮营":2,"黄蜂自行火炮":3,"Bf109":3,"Ju 88轰炸机":2,"88毫米高射炮":1,"协同作战":2,"钳击战术":2,"闪电集结":2,"战术打击":2,"第7伞兵团":3,"Sd Kfz 231装甲车":2,"突然袭击":2}}
+    {id:"r3",builtin:true,name:"部署协同",desc:"低费高频部署，每拍一张都触发收益",play:"<b>部署即收益</b>。国民掷弹兵低费铺场抽牌，装甲掷弹兵部署打点（有坦克打2）。黄蜂自行火炮在场时每部署一个友军就打脸1点。突击炮营部署时若步兵+坦克齐备，使一个坦克+3/+3并获得闪击。Bf109 步兵坦克双全时+3/+3。靠连续铺场触发黄蜂打脸，突击炮营与钳击小队把坦克养到巨大，闪电集结让全军当回合出击终结。",cards:{"国民掷弹兵":4,"装甲掷弹兵":2,"突击工兵第一团":3,"三号坦克":2,"四号突击坦克":2,"突击炮营":2,"黄蜂自行火炮":3,"Bf109":3,"Ju 88轰炸机":2,"88毫米高射炮":1,"协同作战":2,"钳击小队":2,"闪电集结":2,"战术打击":2,"第7伞兵团":3,"Sd Kfz 231装甲车":2,"突然袭击":2}}
   ],
   S:[
     {id:"r0",builtin:true,name:"人海洪流",desc:"低费人海铺场，牺牲换取资源",play:"<b>人海铺场+牺牲换资源</b>。动员兵靠动员加成抢节奏，亡计2伤；近卫第8步兵师守护+老兵成长成为前线铁壁。突击工兵、狙击小组低费高效，T34/76 闪击推进且亡计召唤。血红的镰刀1费打1抽1、不惜代价卖血全体2伤。钢铁洪流给坦克+2/+2一波带走。",cards:{"动员兵":4,"近卫第8步兵师":2,"突击工兵":3,"狙击小组":3,"步兵第102团":1,"乌拉尔工兵":1,"近卫摩托化团":2,"ZiS-3":3,"T-34/76":3,"雅克9":2,"米格3战斗机":3,"血红的镰刀":4,"人海战术":1,"冬季攻势":2,"不惜代价":2,"钢铁洪流":2,"IS-7重型坦克":1}},
@@ -3823,7 +3824,11 @@ var GAME={
       if(c.pincerPartnerUid){
         var partner=null;
         [GAME.player,GAME.enemy].forEach(function(sd){if(sd)sd.allUnits().forEach(function(u){if(u.uid===c.pincerPartnerUid)partner=u})});
-        if(partner){partner.atk-=2;partner.hp-=2;partner.maxHp-=2;partner.pincerPartnerUid=0;GAME.log('\u2694 钳击解除：'+partner.cn+' 失去加成','effect')}
+        if(partner){
+          var pa=c.pincerAtk||2,pv=c.pincerHp||2;
+          partner.atk-=pa;partner.hp-=pv;partner.maxHp-=pv;partner.pincerPartnerUid=0;
+          GAME.log('\u2694 钳击解除：'+partner.cn+' 失去+'+pa+'/'+pv+'加成','effect');
+        }
       }
       GAME.log(c.cn+' \uD83D\uDC80 被摧毁','system');
       SFX.play('destroy');
@@ -4073,16 +4078,20 @@ var GAME={
           GAME.log('\uD83C\uDF96 精锐空降：牺牲'+target.cn+'，本单位+4/+4并获得闪击','effect');
         })();break;
       case'pincer':
-        // 钳击：部署单位与选定友军结对，双方各+2/+2；一方离场则另一方失去加成
+        // 钳击：部署时与选定友军结对，双方按卡面"+X/+Y"数值加成；一方离场则双方失去加成
         (function(){
           if(target===sourceCard||target.uid===sourceCard.uid)return;
-          sourceCard.atk+=2;sourceCard.hp+=2;sourceCard.maxHp+=2;
-          target.atk+=2;target.hp+=2;target.maxHp+=2;
+          var pm=(sourceCard.effText||'').match(/\+(\d+)\/(\d+)/);
+          var pn=pm?parseInt(pm[1],10):2;   // 攻击加成
+          var ph=pm?parseInt(pm[2],10):2;   // 生命加成
+          sourceCard.atk+=pn;sourceCard.hp+=ph;sourceCard.maxHp+=ph;
+          target.atk+=pn;target.hp+=ph;target.maxHp+=ph;
           sourceCard.pincerPartnerUid=target.uid;target.pincerPartnerUid=sourceCard.uid;
+          sourceCard.pincerAtk=pn;sourceCard.pincerHp=ph;target.pincerAtk=pn;target.pincerHp=ph;
           var se=findCardEl(sourceCard),te2=findCardEl(target);
-          if(se){floatDamage(se,2,'heal','left');floatDamage(se,2,'heal','right')}
-          if(te2){floatDamage(te2,2,'heal','left');floatDamage(te2,2,'heal','right')}
-          GAME.log('\u2694 钳击：'+sourceCard.cn+' 与 '+target.cn+' 结对，各+2/+2','effect');
+          if(se){floatDamage(se,pn,'heal','left');floatDamage(se,ph,'heal','right')}
+          if(te2){floatDamage(te2,pn,'heal','left');floatDamage(te2,ph,'heal','right')}
+          GAME.log('\u2694 钳击：'+sourceCard.cn+' 与 '+target.cn+' 结对，各+'+pn+'/'+ph,'effect');
         })();break;
       case'suppressOrder':
         // 抑制指令：清除目标全部词条并重置攻防为原始值（保留已受伤）
@@ -7554,6 +7563,7 @@ GAME.newGame();
     <div class="kw-row"><span class="kw-tag-big S">烟幕</span><div class="kw-desc">拥有烟幕的单位或总部<b>无法被敌方单位攻击</b>。单位攻击或移动后<b>失去烟幕</b>。守护单位、位于前线的单位以及战斗机<b>不能具有烟幕</b>。</div></div>
     <div class="kw-row"><span class="kw-tag-big F">奋战</span><div class="kw-desc">每回合可以<b>攻击两次</b>。</div></div>
     <div class="kw-row"><span class="kw-tag-big C">冲击</span><div class="kw-desc">冲击单位首次攻击时，被攻击单位<b>不会造成任何反击伤害</b>。冲击单位攻击单位后，<b>移除冲击</b>。</div></div>
+    <div class="kw-row"><span class="kw-tag-big P">钳击</span><div class="kw-desc">部署时<b>选择一个友方单位结对</b>，双方获得钳击描述的加成（如 +1/+1）。<b>其中一方离场，双方同时失去加成</b>。</div></div>
   </div>
 
   <!-- ====== 推线说明面板 ====== -->
@@ -7634,6 +7644,7 @@ var KW_DESC={
   '重甲3': '单位受到的<b>对战伤害</b>减少 3。',
   '奋战':  '每回合可以<b>攻击两次</b>。',
   '冲击':  '冲击单位首次攻击时，被攻击单位<b>不会造成任何反击伤害</b>。攻击后<b>移除冲击</b>。',
+  '钳击':  '部署时<b>选择一个友方单位结对</b>，双方获得钳击描述的加成（如 +1/+1）。<b>其中一方离场，双方同时失去加成</b>。',
   '伏击':  '伏击单位<b>每回合首次被攻击</b>时，会首先造成反击伤害。若敌方单位因此被消灭，则其无法对伏击单位造成伤害。',
   '烟幕':  '拥有烟幕的单位<b>无法被敌方单位攻击</b>。单位攻击或移动后<b>失去烟幕</b>。',
   '压制':  '被压制的单位<b>无法攻击或移动</b>，持续到友方下回合开始。',
