@@ -1679,11 +1679,11 @@ var CP=[
 ['大和号战列舰','Yamato Battleship','J','O',7,7,9,2,2,'H','重甲2。每当友方单位死亡，对敌方总部造成2点伤害。','',1,'hqOnAllyDeath'],
 ['菊水总攻击','Kikusui All-Out','J','X',8,'sacAllHq','牺牲所有友方单位，每牺牲一个对敌方总部造成3点伤害。','selfHasUnit','己方无单位',1],
 ['钳击小队','Pincer Squad','D','I',3,4,4,1,0,'P','钳击：部署时选一个友方单位结对，双方+1/+1；其中一方死亡则双方失去加成。','pincer',2],
-['钳击装甲兵','Pincer Panzergrenadier','D','I',4,4,4,1,0,'P','钳击：部署时选一个友方单位结对，双方+2/+1；其中一方死亡则双方失去加成。','pincer',2],
-['近卫钳击队','Guards Pincer Squad','S','I',2,3,2,1,0,'GP','守护。钳击：部署时选一个友方单位结对，双方+1/+2；其中一方死亡则双方失去加成。','pincer',2],
-['钳击步兵团','Pincer Infantry Regiment','U','I',3,3,3,1,0,'P','钳击：部署时选一个友方单位结对，双方+2/+1；其中一方死亡则双方失去加成。','pincer',2],
-['皇家钳击团','Royal Pincer Regiment','B','I',3,5,4,1,0,'GP','守护。钳击：部署时选一个友方单位结对，双方+1/+3；其中一方死亡则双方失去加成。','pincer',2],
-['钳击突击队','Pincer Assault Team','J','I',3,2,2,1,0,'P','钳击：部署时选一个友方单位结对，双方+2/+0；其中一方死亡则双方失去加成。','pincer',2]
+['钳击装甲兵','Pincer Panzergrenadier','D','I',4,4,4,1,0,'P','钳击：部署时选一个友方单位结对，双方+1/+1且获得重甲1；一方死亡则双方失去加成与重甲。','pincerArmor',2],
+['近卫钳击队','Guards Pincer Squad','S','I',2,3,2,1,0,'GP','守护。钳击：部署时选一个友方单位结对，双方+1/+1且获得守护；一方死亡则双方失去加成。','pincerGuard',2],
+['钳击步兵团','Pincer Infantry Regiment','U','I',3,3,3,1,0,'P','钳击：部署时选一个友方单位结对，双方+1/+1并抽一张牌；一方死亡则双方失去加成。','pincerDraw',2],
+['皇家钳击团','Royal Pincer Regiment','B','I',3,5,4,1,0,'GP','钳击：部署时选一个友方单位结对，双方+1/+1且本回合行动次数+1；一方死亡则双方失去加成。','pincerRally',2],
+['钳击突击队','Pincer Assault Team','J','I',3,2,2,1,0,'P','钳击：部署时选一个友方单位结对，双方+1/+1且获得冲击；一方死亡则双方失去加成与冲击。','pincerShock',2]
 ];
 
 
@@ -3835,8 +3835,22 @@ var GAME={
         var partner=null;
         [GAME.player,GAME.enemy].forEach(function(sd){if(sd)sd.allUnits().forEach(function(u){if(u.uid===c.pincerPartnerUid)partner=u})});
         if(partner){
-          var pa=c.pincerAtk||2,pv=c.pincerHp||2;
+          var pa=c.pincerAtk||1,pv=c.pincerHp||1;
           partner.atk-=pa;partner.hp-=pv;partner.maxHp-=pv;partner.pincerPartnerUid=0;
+          // 还原钳击专属机制
+          var ex=c.pincerExtra||'';
+          if(ex==='armor'&&partner.armor>0)partner.armor-=1;
+          if(ex==='guard'){
+            // 仅移除由钳击获得的守护（若单位本身自带守护则保留）
+            var pc=CP.find(function(d){return d[0]===partner.cn});
+            var hadG=pc&&pc[9]&&pc[9].indexOf('G')>=0;
+            if(!hadG&&partner.kw.indexOf('G')>=0){partner.kw=partner.kw.replace('G','');partner.hasG=false}
+          }
+          if(ex==='shock'){
+            var pc2=CP.find(function(d){return d[0]===partner.cn});
+            var hadC=pc2&&pc2[9]&&pc2[9].indexOf('C')>=0;
+            if(!hadC&&partner.kw.indexOf('C')>=0){partner.kw=partner.kw.replace('C','');partner.hasC=false}
+          }
           GAME.log('\u2694 钳击解除：'+partner.cn+' 失去+'+pa+'/'+pv+'加成','effect');
         }
       }
@@ -3942,7 +3956,8 @@ var GAME={
   // ---------- 效果目标系统 ----------
   // 判断效果代码是否需要玩家选择目标
   isTargetedEffect:function(code){
-    return{dmg1:1,dmg2:1,heal2:1,buff1:1,buff22_selfDmg2:1,dmg2bomber:1,dmg2fighter:1,kill2c:1,destroyLowAtk:1,dmg1self1draw1:1,pin1:1,pinAtk2:1,bounceEnemyGround:1,killAir:1,dmg2t4:1,dmg1tank:1,removeArmor:1,buffBomber:1,shareBuff:1,sacrificeDeploy:1,sacrificeDeployBuff:1,pincer:1,pingDraw:1,suppressOrder:1,confiscateOrder:1}[code]||0;
+    if(code&&code.indexOf('pincer')===0)return 1; // 所有钳击变体都需选友军结对
+    return{dmg1:1,dmg2:1,heal2:1,buff1:1,buff22_selfDmg2:1,dmg2bomber:1,dmg2fighter:1,kill2c:1,destroyLowAtk:1,dmg1self1draw1:1,pin1:1,pinAtk2:1,bounceEnemyGround:1,killAir:1,dmg2t4:1,dmg1tank:1,removeArmor:1,buffBomber:1,shareBuff:1,sacrificeDeploy:1,sacrificeDeployBuff:1,pingDraw:1,suppressOrder:1,confiscateOrder:1}[code]||0;
   },
   // 获取效果的合法目标列表
   getEffectTargets:function(code,owner){
@@ -3964,7 +3979,7 @@ var GAME={
       case'bounceEnemyGround':return opp.allUnits().filter(function(u){return(u.isI||u.isT||u.isA)&&u.hp>0});
       case'killAir':return opp.allUnits().filter(function(u){return(u.isF||u.isO)&&u.hp>0});
       case'shareBuff':return allies.filter(function(u){return u.hp>0&&u.isUnit});
-      case'pincer':return allies.filter(function(u){return u.hp>0&&u.isUnit});
+      case'pincer':case'pincerArmor':case'pincerGuard':case'pincerDraw':case'pincerRally':case'pincerShock':return allies.filter(function(u){return u.hp>0&&u.isUnit});
       case'sacrificeDeploy':case'sacrificeDeployBuff':return owner.allUnits().filter(function(u){return u.hp>0&&u.isUnit});
       case'suppressOrder':case'confiscateOrder':return opp.allUnits().filter(function(u){return u.hp>0&&u.isUnit});
       default:return[];
@@ -4087,17 +4102,33 @@ var GAME={
           }
           GAME.log('\uD83C\uDF96 精锐空降：牺牲'+target.cn+'，本单位+4/+4并获得闪击','effect');
         })();break;
-      case'pincer':
-        // 钳击：部署时与选定友军结对，双方按卡面"+X/+Y"数值加成；一方离场则双方失去加成
+      case'pincer':case'pincerArmor':case'pincerGuard':case'pincerDraw':case'pincerRally':case'pincerShock':
+        // 钳击：部署时与选定友军结对，双方获数值加成+各自专属机制；一方离场双方一并失去
         (function(){
           if(target===sourceCard||target.uid===sourceCard.uid)return;
+          var code=sourceCard.effCode;
           var pm=(sourceCard.effText||'').match(/\+(\d+)\/(\d+)/);
-          var pn=pm?parseInt(pm[1],10):2;   // 攻击加成
-          var ph=pm?parseInt(pm[2],10):2;   // 生命加成
+          var pn=pm?parseInt(pm[1],10):1, ph=pm?parseInt(pm[2],10):1;
           sourceCard.atk+=pn;sourceCard.hp+=ph;sourceCard.maxHp+=ph;
           target.atk+=pn;target.hp+=ph;target.maxHp+=ph;
           sourceCard.pincerPartnerUid=target.uid;target.pincerPartnerUid=sourceCard.uid;
           sourceCard.pincerAtk=pn;sourceCard.pincerHp=ph;target.pincerAtk=pn;target.pincerHp=ph;
+          var extra='';
+          if(code==='pincerArmor'){extra='armor';sourceCard.armor+=1;target.armor+=1;}
+          if(code==='pincerGuard'){
+            extra='guard';
+            [sourceCard,target].forEach(function(u){if(u.kw.indexOf('G')<0)u.kw+='G';u.hasG=true});
+          }
+          if(code==='pincerShock'){
+            extra='shock';
+            [sourceCard,target].forEach(function(u){if(u.kw.indexOf('C')<0)u.kw+='C';u.hasC=true});
+          }
+          if(code==='pincerRally'){
+            extra='rally';
+            [sourceCard,target].forEach(function(u){u.apSpent=0;u.attacksThisTurn=0;u.canAct=true});
+          }
+          if(code==='pincerDraw'){extra='draw';owner.draw(1);}
+          sourceCard.pincerExtra=extra;target.pincerExtra=extra;
           var se=findCardEl(sourceCard),te2=findCardEl(target);
           if(se){floatDamage(se,pn,'heal','left');floatDamage(se,ph,'heal','right')}
           if(te2){floatDamage(te2,pn,'heal','left');floatDamage(te2,ph,'heal','right')}
