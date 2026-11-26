@@ -3193,9 +3193,15 @@ var GAME={
         var aHQEl=findHQEl(who);_chainDmgFX(aHQEl,airUnits.map(function(x){return{card:x,isHq:false,dmg:2}}));
         GAME.log('\uD83D\uDCA3 \u9632\u7A7A\u706B\u529B\u2192\u654C\u65B9\u7A7A\u519B2\u4F24','effect');break;
       case'retreatAll':
-        var oppSupport=opp.support.slice();opp.support=[];
+        var oppSupport=opp.support.slice();
+        var oppFl=opp.fl.slice();
+        // 先释放所有将回手单位的钳击（在清空阵地前反查伙伴）
+        oppSupport.forEach(function(x){GAME._releasePincer(x);});
+        var flKeep=Math.min(4,oppFl.length);
+        oppFl.slice(flKeep).forEach(function(x){GAME._releasePincer(x);});
+        opp.support=[];
         oppSupport.forEach(function(x){x.zone='hand';x.resetToBase();opp.hand.push(x);});
-        var oppFl=opp.fl.slice();opp.fl=[];
+        opp.fl=[];
         oppFl.forEach(function(x){x.hp=x.maxHp;x.zone='support';if(opp.support.length<4){opp.support.push(x);}else{x.zone='hand';x.resetToBase();opp.hand.push(x);}});
         GAME.log('\u23F3 拖延战术\u2192敌方全体撤退','effect');break;
       case'radarAlert':
@@ -3816,6 +3822,41 @@ var GAME={
     });
   },
 
+  // ---------- 钳击解除 ----------
+  // 离场单位（死亡/弹回手牌等）与其伙伴双向解绑：反向扣除加成、还原专属词条、断开链接
+  _releasePincer:function(leavingCard){
+    if(!leavingCard||!leavingCard.pincerPartnerUid)return;
+    var pid=leavingCard.pincerPartnerUid;
+    var partner=null;
+    [GAME.player,GAME.enemy].forEach(function(sd){if(sd)sd.allUnits().forEach(function(u){if(u.uid===pid)partner=u})});
+    var pa=leavingCard.pincerAtk||1,ph=leavingCard.pincerHp||1;
+    var ex=leavingCard.pincerExtra||'';
+    if(partner){
+      partner.atk-=pa;partner.hp-=ph;partner.maxHp-=ph;
+      GAME._restorePincerExtra(partner,ex);
+      partner.pincerPartnerUid=0;partner.pincerAtk=0;partner.pincerHp=0;partner.pincerExtra='';
+      GAME.log('\u2694 钳击解除：'+partner.cn+' 失去+'+pa+'/'+ph+'加成','effect');
+    }
+    // 离场卡自身：若仍存活（如被弹回手牌），一并还原其专属词条并断开链接
+    GAME._restorePincerExtra(leavingCard,ex);
+    leavingCard.pincerPartnerUid=0;leavingCard.pincerAtk=0;leavingCard.pincerHp=0;leavingCard.pincerExtra='';
+  },
+  // 还原钳击带来的专属词条（仅当单位本身非原生自带时移除）
+  _restorePincerExtra:function(card,ex){
+    if(!card||!ex)return;
+    if(ex==='armor'&&card.armor>0)card.armor-=1;
+    if(ex==='guard'){
+      var pc=CP.find(function(d){return d[0]===card.cn});
+      var hadG=pc&&pc[9]&&pc[9].indexOf('G')>=0;
+      if(!hadG&&card.kw.indexOf('G')>=0)card.kw=card.kw.replace('G','');
+    }
+    if(ex==='shock'){
+      var pc2=CP.find(function(d){return d[0]===card.cn});
+      var hadC=pc2&&pc2[9]&&pc2[9].indexOf('C')>=0;
+      if(!hadC&&card.kw.indexOf('C')>=0)card.kw=card.kw.replace('C','');
+    }
+  },
+
   // ---------- 清理死亡单位 + 触发亡计 ----------
   cleanup:function(who,visualDelay){
     visualDelay=visualDelay||0;
@@ -3830,30 +3871,8 @@ var GAME={
     });
     // 日志+亡计立即执行，死亡动画延迟
     dead.forEach(function(c){
-      // 钳击：一方离场，清除其伙伴的钳击加成
-      if(c.pincerPartnerUid){
-        var partner=null;
-        [GAME.player,GAME.enemy].forEach(function(sd){if(sd)sd.allUnits().forEach(function(u){if(u.uid===c.pincerPartnerUid)partner=u})});
-        if(partner){
-          var pa=c.pincerAtk||1,pv=c.pincerHp||1;
-          partner.atk-=pa;partner.hp-=pv;partner.maxHp-=pv;partner.pincerPartnerUid=0;
-          // 还原钳击专属机制
-          var ex=c.pincerExtra||'';
-          if(ex==='armor'&&partner.armor>0)partner.armor-=1;
-          if(ex==='guard'){
-            // 仅移除由钳击获得的守护（若单位本身自带守护则保留）
-            var pc=CP.find(function(d){return d[0]===partner.cn});
-            var hadG=pc&&pc[9]&&pc[9].indexOf('G')>=0;
-            if(!hadG&&partner.kw.indexOf('G')>=0){partner.kw=partner.kw.replace('G','');partner.hasG=false}
-          }
-          if(ex==='shock'){
-            var pc2=CP.find(function(d){return d[0]===partner.cn});
-            var hadC=pc2&&pc2[9]&&pc2[9].indexOf('C')>=0;
-            if(!hadC&&partner.kw.indexOf('C')>=0){partner.kw=partner.kw.replace('C','');partner.hasC=false}
-          }
-          GAME.log('\u2694 钳击解除：'+partner.cn+' 失去+'+pa+'/'+pv+'加成','effect');
-        }
-      }
+      // 钳击：一方离场，解除其伙伴的钳击加成
+      GAME._releasePincer(c);
       GAME.log(c.cn+' \uD83D\uDC80 被摧毁','system');
       SFX.play('destroy');
       GAME.triggerDeathrattle(c,c.owner);
@@ -3979,7 +3998,7 @@ var GAME={
       case'bounceEnemyGround':return opp.allUnits().filter(function(u){return(u.isI||u.isT||u.isA)&&u.hp>0});
       case'killAir':return opp.allUnits().filter(function(u){return(u.isF||u.isO)&&u.hp>0});
       case'shareBuff':return allies.filter(function(u){return u.hp>0&&u.isUnit});
-      case'pincer':case'pincerArmor':case'pincerGuard':case'pincerDraw':case'pincerRally':case'pincerShock':return allies.filter(function(u){return u.hp>0&&u.isUnit});
+      case'pincer':case'pincerArmor':case'pincerGuard':case'pincerDraw':case'pincerRally':case'pincerShock':return allies.filter(function(u){return u.hp>0&&u.isUnit&&!u.pincerPartnerUid});
       case'sacrificeDeploy':case'sacrificeDeployBuff':return owner.allUnits().filter(function(u){return u.hp>0&&u.isUnit});
       case'suppressOrder':case'confiscateOrder':return opp.allUnits().filter(function(u){return u.hp>0&&u.isUnit});
       default:return[];
@@ -4060,6 +4079,7 @@ var GAME={
       case'pin1':target.pinned=true;target.canAct=false;target.apSpent=99;target.hasActedThisTurn=true;GAME.log('\uD83C\uDFAF '+target.cn+' \uD83D\uDCA2 被压制（本回合不可行动）','effect');break;
       case'pinAtk2':target.pinned=true;target.canAct=false;target.apSpent=99;target.hasActedThisTurn=true;var atkLoss=Math.min(target.atk,2);target.atk-=atkLoss;_chainDmgFX(srcEl,[{card:target,isHq:false,dmg:atkLoss}]);GAME.log('\uD83C\uDFAF '+target.cn+' \uD83D\uDCA2 被压制且攻击力-'+atkLoss+'（本回合不可行动）','effect');break;
       case'bounceEnemyGround':
+        GAME._releasePincer(target);
         target.owner.support=target.owner.support.filter(function(x){return x!==target});
         target.owner.fl=target.owner.fl.filter(function(x){return x!==target});
         target.zone='hand';target.justDeployed=false;target.pinned=false;target.canAct=true;target.apSpent=0;target.attacksThisTurn=0;target.hasActedThisTurn=false;target.resetToBase();
@@ -6023,8 +6043,8 @@ var GAME={
       }
     }
     if(who.nextExtraDraw){who.draw(who.nextExtraDraw);GAME.log('\uD83C\uDFA0 战争债券\u2192额外抽'+who.nextExtraDraw+'张牌','effect');who.nextExtraDraw=0;}
-    if(who===GAME.enemy&&GAME.turn===1&&!GAME.playerIsFirst){who.cmd+=2;if(AI_LEVEL===4)GAME.log("\u26A1 地狱级作弊：AI先手额外+2指挥点","system")}
-    if(who===GAME.enemy){var cfg3=AI_CONFIG[AI_LEVEL];if(cfg3.cmdBonus&&GAME.turn>1){who.cmd+=cfg3.cmdBonus;if(AI_LEVEL===4)GAME.log("💰 地狱级作弊：指挥点+"+cfg3.cmdBonus,"system")};if(cfg3.extraDraw&&GAME.turn>0){who.draw(cfg3.extraDraw);if(AI_LEVEL===4)GAME.log("💰 地狱级作弊：额外抽"+cfg3.extraDraw+"张牌","system")}}
+    if(who===GAME.enemy&&AI_LEVEL===4&&GAME.turn===1&&!GAME.playerIsFirst){who.cmd+=2;who.maxCmd+=2;GAME.log("\u26A1 地狱级作弊：AI先手额外+2指挥点","system")}
+    if(who===GAME.enemy){var cfg3=AI_CONFIG[AI_LEVEL];if(cfg3.cmdBonus&&GAME.turn>1){who.cmd+=cfg3.cmdBonus;who.maxCmd+=cfg3.cmdBonus;if(AI_LEVEL===4)GAME.log("💰 地狱级作弊：指挥点+"+cfg3.cmdBonus,"system")};if(cfg3.extraDraw&&GAME.turn>0){who.draw(cfg3.extraDraw);if(AI_LEVEL===4)GAME.log("💰 地狱级作弊：额外抽"+cfg3.extraDraw+"张牌","system")}}
 
     // 当前玩家的单位刷新
     who.allUnits().forEach(function(c){c.resetTurn()});
