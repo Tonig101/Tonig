@@ -19,6 +19,19 @@ const args = process.argv.slice(2);
 const GAMES_PER = parseInt(args.find(a => /^\d+$/.test(a)) || '6', 10);
 const VERBOSE = args.indexOf('--verbose') >= 0 || args.indexOf('-v') >= 0;
 
+// 指定卡组：--a 阵营:卡组id   --b 阵营:卡组id   --vs 阵营:卡组id
+// --a/--b 双方各指定一套，打定制对阵；--vs 指定一套，与其余全部卡组逐个对抗
+function argVal(flag) {
+  const i = args.indexOf(flag);
+  if (i < 0) return null;
+  const v = args[i + 1];
+  if (!v || v.startsWith('--')) return null;
+  return v;
+}
+const SPEC_A = argVal('--a');
+const SPEC_B = argVal('--b');
+const SPEC_VS = argVal('--vs');
+
 // ---------------- 同步定时器队列 ----------------
 const syncQueue = [];
 function queue(fn) { if (typeof fn === 'function') syncQueue.push(fn); return 0; }
@@ -393,7 +406,8 @@ function checkInvariants() {
 }
 
 // ---------------- 单局对局 ----------------
-function playOneGame(playerFc, playerDeckId, enemyFc, enemyDeckId, aiLevel, seed) {
+// forceFirst: null=随机先手；true=player 先手；false=enemy 先手
+function playOneGame(playerFc, playerDeckId, enemyFc, enemyDeckId, aiLevel, seed, forceFirst) {
   seedGame(seed);
   sandbox.ENEMY_FC = enemyFc;
   sandbox.AI_LEVEL = aiLevel;
@@ -401,6 +415,7 @@ function playOneGame(playerFc, playerDeckId, enemyFc, enemyDeckId, aiLevel, seed
   DeckStore.__queueDeck(DeckStore.byId(playerFc, playerDeckId));
   DeckStore.__queueDeck(DeckStore.byId(enemyFc, enemyDeckId));
   GAME._initGame(playerFc);
+  if (forceFirst === true || forceFirst === false) GAME.playerIsFirst = forceFirst;
   GAME.phase = 'play';
 
   const violations = [];
@@ -595,6 +610,98 @@ function main() {
       console.log('调试对局:', pa.name, 'vs', eb.name, '=>', r.winner, '回合', r.turns);
       console.log('不变量违规:', r.violations.length ? r.violations : '无');
     }
+    return;
+  }
+
+  const pickDeck = spec => {
+    if (!spec || spec.indexOf(':') < 0) return null;
+    const fc = spec.split(':')[0];
+    const id = spec.split(':')[1];
+    return decks.find(d => d.fc === fc && d.id === id) || null;
+  };
+  const listDecks = () => {
+    console.log('可用卡组（用 阵营:卡组id 指定）：');
+    Object.keys(DEFAULT_DECKS).forEach(fc => {
+      const ids = decks.filter(d => d.fc === fc).map(d => d.id + '=' + d.name);
+      console.log('  [' + fc + '] ' + ids.join('  '));
+    });
+  };
+
+  // ---- 模式一：双方各指定一套卡组，打定制对阵 ----
+  if (SPEC_A && SPEC_B) {
+    const A = pickDeck(SPEC_A), B = pickDeck(SPEC_B);
+    if (!A) { console.error('找不到卡组 A：' + SPEC_A + '（格式 阵营:卡组id，如 B:r0）'); listDecks(); process.exitCode = 1; return; }
+    if (!B) { console.error('找不到卡组 B：' + SPEC_B + '（格式 阵营:卡组id，如 J:r1）'); listDecks(); process.exitCode = 1; return; }
+    console.log('=== 指定卡组对阵 ===');
+    console.log('  A: [' + A.fc + '] ' + A.name + '  vs  B: [' + B.fc + '] ' + B.name);
+    console.log('  每方局数: ' + GAMES_PER + '（双方轮流先后手）');
+    console.log('');
+    const stat = {
+      A: { win: 0, loss: 0, draw: 0, timeout: 0, turns: 0 },
+      B: { win: 0, loss: 0, draw: 0, timeout: 0, turns: 0 },
+    };
+    const viol = [];
+    for (let g = 0; g < GAMES_PER; g++) {
+      const r = playOneGame(A.fc, A.id, B.fc, B.id, 1, 5000 + g, g % 2 === 0);
+      stat.A.turns += r.turns; stat.B.turns += r.turns;
+      if (r.winner === 'player') { stat.A.win++; stat.B.loss++; }
+      else if (r.winner === 'enemy') { stat.B.win++; stat.A.loss++; }
+      else if (r.winner === 'draw') { stat.A.draw++; stat.B.draw++; }
+      else { stat.A.timeout++; stat.B.timeout++; }
+      if (r.violations.length) viol.push('第' + (g + 1) + '局: ' + r.violations.join('; '));
+    }
+    const wrA = (stat.A.win / GAMES_PER * 100).toFixed(1);
+    console.log('  ' + A.name + ' 胜' + stat.A.win + ' 负' + stat.A.loss + ' 平' + stat.A.draw + ' 超时' + stat.A.timeout + '  胜率 ' + wrA + '%');
+    console.log('  ' + B.name + ' 胜' + stat.B.win + ' 负' + stat.B.loss + ' 平' + stat.B.draw + ' 超时' + stat.B.timeout + '  胜率 ' + (100 - wrA) + '%');
+    console.log('  平均回合数: ' + (stat.A.turns / GAMES_PER).toFixed(1));
+    console.log('');
+    console.log('=== 不变量校验（钳击/指挥点） ===');
+    console.log(viol.length ? '  发现 ' + viol.length + ' 处违规：' + viol.slice(0, 5).join(' | ') : '  OK — 无违规');
+    return;
+  }
+
+  // ---- 模式二：指定一套卡组，与其余全部卡组逐个对抗 ----
+  if (SPEC_VS) {
+    const A = pickDeck(SPEC_VS);
+    if (!A) { console.error('找不到卡组：' + SPEC_VS + '（格式 阵营:卡组id，如 D:r3）'); listDecks(); process.exitCode = 1; return; }
+    console.log('=== 指定卡组对全部对手 ===');
+    console.log('  指定: [' + A.fc + '] ' + A.name + '   每对阵局数: ' + GAMES_PER);
+    console.log('');
+    const rows = [];
+    let violCount = 0;
+    let seed = 7000;
+    decks.forEach(B => {
+      if (B.fc === A.fc && B.id === A.id) return;
+      let win = 0, loss = 0, draw = 0, timeout = 0, turns = 0;
+      for (let g = 0; g < GAMES_PER; g++) {
+        const r = playOneGame(A.fc, A.id, B.fc, B.id, 1, seed++, g % 2 === 0);
+        turns += r.turns;
+        if (r.winner === 'player') win++;
+        else if (r.winner === 'enemy') loss++;
+        else if (r.winner === 'draw') draw++;
+        else timeout++;
+        if (r.violations.length) violCount++;
+      }
+      rows.push({ name: B.name, fc: B.fc, win, loss, draw, timeout, turns, wr: win / Math.max(1, win + loss + draw) });
+    });
+    rows.sort((a, b) => b.wr - a.wr);
+    rows.forEach(r => {
+      console.log('  ' + (r.wr * 100).toFixed(1).padStart(5) + '%  [' + r.fc + '] ' + r.name.padEnd(14) +
+        '  胜' + String(r.win).padStart(3) + ' 负' + String(r.loss).padStart(3) +
+        ' 平' + String(r.draw).padStart(2) + ' 超时' + String(r.timeout).padStart(2) +
+        ' 均' + (r.turns / Math.max(1, r.win + r.loss + r.draw + r.timeout)).toFixed(1) + '回合');
+    });
+    const tw = rows.reduce((s, r) => s + r.win, 0);
+    const tl = rows.reduce((s, r) => s + r.loss, 0);
+    console.log('');
+    console.log('  合计: 胜' + tw + ' 负' + tl + '  总胜率 ' + (tw / Math.max(1, tw + tl) * 100).toFixed(1) + '%');
+    console.log('  不变量校验: ' + (violCount ? '发现 ' + violCount + ' 局违规' : 'OK — 无违规'));
+    return;
+  }
+
+  if ((SPEC_A && !SPEC_B) || (SPEC_B && !SPEC_A)) {
+    console.error('--a 与 --b 需同时指定（如 --a B:r0 --b J:r1）；单独测一套卡组请用 --vs B:r0');
+    process.exitCode = 1;
     return;
   }
 
