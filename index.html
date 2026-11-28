@@ -5827,15 +5827,22 @@ var GAME={
   // ==================== AI 辅助函数（增强版 v2） ====================
 
   // 获取当前AI的综合风格配置（阵营+难度）
-  _getAIStyle:function(){
-    var style=AI_FACTION_STYLE[ENEMY_FC]||AI_FACTION_STYLE['D'];
+  // fc 可显式指定阵营（无头模拟双方各用自己的阵营风格），缺省为敌方阵营
+  _getAIStyle:function(fc){
+    var key=(fc||ENEMY_FC)+'|'+AI_LEVEL;
+    if(this._styleCache&&this._styleCacheKey===key)return this._styleCache;
+    var base=AI_FACTION_STYLE[fc||ENEMY_FC]||AI_FACTION_STYLE['D'];
     var cfg=AI_CONFIG[AI_LEVEL];
+    var style;
     if(AI_LEVEL===1){
       style={cardPref:{},orderWeights:{},attackHQWeight:0.5,attackTypeWeights:{},pushAggression:0.3,pushPreferBlitz:false,targetLowestHp:false,avoidTrade:false,reserveBonus:0};
+    }else{
+      // 返回副本，避免把 saveCredits 累加进共享配置（原实现会越积越多导致AI囤积指挥点）
+      style={};
+      for(var k in base)style[k]=base[k];
+      if(AI_LEVEL===3)style.reserveBonus=(base.reserveBonus||0)+cfg.saveCredits;
     }
-    if(AI_LEVEL===3){
-      style.reserveBonus=(style.reserveBonus||0)+cfg.saveCredits;
-    }
+    this._styleCache=style;this._styleCacheKey=key;
     return style;
   },
 
@@ -5880,6 +5887,20 @@ var GAME={
     if(unit.isA||unit.isO)threat+=5;
     if(unit.effCode==='drawOnDmg'||unit.effCode==='draw1')threat+=5;
     return threat;
+  },
+
+  // 单位局面价值：与 _cardValue 的单位分支同口径，供攻击交换评估使用
+  // 这是"解场"与"打脸"共用的价值单位，保证两类动作可以直接比较
+  _unitWorth:function(u){
+    if(!u)return 0;
+    var w=u.effectiveAtk*1.5+u.hp*1.0;
+    if(u.hasG)w+=3;
+    if(u.hasB)w+=3;
+    if(u.hasFr)w+=3;
+    if(u.armor)w+=u.armor*1.5;
+    if(u.isA||u.isO)w+=3;
+    if(u.effCode==='drawOnDmg'||u.effCode==='draw1'||u.effCode==='furyDraw')w+=4;
+    return w;
   },
 
   // 指令针对敌方高威胁单位的对策价值
@@ -5992,63 +6013,109 @@ var GAME={
   },
 
   // 斩杀计算（可选额外牌）
+  // 只统计真正能打到总部的伤害：单位须费用够且当前能命中总部（未被守护挡），
+  // 指令须是直伤总部的 fx（打单位的 dmgAll* 不能计入）
   _calcLethal:function(ai,opp,extraCard){
-    var total=0;
+    var total=0,cmd=ai.cmd;
+    var hqDmgFx={dmg2hq:2,dmg3hq:3,dmg4hq:4,dmg5hq:5,dmg6hq:6,dmg2hqDraw:2,dmg2hqBuff:2,dmg2hqPing1:2};
     ai.allUnits().forEach(function(c){
-      if(c.hp>0&&c.canStillAtk)total+=c.effectiveAtk;
-    });
-    ai.hand.forEach(function(c){
-      if(c.isOrder&&c.cost<=ai.cmd){
-        if(c.fx==='dmg4hq')total+=4;
-        else if(c.fx==='dmgAll1')total+=1;
-        else if(c.fx==='dmgAll2')total+=2;
-        else if(c.fx&&c.fx.indexOf('dmg')>=0)total+=3;
+      if(c.hp>0&&c.canStillAtk&&cmd>=c.effAcost){
+        var tgs=GAME.getTargets(c);
+        if(tgs.some(function(t){return t.card===null})){
+          cmd-=c.effAcost;total+=c.effectiveAtk;
+        }
       }
     });
-    if(extraCard){
-      if(extraCard.fx==='dmg4hq')total+=4;
-      else if(extraCard.fx&&extraCard.fx.indexOf('dmg')>=0)total+=3;
-    }
+    ai.hand.forEach(function(c){
+      if(c.isOrder&&c.cost<=ai.cmd&&hqDmgFx[c.fx])total+=hqDmgFx[c.fx];
+    });
+    if(extraCard&&extraCard.isOrder&&hqDmgFx[extraCard.fx])total+=hqDmgFx[extraCard.fx];
     return total>=opp.hp;
   },
 
-  // 攻击目标评分（阵营风格增强版）
-  _targetScore:function(attacker,target,ai,opp){
-    if(!target)return 100;
-    var score=0;
+  // 攻击目标评分：以单位局面价值为统一量纲（正分=值得打，负分=亏本）
+  // ctx 由 smartAttack 每轮构造：{board,fieldLead,oppHasLethal,aiHasLethal,canKillSomething}
+  _targetScore:function(attacker,target,ai,opp,ctx){
+    if(!target)return 0;
+    var style=this._getAIStyle(ai&&ai.fc);
+    var atw=style.attackTypeWeights||{};
     var atkDmg=Math.max(0,attacker.effectiveAtk-(target.armor||0));
     var counterDmg=Math.max(0,target.effectiveAtk-(attacker.armor||0));
     var willKill=atkDmg>=target.hp;
     var willDie=counterDmg>=attacker.hp;
-    var board=GAME._evalBoard(ai,opp);
-    var style=this._getAIStyle();
-    var atw=style.attackTypeWeights||{};
+    var worth=this._unitWorth(target);
+    var myWorth=this._unitWorth(attacker);
+    var score=0;
 
-    if(willKill)score+=15;
-    // 一击必杀高威胁单位额外奖励（解场收益最大化）
-    if(willKill&&(target.effectiveAtk>=4||target.hasG||target.isO||target.isA))score+=8;
-    // 守护单位守家：HQ 安全时优先打脸，不主动解场送掉守护墙
-    if(attacker.hasG&&ai.hp>ai.maxHp*0.6&&!willDie)score-=10;
-    if(willDie)score-=12;
-    // 阵营交换偏好：苏联以交换为主，不惩罚己方阵亡
-    if(style.avoidTrade&&willDie)score-=12;
-    var myLoss=counterDmg;
-    var theirLoss=Math.min(atkDmg,target.hp);
-    score+=(theirLoss-myLoss)*0.8;
-    score+=GAME._threatRank(target)*1.0;
-    // 过杀惩罚
-    if(willKill&&atkDmg>target.hp+3)score-=6;
-    // 阵营攻击类型偏好
-    if(target.hasG)score+=7+(atw.guard||0);
-    if(target.isA)score+=6+(atw.artillery||0);
-    if(target.isO)score+=6+(atw.bomber||0);
-    if(target.isF)score+=0+(atw.fighter||0);
-    if(target.isT)score+=0+(atw.tank||0);
-    if(target.isI)score+=0+(atw.infantry||0);
-    if(target.effCode==='drawOnDmg'||target.effCode==='draw1')score+=(atw.draw||0);
-    if(board<-5)score+=5;
+    if(willKill){
+      // 击杀=白赚一张牌，收益约等于目标单位价值
+      score+=worth*1.2+6;
+      // 过杀：伤害溢出太多说明大材小用
+      if(atkDmg>=target.hp+4)score-=4;
+      // 破守护：打开打脸通道
+      if(target.hasG)score+=6+(atw.guard||0);
+      // 清远程火力优先
+      if(target.isA)score+=4+(atw.artillery||0);
+      if(target.isO)score+=4+(atw.bomber||0);
+      if(target.isF)score+=2+(atw.fighter||0);
+      if(target.isT)score+=(atw.tank||0);
+      if(target.isI)score+=(atw.infantry||0);
+      if(target.effCode==='drawOnDmg'||target.effCode==='draw1')score+=4+(atw.draw||0);
+    }else{
+      // 打不死：只按有效削血计价值，绝不因"威胁高"就给分
+      score+=Math.min(atkDmg,target.hp)*0.8;
+      score+=Math.min(atkDmg,4)*0.4;
+      // 敌方下回合可斩杀我方：削其场攻是止血，即使换命也算有效
+      if(ctx&&ctx.oppHasLethal&&atkDmg>0){
+        score+=atkDmg*1.2;
+        if(willDie)score+=myWorth*0.3;
+      }
+    }
+
+    // 换血代价
+    if(willDie){
+      score-=myWorth*0.8;
+      if(!willKill)score-=8;
+    }else if(willKill){
+      score+=4;
+    }
+    // 守护单位守家：血量安全时不主动出击送掉墙
+    if(attacker.hasG&&ai.hp>ai.maxHp*0.6&&!willDie&&!willKill)score-=6;
+    // 阵营交换偏好：以交换为主的阵营对己方阵亡更宽容
+    if(style.avoidTrade&&willDie)score-=myWorth*0.3;
     // 苏联：优先攻击低血量
-    if(style.targetLowestHp&&target.hp<=2)score+=4;
+    if(style.targetLowestHp&&target.hp<=2)score+=3;
+    return score;
+  },
+
+  // 打脸评分：与 _targetScore 同一量纲，可直接比较
+  _hqScore:function(attacker,ai,opp,ctx){
+    var style=this._getAIStyle(ai&&ai.fc);
+    var dmg=attacker.effectiveAtk;
+    // 本回合能斩杀（含多单位合力与直伤指令）→ 全力打脸
+    if(ctx&&ctx.aiCanLethal)return 1000;
+    // 这一击直接结束战斗
+    if(dmg>=opp.hp)return 1000;
+    // 每点伤害的基础价值由阵营打脸倾向决定（J 最激进 5.0，B/S 最保守 2.3）
+    var per=2.0+(style.attackHQWeight||0.5)*3.0;
+    var score=dmg*per+1; // +1：打脸零损耗，优于任何有风险的交换
+    // 按「打完之后敌方剩余血量」评估：越接近斩杀，这一击越值钱
+    var remain=opp.hp-dmg;
+    if(remain<=3)score*=3.0;
+    else if(remain<=6)score*=2.0;
+    else if(remain<=10)score*=1.4;
+    // 敌方下回合可斩杀我方，且本回合没有任何可击杀目标 → 只能搏命打脸
+    if(ctx&&ctx.oppHasLethal){
+      score*=ctx.canKillSomething?0.35:0.85;
+    }else if(ctx&&ctx.fieldLead>=8)score*=1.5;
+    else if(ctx&&ctx.fieldLead>=4)score*=1.2;
+    else if(ctx&&ctx.fieldLead<=-4)score*=0.6;
+    // 局面劣势时打脸收益下降（劣势更该先止血）
+    if(ctx&&ctx.board<-5)score*=0.75;
+    // 我方下回合即可斩杀 → 打脸推进
+    if(ctx&&ctx.aiHasLethal&&!ctx.oppHasLethal)score*=1.3;
+    // 闪击单位打脸更有意义
+    if(attacker.hasB)score*=1.1;
     return score;
   },
 
@@ -6248,81 +6315,60 @@ var GAME={
     // 4) 攻击（阵营风格增强版 v3）
     function smartAttack(){
       if(GAME.checkEnd())return;
-      var atkrs=en.allUnits().filter(function(c){return c.canStillAtk});
+      var atkrs=en.allUnits().filter(function(c){return c.canStillAtk&&en.cmd>=c.effAcost});
       if(!atkrs.length){aiEnd();return}
 
       var cfg2=AI_CONFIG[AI_LEVEL];
-      var lethal=cfg2.lethalCheck?self._calcLethal(en,pl):false;
       var isJapan=(en.fc==='J');
-      var atkHQWeight=style.attackHQWeight||0.5;
 
       if(cfg2.smartAtk){
         // ===== 中/困难：攻击规划 =====
-        var ai2=0;
         function stepFight(){
-          if(ai2>=atkrs.length||GAME.checkEnd()){aiEnd();return}
-          var a=atkrs[ai2++];if(!a.canStillAtk){stepFight();return}
-          var tgs=GAME.getTargets(a);if(!tgs.length){stepFight();return}
+          if(GAME.checkEnd()){aiEnd();return}
+          // 每轮重新扫描（不要用递增索引：攻击后单位可能阵亡导致数组缩短、索引错位漏人）
+          var atkrs2=en.allUnits().filter(function(c){return c.canStillAtk&&en.cmd>=c.effAcost});
+          if(!atkrs2.length){aiEnd();return}
 
-          // 日本：全员攻击总部（除非必须解守护才能打到）
-          if(isJapan&&atkHQWeight>=0.9){
-            var hqTarget=null;
-            for(var j=0;j<tgs.length;j++){if(tgs[j].card===null){hqTarget=tgs[j];break}}
-            if(hqTarget){
-              GAME.doAttack(a,hqTarget);GAME.render();
-              if(GAME.checkEnd())return;
-              atkrs=en.allUnits().filter(function(c){return c.canStillAtk});
-              setTimeout(stepFight,800);return;
-            }
-          }
-
-          // 斩杀检查
-          if(cfg2.lethalCheck&&self._calcLethal(en,pl)){
-            var hqTgt=null;
-            for(var k=0;k<tgs.length;k++){if(tgs[k].card===null){hqTgt=tgs[k];break}}
-            if(hqTgt){GAME.doAttack(a,hqTgt);GAME.render();if(GAME.checkEnd())return;setTimeout(stepFight,800);return}
-          }
-
-          // 场攻计算：用于判定解场/打脸策略
+          // 场攻/血线上下文（每轮刷新，前一次攻击已改变局面）
           var myFA=self._calcFieldAtk(en);
           var oppFA=self._calcFieldAtk(pl);
-          var aiHasLethal=myFA.total>=pl.hp; // AI下回合斩杀
-          var oppHasLethal=oppFA.total>=en.hp; // 敌方下回合斩杀
-          var aiFieldLead=myFA.total-oppFA.total; // 场攻差
-
-          // 构建候选目标列表（含阵营偏好）
-          var candidates=[];
-          tgs.forEach(function(t){
-            if(t.card===null){
-              var hqScore=50+(atkHQWeight*80); // 阵营打脸倾向加成
-              var board=self._evalBoard(en,pl);
-              if(board<-3)hqScore+=25;
-              if(pl.hp<=8)hqScore+=20;
-              if(a.effectiveAtk>=4)hqScore+=10;
-              // === 场攻决策 ===
-              if(aiHasLethal)hqScore+=200; // 能斩杀→全力打脸
-              if(oppHasLethal)hqScore-=60; // 敌方即将斩杀→优先解场
-              if(aiFieldLead>5)hqScore+=30; // 场攻碾压→放心打脸
-              if(aiFieldLead<-3)hqScore-=40; // 场攻落后→优先解场
-              candidates.push({t:t,score:hqScore});
-            }else{
-              var s=self._targetScore(a,t.card,en,pl);
-              candidates.push({t:t,score:s});
-            }
+          var ctx={
+            board:self._evalBoard(en,pl),
+            fieldLead:myFA.total-oppFA.total,
+            oppHasLethal:oppFA.total>=en.hp,
+            aiHasLethal:myFA.total>=pl.hp,
+            aiCanLethal:cfg2.lethalCheck&&self._calcLethal(en,pl),
+            canKillSomething:false
+          };
+          // 本回合是否存在可击杀目标：决定敌方斩杀威胁下是否还有解场价值
+          atkrs2.forEach(function(a){
+            if(ctx.canKillSomething)return;
+            GAME.getTargets(a).forEach(function(t){
+              if(t.card&&Math.max(0,a.effectiveAtk-(t.card.armor||0))>=t.card.hp)ctx.canKillSomething=true;
+            });
           });
 
-          // 找最高分
-          var best=null,bestScore=-9999;
-          candidates.forEach(function(ct){
-            if(ct.score>bestScore){bestScore=ct.score;best=ct.t;}
+          // 全局最优配对：遍历所有攻击者×目标，而不是按顺序取
+          var best=null,bestScore=-1e9;
+          atkrs2.forEach(function(a){
+            GAME.getTargets(a).forEach(function(t){
+              var sc;
+              if(t.card===null){
+                sc=(a.effectiveAtk>=pl.hp)?1000:self._hqScore(a,en,pl,ctx);
+              }else{
+                sc=self._targetScore(a,t.card,en,pl,ctx);
+              }
+              if(sc>bestScore){bestScore=sc;best={atk:a,tg:t,score:sc};}
+            });
           });
 
-          if(best){
-            GAME.doAttack(a,best);GAME.render();
-            if(GAME.checkEnd())return;
-            atkrs=en.allUnits().filter(function(c){return c.canStillAtk});
-            setTimeout(stepFight,800);
-          }else{stepFight()}
+          if(!best){aiEnd();return}
+          // 全部动作亏本：血量安全就按兵不动保存实力，危险时才硬打（避免白送）
+          if(bestScore<=0&&en.hp>en.maxHp*0.5&&!ctx.oppHasLethal){aiEnd();return}
+
+          GAME.doAttack(best.atk,best.tg);GAME.render();
+          if(GAME.checkEnd())return;
+          setTimeout(stepFight,800);
         }
         stepFight();
       }else{

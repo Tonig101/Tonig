@@ -300,41 +300,52 @@ function botMove(side, opp) {
   }
 }
 
-function attackScore(atk, ti, opp) {
-  const target = ti.card;
-  if (target === null) {
-    let s = 12;
-    const dmg = atk.effectiveAtk;
-    if (opp.hp - dmg <= 0) s += 100; // 斩杀
-    s += dmg * 0.5;
-    return s;
+function attackCtx(side, opp) {
+  const myFA = GAME._calcFieldAtk(side);
+  const oppFA = GAME._calcFieldAtk(opp);
+  const attackers = side.allUnits().filter(u => u.hp > 0 && u.canStillAtk && side.cmd >= u.effAcost);
+  const ctx = {
+    board: GAME._evalBoard(side, opp),
+    fieldLead: myFA.total - oppFA.total,
+    oppHasLethal: oppFA.total >= side.hp,
+    aiHasLethal: myFA.total >= opp.hp,
+    aiCanLethal: GAME._calcLethal(side, opp),
+    canKillSomething: false
+  };
+  for (const a of attackers) {
+    if (ctx.canKillSomething) break;
+    for (const t of GAME.getTargets(a)) {
+      if (t.card && Math.max(0, a.effectiveAtk - (t.card.armor || 0)) >= t.card.hp) {
+        ctx.canKillSomething = true; break;
+      }
+    }
   }
-  const atkDmg = Math.max(0, atk.effectiveAtk - target.armor);
-  const counterDmg = Math.max(0, target.effectiveAtk - atk.armor);
-  const canKill = atkDmg >= target.hp;
-  let s = target.effectiveAtk * 1.5 + target.hp;
-  if (canKill) s += 100;
-  if (target.hasG) s += 25;
-  if (!canKill && counterDmg >= atk.hp) s -= 200; // 避免自杀式换血
-  return s;
+  return { attackers, ctx };
+}
+
+// 攻击评分直接复用浏览器端同一套函数，避免两端策略漂移
+function attackScore(atk, ti, side, opp, ctx) {
+  if (ti.card === null) return (atk.effectiveAtk >= opp.hp) ? 1000 : GAME._hqScore(atk, side, opp, ctx);
+  return GAME._targetScore(atk, ti.card, side, opp, ctx);
 }
 
 function botAttack(side, opp) {
   let guard = 0;
   while (guard++ < 240) {
-    const attackers = side.allUnits()
-      .filter(u => u.hp > 0 && u.canStillAtk && u.owner.cmd >= u.effAcost);
+    const { attackers, ctx } = attackCtx(side, opp);
     if (!attackers.length) break;
     let best = null, bestScore = -Infinity;
     for (let i = 0; i < attackers.length; i++) {
       const atk = attackers[i];
       const targets = GAME.getTargets(atk);
       for (let j = 0; j < targets.length; j++) {
-        const sc = attackScore(atk, targets[j], opp);
+        const sc = attackScore(atk, targets[j], side, opp, ctx);
         if (sc > bestScore) { bestScore = sc; best = { atk: atk, ti: targets[j] }; }
       }
     }
     if (!best) break;
+    // 全部动作亏本：血量安全就按兵不动，避免白送
+    if (bestScore <= 0 && side.hp > side.maxHp * 0.5 && !ctx.oppHasLethal) break;
     GAME.doAttack(best.atk, best.ti);
     GAME.cleanup(side, 0);
     GAME.cleanup(opp, 0);
