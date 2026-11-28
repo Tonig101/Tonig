@@ -138,16 +138,41 @@ sandbox.playAttackLine = function () { return new Promise(function () {}); };
 GAME.enterTargetSelect = function (code, owner, sourceCard, onComplete) {
   const targets = GAME.getEffectTargets(code, owner);
   if (!targets.length) { if (onComplete) onComplete(); return; }
-  let t = null;
-  if (code.indexOf('pincer') === 0) {
-    const cands = targets.filter(u => u !== sourceCard && u.uid !== sourceCard.uid);
-    if (cands.length) t = cands.reduce((a, b) => (a.effectiveAtk + a.hp) >= (b.effectiveAtk + b.hp) ? a : b);
-  } else {
-    t = GAME.aiPickTarget(code, targets);
-  }
+  const t = GAME.aiPickTarget(code, targets, owner, sourceCard);
   if (!t) { if (onComplete) onComplete(); return; }
   GAME.resolveEffectOnTarget(code, owner, sourceCard, t);
   if (onComplete) onComplete();
+};
+
+// 让 forecast / develop 的三选一弹窗在无头模拟下自动结算（模拟 AI 从三张中随机选一张）
+GAME.forecastSelect = function (owner) {
+  if (!owner || owner.hand.length >= 9) return;
+  const types = ['clear', 'mist', 'storm'];
+  const type = types[Math.floor(Math.random() * 3)];
+  const pool = (GAME._forecastPool && GAME._forecastPool[type]) ? GAME._forecastPool[type].slice() : [];
+  if (!pool.length) return;
+  const picks = [];
+  while (picks.length < 3 && pool.length) {
+    picks.push(pool.splice(Math.floor(Math.random() * pool.length), 1)[0]);
+  }
+  const d = picks[Math.floor(Math.random() * picks.length)];
+  const c = new sandbox.Card(d);
+  c.owner = owner;
+  owner.hand.push(c);
+};
+
+GAME.developSelect = function (owner) {
+  if (!owner || owner.hand.length >= 9) return;
+  const orders = owner.deck.filter(c => c.isOrder);
+  if (!orders.length) return;
+  const pool = orders.slice();
+  const picks = [];
+  while (picks.length < 3 && pool.length) {
+    picks.push(pool.splice(Math.floor(Math.random() * pool.length), 1)[0]);
+  }
+  const pick = picks[Math.floor(Math.random() * picks.length)];
+  owner.deck = owner.deck.filter(c => c !== pick);
+  owner.hand.push(pick);
 };
 
 // 修正：同阵营内战时 data.active[faction] 无法同时表示双方不同卡组（先设玩家、后设敌方会互相覆盖），
@@ -199,6 +224,8 @@ function orderScore(c, side, opp) {
   if (/draw/.test(fx)) s += (side.hand.length <= 3 ? 6 : 2);
   if (/cmd1|cmd2/.test(fx)) s += 6;
   if (/heal/.test(fx)) s += (side.hp <= side.maxHp - 4 ? 5 : -15);
+  // 针对敌方高威胁单位的对策价值（与 index.html 的 AI 评分保持一致）
+  if (typeof GAME._counterValue === 'function') s += GAME._counterValue(c, side, opp);
   return s;
 }
 
@@ -398,8 +425,149 @@ function playOneGame(playerFc, playerDeckId, enemyFc, enemyDeckId, aiLevel, seed
   return { winner, turns: GAME.turn, violations };
 }
 
+// ---------------- 专项测试：被抑制时钳击失效 ----------------
+function runSuppressTest() {
+  const Card = sandbox.Card;
+  const assert = (cond, msg) => {
+    if (cond) return;
+    console.error('  ✗ 断言失败: ' + msg);
+    process.exitCode = 1;
+    throw new Error(msg);
+  };
+
+  seedGame(1);
+  DeckStore.__queueDeck(DeckStore.byId('D', 'r3'));
+  DeckStore.__queueDeck(DeckStore.byId('B', 'r0'));
+  GAME._initGame('D');
+  GAME.phase = 'play';
+
+  // ---- 用例1：抑制指令(suppressOrder)解除钳击（pincerArmor 重甲加成）----
+  const p1 = new Card(['钳击装甲兵','Pincer Panzergrenadier','D','I',4,4,4,1,0,'P','测试','pincerArmor',2]);
+  const pa1 = new Card(['国民掷弹兵','Volksgrenadier','D','I',2,2,1,1,0,'','','draw1']);
+  p1.owner = GAME.player; p1.zone = 'support'; p1.supSide = 'L'; p1.justDeployed = true; p1.justPlayed = true;
+  pa1.owner = GAME.player; pa1.zone = 'support'; pa1.supSide = 'R'; pa1.justDeployed = true; pa1.justPlayed = true;
+  GAME.player.support.push(p1, pa1);
+  GAME.resolveEffectOnTarget('pincerArmor', GAME.player, p1, pa1);
+  assert(pa1.atk === 3 && pa1.hp === 3 && pa1.maxHp === 3 && pa1.armor === 1,
+    '钳击结对后伙伴应为3/3重甲1（实际 ' + pa1.atk + '/' + pa1.hp + ' 甲' + pa1.armor + '）');
+  assert(p1.pincerPartnerUid === pa1.uid && pa1.pincerPartnerUid === p1.uid, '钳击应双向链接');
+
+  GAME.resolveEffectOnTarget('suppressOrder', GAME.player, null, p1);
+  assert(pa1.atk === 2 && pa1.hp === 2 && pa1.maxHp === 2 && pa1.armor === 0,
+    '抑制后伙伴应失去+1/+1与重甲（实际 ' + pa1.atk + '/' + pa1.hp + ' 甲' + pa1.armor + '）');
+  assert(pa1.pincerPartnerUid === 0 && p1.pincerPartnerUid === 0, '抑制后双方应断开钳击链接');
+  assert(p1.atk === 4 && p1.hp === 4 && p1.maxHp === 4 && p1.kw === '' && p1.armor === 0,
+    '被抑制单位应重置为4/4无词条无重甲（实际 ' + p1.atk + '/' + p1.hp + ' kw=' + p1.kw + ' 甲' + p1.armor + '）');
+
+  // ---- 用例2：攻击抑制(suppress)解除钳击（pincerGuard 守护加成）----
+  const p2 = new Card(['近卫钳击队','Guards Pincer Squad','S','I',2,3,2,1,0,'GP','测试','pincerGuard',2]);
+  const pa2 = new Card(['动员兵','Mobilized Infantry','S','I',1,1,1,1,0,'','','dr_dmg2',4]);
+  p2.owner = GAME.player; p2.zone = 'support'; p2.supSide = 'L'; p2.justDeployed = true; p2.justPlayed = true;
+  pa2.owner = GAME.player; pa2.zone = 'support'; pa2.supSide = 'R'; pa2.justDeployed = true; pa2.justPlayed = true;
+  GAME.player.support.push(p2, pa2);
+  GAME.resolveEffectOnTarget('pincerGuard', GAME.player, p2, pa2);
+  assert(pa2.atk === 2 && pa2.hp === 2 && pa2.hasG === true,
+    '守护钳击结对后伙伴应为2/2且有守护（实际 ' + pa2.atk + '/' + pa2.hp + ' G=' + pa2.hasG + '）');
+
+  const m18 = new Card(['M18地狱猫','M18 Hellcat','U','T',4,3,4,1,0,'B','','suppress',2]);
+  m18.owner = GAME.enemy; m18.zone = 'support'; m18.supSide = 'L'; m18.justDeployed = true; m18.justPlayed = true;
+  m18.canAct = true; m18.apSpent = 0; m18.attacksThisTurn = 0;
+  GAME.enemy.support.push(m18);
+  GAME.enemy.cmd = 10;
+  GAME.doAttack(m18, { card: p2, zone: 'support' });
+  assert(pa2.atk === 1 && pa2.hp === 1 && pa2.maxHp === 1 && pa2.hasG === false,
+    '攻击抑制后伙伴应失去+1/+1与守护（实际 ' + pa2.atk + '/' + pa2.hp + ' G=' + pa2.hasG + '）');
+  assert(pa2.pincerPartnerUid === 0 && p2.pincerPartnerUid === 0, '攻击抑制后双方应断开钳击链接');
+
+  // ---- 用例3：攻击抑制解除钳击（pincerShock 冲击加成）----
+  const p3 = new Card(['钳击突击队','Pincer Assault Team','J','I',3,2,2,1,0,'P','测试','pincerShock',2]);
+  const pa3 = new Card(['步兵小队','Infantry Squad','J','I',2,2,1,1,0,'B','','']);
+  p3.owner = GAME.player; p3.zone = 'support'; p3.supSide = 'L'; p3.justDeployed = true; p3.justPlayed = true;
+  pa3.owner = GAME.player; pa3.zone = 'support'; pa3.supSide = 'R'; pa3.justDeployed = true; pa3.justPlayed = true;
+  GAME.player.support.push(p3, pa3);
+  GAME.resolveEffectOnTarget('pincerShock', GAME.player, p3, pa3);
+  assert(pa3.atk === 3 && pa3.hp === 3 && pa3.hasC === true,
+    '冲击钳击结对后伙伴应为3/3且有冲击（实际 ' + pa3.atk + '/' + pa3.hp + ' C=' + pa3.hasC + '）');
+
+  const firefly = new Card(['萤火虫坦克','Sherman Firefly','B','T',5,5,5,2,1,'','','suppress',2]);
+  firefly.owner = GAME.enemy; firefly.zone = 'support'; firefly.supSide = 'R'; firefly.justDeployed = true; firefly.justPlayed = true;
+  firefly.canAct = true; firefly.apSpent = 0; firefly.attacksThisTurn = 0;
+  GAME.enemy.support.push(firefly);
+  GAME.enemy.cmd = 10;
+  GAME.doAttack(firefly, { card: p3, zone: 'support' });
+  assert(pa3.atk === 2 && pa3.hp === 2 && pa3.maxHp === 2 && pa3.hasC === false,
+    '攻击抑制后伙伴应失去+1/+1与冲击（实际 ' + pa3.atk + '/' + pa3.hp + ' C=' + pa3.hasC + '）');
+  assert(pa3.pincerPartnerUid === 0 && p3.pincerPartnerUid === 0, '攻击抑制后双方应断开钳击链接');
+
+  console.log('=== 专项：被抑制时钳击失效 ===');
+  console.log('  OK — 3 个用例全部通过（suppressOrder / M18攻击抑制 / 萤火虫攻击抑制，均正确解除双方钳击）');
+  clearQueue();
+}
+
+// ---------------- 专项测试：动员累积血量真实生效 ----------------
+function runMobilizeTest() {
+  const Card = sandbox.Card;
+  const applyDmg = sandbox._applyDmg;
+  const assert = (cond, msg) => {
+    if (cond) return;
+    console.error('  ✗ 断言失败: ' + msg);
+    process.exitCode = 1;
+    throw new Error(msg);
+  };
+
+  seedGame(1);
+  DeckStore.__queueDeck(DeckStore.byId('S', 'r0'));
+  DeckStore.__queueDeck(DeckStore.byId('B', 'r0'));
+  GAME._initGame('S');
+  GAME.phase = 'play';
+
+  const mob = new Card(['动员兵','Mobilized Infantry','S','I',1,1,1,1,0,'','动员（每回合累积+1/+1，受伤停止累积但数值保留）。亡计：对随机一个敌方单位造成2点伤害。','dr_dmg2',4,'mobilize']);
+  mob.owner = GAME.player; mob.zone = 'support'; mob.supSide = 'L';
+  GAME.player.support.push(mob);
+
+  assert(mob.atk === 1 && mob.hp === 1 && mob.maxHp === 1,
+    '初始应为1/1（实际 ' + mob.atk + '/' + mob.hp + ' max' + mob.maxHp + '）');
+
+  // 熬过己方回合：动员累积 +1/+1 应真正落到 atk/hp/maxHp
+  mob.resetTurn();
+  assert(mob.atk === 2 && mob.hp === 2 && mob.maxHp === 2,
+    '熬过1回合应真实 +1/+1 → 2/2（实际 ' + mob.atk + '/' + mob.hp + ' max' + mob.maxHp + '）');
+
+  mob.resetTurn();
+  assert(mob.atk === 3 && mob.hp === 3 && mob.maxHp === 3,
+    '熬过2回合应 3/3（实际 ' + mob.atk + '/' + mob.hp + ' max' + mob.maxHp + '）');
+
+  // 核心回归点：被打1点不应死，动员加的血必须有效
+  applyDmg(mob, 1);
+  assert(mob.hp === 2 && mob.hp > 0,
+    '被打1点后应剩2血、不死（实际 hp=' + mob.hp + '）');
+  assert(mob.mobStopped === true && mob.mobilized === false,
+    '受伤后应停止累积（mobStopped=' + mob.mobStopped + '）');
+
+  // 受伤后不再累积，但已获数值保留
+  mob.resetTurn();
+  assert(mob.atk === 3 && mob.maxHp === 3 && mob.hp === 2,
+    '受伤后回合开始不应再累积，已获数值保留（实际 ' + mob.atk + '/' + mob.hp + ' max' + mob.maxHp + '）');
+
+  // 被打致死点：3/2 再打2点 → hp=0 死亡（累计血量已真实参与结算）
+  applyDmg(mob, 2);
+  assert(mob.hp <= 0, '再打2点后应死亡（实际 hp=' + mob.hp + '）');
+
+  console.log('=== 专项：动员累积血量真实生效 ===');
+  console.log('  OK — 动员兵 1/1→3/3 真实叠加，被打1点不死，受伤停止累积且数值保留');
+  clearQueue();
+}
+
 // ---------------- 主流程 ----------------
 function main() {
+  if (args.indexOf('--test-suppress') >= 0) {
+    runSuppressTest();
+    return;
+  }
+  if (args.indexOf('--test-mobilize') >= 0) {
+    runMobilizeTest();
+    return;
+  }
   const factions = Object.keys(DEFAULT_DECKS);
   const decks = [];
   factions.forEach(fc => {
