@@ -323,6 +323,10 @@ body{background:var(--bg);color:var(--w);min-height:100vh;display:flex;justify-c
 .sim-fc-btn .sim-fc-name{font-size:.5rem;color:#888}
 .sim-fc-btn:hover{border-color:#7c4dff;color:#eee}
 .sim-fc-btn.selected{border-color:#7c4dff;background:rgba(124,77,255,.12);color:#b39ddb;box-shadow:0 0 0 2px rgba(124,77,255,.35)}
+.sim-deck-row{display:flex;justify-content:center;align-items:center;gap:6px;margin:2px 0 6px}
+.sim-deck-row .sim-deck-tag{font-size:.62rem;color:#777}
+.sim-deck-row select{background:#1e2030;color:#eee;border:1px solid #3a3f52;border-radius:6px;padding:5px 8px;font-size:.74rem;width:180px;cursor:pointer}
+.sim-deck-row select:focus{outline:none;border-color:#7c4dff}
 .sim-count-row{display:flex;align-items:center;justify-content:center;gap:10px;margin:14px 0}
 .sim-count-btn{width:36px;height:36px;border-radius:8px;border:2px solid #333;background:#1a1c28;color:#ccc;cursor:pointer;font-size:1.1rem;transition:all .2s}
 .sim-count-btn:hover{border-color:#7c4dff;color:#eee}
@@ -7993,6 +7997,7 @@ var SIM={
   running:false,
   _saved:null,
   _uiFcA:'D',_uiFcB:'S',_uiGames:20,
+  _uiDeckA:null,_uiDeckB:null,
 
   // ---- 指向性/三选一效果自动结算（无头模拟与可视化演示共用） ----
   _autoTargetSelect:function(code,owner,sourceCard,onComplete){
@@ -8268,9 +8273,16 @@ var SIM={
   },
 
   // ---- 公平对局初始化 ----
-  initGame:function(playerFc,enemyFc){
-    GAME.player=new Player('蓝方',playerFc,DeckStore.active(playerFc).cards);
-    GAME.enemy=new Player('红方',enemyFc,DeckStore.active(enemyFc).cards);
+  // deckA/deckB 可选：指定卡组 id（缺省或无效则用该阵营当前激活卡组）
+  _pickDeck:function(fc,id){
+    if(!id)return DeckStore.active(fc);
+    var d=DeckStore.byId(fc,id);
+    if(!d||!validateDeck(fc,d).ok)d=DeckStore.active(fc);
+    return d;
+  },
+  initGame:function(playerFc,enemyFc,deckA,deckB){
+    GAME.player=new Player('蓝方',playerFc,SIM._pickDeck(playerFc,deckA).cards);
+    GAME.enemy=new Player('红方',enemyFc,SIM._pickDeck(enemyFc,deckB).cards);
     GAME.turn=0;GAME.phase='play';
     GAME.selected=null;GAME.pendingPush=null;GAME.pendingEffect=null;GAME.pendingDeploy=null;GAME.pendingOrder=null;
     GAME.gameOver=false;
@@ -8302,11 +8314,11 @@ var SIM={
   },
 
   // ---- 单局自动对战 ----
-  playGame:function(playerFc,enemyFc){
+  playGame:function(playerFc,enemyFc,deckA,deckB){
     SIM.suppress();
     var snap=SIM._snapshot();
     try{
-      SIM.initGame(playerFc,enemyFc);
+      SIM.initGame(playerFc,enemyFc,deckA,deckB);
       var turnLimit=60;
       while(!GAME.gameOver&&GAME.turn<turnLimit){
         GAME.turn++;
@@ -8330,12 +8342,12 @@ var SIM={
   },
 
   // ---- 批量自动对战（逐局调度，避免阻塞 UI） ----
-  runSeries:function(playerFc,enemyFc,games,onProgress,onDone){
+  runSeries:function(playerFc,enemyFc,games,onProgress,onDone,deckA,deckB){
     var results={player:0,enemy:0,draw:0,timeout:0,detail:[]};
     var i=0;
     function step(){
       if(i>=games){if(onDone)onDone(results);return;}
-      var r=SIM.playGame(playerFc,enemyFc);
+      var r=SIM.playGame(playerFc,enemyFc,deckA,deckB);
       results[r.winner]=(results[r.winner]||0)+1;
       results.detail.push(r);
       i++;
@@ -8520,7 +8532,7 @@ var SIM={
   },
 
   // ---- 可视化演示主流程 ----
-  demoGame:async function(fcA,fcB){
+  demoGame:async function(fcA,fcB,deckA,deckB){
     var D=SIM.demo;
     D.running=true;D.paused=false;D.stopped=false;D.waiters=[];
     if(!D.speed)D.speed=1;
@@ -8536,7 +8548,7 @@ var SIM={
       $('sim-battle').style.display='none';
       $('overlay').classList.remove('show');
       $('log').innerHTML='';
-      SIM.initGame(fcA,fcB);
+      SIM.initGame(fcA,fcB,deckA,deckB);
       GAME.phase='demo';
       GAME.turn=0;
       $('handLabel').textContent='\uD83C\uDFAC 自动演示中（无需操作）';
@@ -8579,15 +8591,31 @@ var SIM={
   },
   _demoShowResult:function(winner){
     var st=$('demo-status');if(!st)return;
-    var aName=FA_DATA[SIM._uiFcA].name,bName=FA_DATA[SIM._uiFcB].name;
-    if(winner==='player')st.textContent='\uD83C\uDFC6 '+aName+'（蓝方）胜利 \u00b7 共'+GAME.turn+'回合';
-    else if(winner==='enemy')st.textContent='\uD83C\uDFC6 '+bName+'（红方）胜利 \u00b7 共'+GAME.turn+'回合';
+    var an=SIM._uiLabel('A'),bn=SIM._uiLabel('B');
+    if(winner==='player')st.textContent='\uD83C\uDFC6 '+an+'（蓝方）胜利 \u00b7 共'+GAME.turn+'回合';
+    else if(winner==='enemy')st.textContent='\uD83C\uDFC6 '+bn+'（红方）胜利 \u00b7 共'+GAME.turn+'回合';
     else if(winner==='draw')st.textContent='\uD83E\uDD1D 平局 \u00b7 共'+GAME.turn+'回合';
     else st.textContent='\u23F1 达到回合上限 \u00b7 未分胜负';
+  },
+  _uiLabel:function(side){
+    var fc=side==='A'?SIM._uiFcA:SIM._uiFcB;
+    var id=side==='A'?SIM._uiDeckA:SIM._uiDeckB;
+    var base=FA_DATA[fc].name;
+    if(!id)return base;
+    var d=DeckStore.byId(fc,id);
+    return d?(base+'·'+d.name):base;
   }
 };
 
 // ---- 模拟对战面板 ----
+GAME._simDeckOptions=function(fc,curId){
+  var list=DeckStore.list(fc),html='';
+  html+='<option value=""'+(curId?'':' selected')+'>默认（当前激活卡组）</option>';
+  list.forEach(function(d){
+    html+='<option value="'+d.id+'"'+(curId===d.id?' selected':'')+'>'+d.name+'</option>';
+  });
+  return html;
+};
 GAME.showSimBattle=function(){
   var el=$('sim-battle');
   var fkeys=['D','S','U','B','J'];
@@ -8597,11 +8625,13 @@ GAME.showSimBattle=function(){
     html+='<div class="sim-fc-btn'+(SIM._uiFcA===k?' selected':'')+'" onclick="GAME._simPickFc(\'A\',\''+k+'\')">'+FA_ICON[k]+'<span class="sim-fc-name">'+FA_DATA[k].name+'</span></div>';
   });
   html+='</div>';
+  html+='<div class="sim-deck-row"><span class="sim-deck-tag">卡组</span><select id="sim-deck-a" onchange="GAME._simPickDeck(\'A\',this.value)">'+GAME._simDeckOptions(SIM._uiFcA,SIM._uiDeckA)+'</select></div>';
   html+='<div class="sim-label" style="margin-top:12px">\uD83D\uDD34 红方（敌方位）</div><div class="sim-fc-grid">';
   fkeys.forEach(function(k){
     html+='<div class="sim-fc-btn'+(SIM._uiFcB===k?' selected':'')+'" onclick="GAME._simPickFc(\'B\',\''+k+'\')">'+FA_ICON[k]+'<span class="sim-fc-name">'+FA_DATA[k].name+'</span></div>';
   });
   html+='</div>';
+  html+='<div class="sim-deck-row"><span class="sim-deck-tag">卡组</span><select id="sim-deck-b" onchange="GAME._simPickDeck(\'B\',this.value)">'+GAME._simDeckOptions(SIM._uiFcB,SIM._uiDeckB)+'</select></div>';
   html+='<div class="sim-count-row"><span class="sim-label" style="margin:0">对战局数：</span>'
     +'<button class="sim-count-btn" onclick="GAME._simChangeCount(-10)">-10</button>'
     +'<button class="sim-count-btn" onclick="GAME._simChangeCount(-1)">-1</button>'
@@ -8620,8 +8650,11 @@ GAME.closeSimBattle=function(){
   $('sim-battle').innerHTML='';
 };
 GAME._simPickFc=function(side,fc){
-  if(side==='A')SIM._uiFcA=fc;else SIM._uiFcB=fc;
+  if(side==='A'){SIM._uiFcA=fc;SIM._uiDeckA=null;}else{SIM._uiFcB=fc;SIM._uiDeckB=null;}
   GAME.showSimBattle();
+};
+GAME._simPickDeck=function(side,id){
+  if(side==='A')SIM._uiDeckA=id||null;else SIM._uiDeckB=id||null;
 };
 GAME._simChangeCount=function(d){
   SIM._uiGames=Math.max(1,Math.min(500,SIM._uiGames+d));
@@ -8643,11 +8676,11 @@ GAME.runSimBattle=function(){
       SIM.running=false;
       if(btn){btn.disabled=false;btn.textContent='\u25B6 开始模拟';}
       GAME._simRenderResult(results);
-    });
+    },SIM._uiDeckA,SIM._uiDeckB);
 };
 GAME._simRenderResult=function(results){
   var res=$('sim-result');if(!res)return;
-  var aName=FA_DATA[SIM._uiFcA].name,bName=FA_DATA[SIM._uiFcB].name;
+  var aName=SIM._uiLabel('A'),bName=SIM._uiLabel('B');
   var total=results.player+results.enemy+results.draw+results.timeout;
   var pct=function(n){return total?Math.round(n/total*100):0;};
   var html='<b>模拟完成（共 '+total+' 局）</b><br>';
@@ -8667,11 +8700,11 @@ GAME.startSimDemo=function(){
   if(SIM.demo.running||SIM.running)return;
   GAME.closeSimBattle();
   GAME._demoShowBar();
-  SIM.demoGame(SIM._uiFcA,SIM._uiFcB);
+  SIM.demoGame(SIM._uiFcA,SIM._uiFcB,SIM._uiDeckA,SIM._uiDeckB);
 };
 GAME._demoShowBar=function(){
   var bar=$('demo-bar');if(!bar)return;
-  var aName=FA_DATA[SIM._uiFcA].name,bName=FA_DATA[SIM._uiFcB].name;
+  var aName=SIM._uiLabel('A'),bName=SIM._uiLabel('B');
   bar.innerHTML='<span class="db-title">\uD83C\uDFAC 演示对战</span>'
     +'<span class="db-vs">\uD83D\uDD35 '+aName+' vs \uD83D\uDD34 '+bName+'</span>'
     +'<button id="demo-pause-btn" onclick="GAME._demoTogglePause()">\u23F8 暂停</button>'
